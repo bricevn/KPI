@@ -310,7 +310,7 @@ public sealed class WebDashboard
         app.MapGet("/login", (HttpContext ctx) =>
         {
             if (ctx.User.Identity?.IsAuthenticated ?? false) return Results.Redirect("/");
-            return Results.Content(LoginView.Page(authCfg), "text/html; charset=utf-8");
+            return Results.Content(LoginView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
         }).AllowAnonymous().RequireRateLimiting("login");
 
         // Bouton « Se connecter avec GitLab » → challenge OAuth de l'instance configurée (Auth.Authority).

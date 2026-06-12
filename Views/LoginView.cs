@@ -20,13 +20,32 @@ namespace Kpi.Views;
 
 public static class LoginView
 {
-    /// <summary>Designed login page. OAuth button shown only when OAuth is configured.</summary>
-    public static string Page(AuthConfig auth)
+    /// <summary>Designed login page. OAuth button shown only when OAuth is configured. Bilingue FR/EN.</summary>
+    public static string Page(AuthConfig auth, string culture = "fr")
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
+        var en = culture == "en";
+        string T(string k) => Kpi.Localization.Loc.T(en ? "en" : "fr", k);
+        // Chaînes utilisées par le <script> inline (échappées en JSON valide, sûres en <script>).
+        var jsI18n = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["encryptedTo"] = T("login.encryptedTo"), ["encrypted"] = T("login.encrypted"),
+            ["errNoInstance"] = T("login.errNoInstance"), ["errNoToken"] = T("login.errNoToken"),
+            ["verifying"] = T("login.verifying"), ["signin"] = T("login.signin"),
+            ["cantConnect"] = T("login.cantConnect"), ["unreachable"] = T("login.unreachable"),
+        });
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
-            .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance));
+            .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
+            .Replace("__LANG__", en ? "en" : "fr")
+            .Replace("__JS_I18N__", jsI18n)
+            .Replace("__SW_FR__", en ? "" : "on").Replace("__SW_EN__", en ? "on" : "")
+            .Replace("__T_TAG1__", T("login.tag1")).Replace("__T_TAG2__", T("login.tag2"))
+            .Replace("__T_DESC__", T("login.desc")).Replace("__T_ENCRYPTED__", T("login.encrypted"))
+            .Replace("__T_WELCOME__", T("login.welcome")).Replace("__T_WELCOMESUB__", T("login.welcomeSub"))
+            .Replace("__T_INSTANCE__", T("login.instance")).Replace("__T_WITHGITLAB__", T("login.withGitlab"))
+            .Replace("__T_USETOKEN__", T("login.useToken")).Replace("__T_TOKENPERSONAL__", T("login.tokenPersonal"))
+            .Replace("__T_SIGNIN__", T("login.signin")).Replace("__T_TOKENNOTE__", T("login.tokenNote"));
     }
 
     /// <summary>Blank success page with a logout button.</summary>
@@ -39,7 +58,7 @@ public static class LoginView
     // ---------------------------------------------------------------- login
     private const string Html = """
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -67,6 +86,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
 .bgrid{position:absolute;inset:0;opacity:.5;background:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(circle at 30% 30%,#000,transparent 75%);}
 .split-form{flex:none;width:480px;background:var(--panel);display:flex;align-items:center;justify-content:center;padding:40px;border-left:1px solid var(--line);}
 .form-inner{width:100%;max-width:360px;}
+.lang-switch{display:flex;justify-content:flex-end;gap:6px;align-items:center;font-size:12px;margin-bottom:12px;color:var(--ink-faint);}
+.lang-switch a{color:var(--ink-faint);text-decoration:none;padding:2px 7px;border-radius:7px;}
+.lang-switch a.on{color:var(--ink);background:var(--panel-2);font-weight:600;}
+.lang-switch a:hover{color:var(--ink);}
 .brand{display:flex;align-items:center;gap:11px;position:relative;}
 .brand-mark{width:38px;height:38px;border-radius:11px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:none;}
 .brand-name{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.01em;line-height:1;}
@@ -144,7 +167,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
       <div><div class="brand-name">KPI</div><div class="brand-sub">Knowledge, Progress &amp; Impact</div></div>
     </div>
     <div>
-      <div class="split-tag">Vos KPI de release,<br><em>en temps réel.</em></div>
+      <div class="split-tag">__T_TAG1__<br><em>__T_TAG2__</em></div>
       <div class="bars" aria-hidden="true">
         <i><b style="height:42%;background:var(--accent)"></b></i>
         <i><b style="height:68%;background:var(--c-done)"></b></i>
@@ -154,18 +177,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
         <i><b style="height:96%;background:var(--gl-orange)"></b></i>
         <i><b style="height:61%;background:var(--accent)"></b></i>
       </div>
-      <div class="split-desc">Suivez l’avancement, le poids validé, la vélocité par collaborateur et les anomalies. Tout est synchronisé depuis GitLab à chaque rafraîchissement.</div>
+      <div class="split-desc">__T_DESC__</div>
     </div>
     <div class="brand-foot">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
-      <span id="footInstance">Connexion chiffrée</span>
+      <span id="footInstance">__T_ENCRYPTED__</span>
     </div>
   </div>
   <div class="split-form"><div class="form-inner">
-    <h1 class="a-title">Bienvenue</h1>
-    <p class="a-sub">Indiquez votre instance GitLab, puis connectez-vous.</p>
+    <div class="lang-switch"><a href="/set-lang?lang=fr&amp;return=/login" class="__SW_FR__">FR</a><span>·</span><a href="/set-lang?lang=en&amp;return=/login" class="__SW_EN__">EN</a></div>
+    <h1 class="a-title">__T_WELCOME__</h1>
+    <p class="a-sub">__T_WELCOMESUB__</p>
     <div class="fld">
-      <label class="fld-l" for="instance">Adresse GitLab</label>
+      <label class="fld-l" for="instance">__T_INSTANCE__</label>
       <div class="fld-box">
         <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
         <input id="instance" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://gitlab.exemple.com" value="__DEFAULT_INSTANCE__">
@@ -173,11 +197,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
     </div>
     <button class="gl-btn" id="oauthBtn" type="button">
       <span id="oauthIcon"><svg width="22" height="22" viewBox="0 0 380 380" aria-hidden="true"><path fill="#fff" opacity="0.95" d="M190 366 L259 154 H121 Z"></path><path fill="#fff" opacity="0.7" d="M190 366 L121 154 H24 Z"></path><path fill="#fff" opacity="0.5" d="M24 154 L3 219 a14 14 0 0 0 5 16 l182 131 Z"></path><path fill="#fff" opacity="0.7" d="M24 154 L53 64 a7 7 0 0 1 13 0 l55 90 Z"></path><path fill="#fff" opacity="0.95" d="M190 366 L259 154 h97 Z"></path><path fill="#fff" opacity="0.5" d="M356 154 l21 65 a14 14 0 0 1 -5 16 L190 366 Z"></path><path fill="#fff" opacity="0.7" d="M356 154 L327 64 a7 7 0 0 0 -13 0 l-55 90 Z"></path></svg></span>
-      <span id="oauthLabel">Se connecter avec GitLab</span>
+      <span id="oauthLabel">__T_WITHGITLAB__</span>
     </button>
-    <button class="reveal-link" id="revealBtn" type="button">Utiliser un token d’accès →</button>
+    <button class="reveal-link" id="revealBtn" type="button">__T_USETOKEN__</button>
     <div class="collapse" id="tokenWrap" style="max-height:0;opacity:0">
-      <div class="a-or">token d’accès personnel</div>
+      <div class="a-or">__T_TOKENPERSONAL__</div>
       <div class="a-err hidden" id="errBox">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg>
         <span id="errMsg"></span>
@@ -187,18 +211,19 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
         <input id="token" type="password" spellcheck="false" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" aria-label="Token d'accès personnel GitLab">
         <button class="eye" id="eyeBtn" type="button" title="Afficher / masquer" aria-label="Afficher ou masquer le token"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
       </div></div>
-      <button class="sub-btn" id="tokenBtn" type="button">Se connecter</button>
-      <div class="a-foot">Le token sert uniquement à vérifier votre identité. Il n’est pas conservé.</div>
+      <button class="sub-btn" id="tokenBtn" type="button">__T_SIGNIN__</button>
+      <div class="a-foot">__T_TOKENNOTE__</div>
     </div>
   </div></div>
 </div></div>
 <script>
 (function(){
   var OAUTH_CONFIGURED = __OAUTH__;
+  var I18N = __JS_I18N__;
   var $ = function(id){return document.getElementById(id);};
   var instance=$('instance'),token=$('token'),tokenWrap=$('tokenWrap'),oauthBtn=$('oauthBtn'),revealBtn=$('revealBtn'),tokenBtn=$('tokenBtn'),errBox=$('errBox'),errMsg=$('errMsg'),tokenBox=$('tokenBox'),footInstance=$('footInstance');
   function normInstance(){var v=(instance.value||'').trim().replace(/\/+$/,'');if(v&&!/^https?:\/\//i.test(v))v='https://'+v;return v;}
-  function syncFoot(){var v=normInstance();footInstance.textContent=v?('Connexion chiffrée à '+v.replace(/^https?:\/\//,'')):'Connexion chiffrée';}
+  function syncFoot(){var v=normInstance();footInstance.textContent=v?(I18N.encryptedTo+v.replace(/^https?:\/\//,'')):I18N.encrypted;}
   instance.addEventListener('input',syncFoot);syncFoot();
   function openToken(){tokenWrap.style.maxHeight='360px';tokenWrap.style.opacity='1';revealBtn.classList.add('hidden');setTimeout(function(){token.focus();},120);}
   revealBtn.addEventListener('click',openToken);
@@ -208,17 +233,17 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
   function clearError(){errBox.classList.add('hidden');tokenBox.classList.remove('err');}
   token.addEventListener('input',clearError);
   oauthBtn.addEventListener('click',function(){window.location.href='/auth/oauth';});
-  function resetTokenBtn(){tokenBtn.disabled=false;tokenBtn.textContent='Se connecter';}
+  function resetTokenBtn(){tokenBtn.disabled=false;tokenBtn.textContent=I18N.signin;}
   tokenBtn.addEventListener('click',function(){
     clearError();
     var inst=normInstance(),tok=(token.value||'').trim();
-    if(!inst){showError('Renseignez l’adresse de votre instance GitLab.');return;}
-    if(!tok){showError('Saisissez votre token d’accès personnel.');return;}
-    tokenBtn.disabled=true;tokenBtn.innerHTML='<span class="spin"></span> Vérification…';
+    if(!inst){showError(I18N.errNoInstance);return;}
+    if(!tok){showError(I18N.errNoToken);return;}
+    tokenBtn.disabled=true;tokenBtn.innerHTML='<span class="spin"></span> '+I18N.verifying;
     fetch('/api/auth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instance:inst,token:tok})})
       .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
-      .then(function(res){if(res.ok&&res.j&&res.j.ok){window.location.href='/';}else{resetTokenBtn();showError((res.j&&res.j.error)||'Connexion impossible.');}})
-      .catch(function(){resetTokenBtn();showError('Serveur injoignable. Réessayez.');});
+      .then(function(res){if(res.ok&&res.j&&res.j.ok){window.location.href='/';}else{resetTokenBtn();showError((res.j&&res.j.error)||I18N.cantConnect);}})
+      .catch(function(){resetTokenBtn();showError(I18N.unreachable);});
   });
   token.addEventListener('keydown',function(e){if(e.key==='Enter')tokenBtn.click();});
 })();
