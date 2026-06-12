@@ -27,6 +27,8 @@ window.buildAPP = function (D) {
   var TIMED = {};
   if (PERIODS.length) PERIODS.forEach(function (p) { if (p.timed) TIMED[p.key] = 1; });
   else TIMED = { dev: 1, review: 1, qawait: 1, qa: 1, tofix: 1, po: 1 };
+  // Clés de phase chronométrées, dans l'ordre admin — pilotent durées, colonnes pivot, moyennes.
+  var PHASE_KEYS = Object.keys(TIMED);
   var cfgLP = D.labelPhases || {};
   var PH_HAS_CFG = false, PH_MAP = {};
   Object.keys(cfgLP).forEach(function (k) { var v = cfgLP[k]; if (v && v !== 'none') { PH_MAP[String(k).toLowerCase()] = v; PH_HAS_CFG = true; } });
@@ -56,23 +58,24 @@ window.buildAPP = function (D) {
   // Durées de phase (ms ouvré), incluant To fix, + retours.
   function times(iss) {
     var e = evs(iss);
-    var acc = { dev: 0, review: 0, qawait: 0, qa: 0, tofix: 0, po: 0 };
-    var cnt = { dev: 0, review: 0, qawait: 0, qa: 0, tofix: 0, po: 0 };
-    var since = { dev: null, review: null, qawait: null, qa: null, tofix: null, po: null };
+    var acc = {}, cnt = {}, since = {};
+    PHASE_KEYS.forEach(function (k) { acc[k] = 0; cnt[k] = 0; since[k] = null; });
     var retours = 0;
-    // Comptage ÉQUILIBRÉ par phase : on accumule le temps ouvré tant qu'au moins un label de la phase
-    // est actif (gère plusieurs labels mappés sur la même phase). « To fix » → +1 retour à chaque ajout.
+    // Comptage ÉQUILIBRÉ par phase (clés DYNAMIQUES depuis la config) : on accumule le temps ouvré tant
+    // qu'au moins un label de la phase est actif. La phase de clé « tofix » → +1 retour à chaque ajout.
     for (var i = 0; i < e.length; i++) {
       var lo = (e[i].label || '').toLowerCase(), t = new Date(e[i].at).getTime(), add = e[i].action === 'add';
       if (isNaN(t)) continue;
       var ph = phaseOf(lo);
       if (!ph || !TIMED[ph]) continue;
+      if (acc[ph] === undefined) { acc[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
       if (add) { if (cnt[ph] === 0) since[ph] = t; cnt[ph]++; if (ph === 'tofix') retours++; }
       else if (cnt[ph] > 0) { cnt[ph]--; if (cnt[ph] === 0 && since[ph] !== null) { acc[ph] += workingMs(since[ph], t); since[ph] = null; } }
     }
     var days = function (ms) { return ms > 0 ? Math.round(ms / 36000000 * 10) / 10 : 0; };
-    var devD = days(acc.dev), revD = days(acc.review), qawD = days(acc.qawait), qaD = days(acc.qa), fixD = days(acc.tofix), poD = days(acc.po);
-    return { dev: devD, review: revD, qawait: qawD, qa: qaD, tofix: fixD, po: poD, total: devD + revD + qawD + qaD + fixD + poD, retours: retours };
+    var out = { total: 0, retours: retours };
+    Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; });
+    return out;
   }
   // Segment Gantt : même mapping label → phase que les durées (inclut uiux). phaseOf gère config + repli.
   function segKey(lo) { return phaseOf(lo); }
@@ -183,17 +186,16 @@ window.buildAPP = function (D) {
   });
 
   // ---------- agrégats par type (pivot) ----------
-  function blankAgg() { return { issues: 0, open: 0, closed: 0, appr: 0, wV: 0, wNV: 0, dev: 0, rev: 0, qawait: 0, qa: 0, tofix: 0, po: 0, ret: 0, comm: 0, _n: { dev: 0, rev: 0, qawait: 0, qa: 0, tofix: 0, po: 0 } }; }
+  // Agrégats par groupe : moyennes de phase indexées par CLÉ DYNAMIQUE (g[phaseKey]). Plus d'alias « rev ».
+  function blankAgg() { var g = { issues: 0, open: 0, closed: 0, appr: 0, wV: 0, wNV: 0, ret: 0, comm: 0, _n: {} }; PHASE_KEYS.forEach(function (k) { g[k] = 0; g._n[k] = 0; }); return g; }
   function addToAgg(g, d) {
     g.issues++; if (d.state === 'closed') g.closed++; else g.open++;
     if (d.approval) g.appr++;
     if (d.validated) g.wV += d.weight; else g.wNV += d.weight;
     g.ret += d.retours; g.comm += d.comments;
-    var tm = d._times; ['dev', 'rev', 'qawait', 'qa', 'tofix', 'po'].forEach(function (k) {
-      var src = k === 'rev' ? 'review' : k; if (tm[src] > 0) { g[k] += tm[src]; g._n[k]++; }
-    });
+    var tm = d._times; PHASE_KEYS.forEach(function (k) { if (tm[k] > 0) { g[k] += tm[k]; g._n[k]++; } });
   }
-  function finishAgg(g) { ['dev', 'rev', 'qawait', 'qa', 'tofix', 'po'].forEach(function (k) { g[k] = g._n[k] > 0 ? Math.round(g[k] / g._n[k] * 10) / 10 : 0; }); delete g._n; return g; }
+  function finishAgg(g) { PHASE_KEYS.forEach(function (k) { g[k] = g._n[k] > 0 ? Math.round(g[k] / g._n[k] * 10) / 10 : 0; }); delete g._n; return g; }
   var pivotMap = {};
   detail.forEach(function (d) { if (!d.type) return; if (!pivotMap[d.type]) pivotMap[d.type] = Object.assign({ key: d.type }, blankAgg()); addToAgg(pivotMap[d.type], d); });
   var pivot = Object.keys(pivotMap).map(function (k) { return finishAgg(pivotMap[k]); }).sort(function (a, b) { return b.issues - a.issues; });

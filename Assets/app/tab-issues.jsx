@@ -4,7 +4,10 @@
   const { useState } = React;
   const A = window.APP;
   const LABEL = { uiux: 'Prod::UI/UX', dev: 'Prod::Code In Progress', review: 'Prod::Code review', qawait: 'Prod::QA Backlog', qa: 'Prod::QA InProgress', tofix: 'Prod::To Fix', po: 'Prod:: PO Validation' };
-  const PHASE_OF = { 'Prod::UI/UX': 'uiux', 'Prod::Code In Progress': 'dev', 'Prod::Code review': 'review', 'Prod::QA Backlog': 'qawait', 'Prod::QA InProgress': 'qa', 'Prod::To Fix': 'tofix', 'Prod:: PO Validation': 'po' };
+  // Mapping label→phase PILOTÉ par la config (window.__DATA__.labelPhases) ; repli sur le mapping standard.
+  const PHASE_OF = (window.__DATA__ && window.__DATA__.labelPhases && Object.keys(window.__DATA__.labelPhases).length)
+    ? window.__DATA__.labelPhases
+    : { 'Prod::UI/UX': 'uiux', 'Prod::Code In Progress': 'dev', 'Prod::Code review': 'review', 'Prod::QA Backlog': 'qawait', 'Prod::QA InProgress': 'qa', 'Prod::To Fix': 'tofix', 'Prod:: PO Validation': 'po' };
 
   function labelColor(l, d) {
     if (l.startsWith('Type::')) return window.typeColor(d.type);

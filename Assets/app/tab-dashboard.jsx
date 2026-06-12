@@ -88,12 +88,7 @@
                 <Th k="issues" num hint={t('tbl.hIssues')}>{t('tbl.issuesOF')}</Th>
                 <Th k="wpc" num hint={t('tbl.hWeight')}>{t('tbl.weightVT')}</Th>
                 <Th k="apc" num hint={t('tbl.hApprovals')}>{t('tbl.approvalsFN')}</Th>
-                <Th k="dev" num unit={t('unit_day')} hint={t('tbl.hDev')}>{t('tbl.dev')}</Th>
-                <Th k="rev" num unit={t('unit_day')} hint={t('tbl.hReview')}>{t('tbl.review')}</Th>
-                <Th k="qawait" num unit={t('unit_day')} hint={t('tbl.hQaWait')}>{t('tbl.qaWait')}</Th>
-                <Th k="qa" num unit={t('unit_day')} hint={t('tbl.hQa')}>{t('tbl.qa')}</Th>
-                <Th k="tofix" num unit={t('unit_day')} hint={t('tbl.hToFix')}>{t('tbl.toFix')}</Th>
-                <Th k="po" num unit={t('unit_day')} hint={t('tbl.hPo')}>{t('tbl.po')}</Th>
+                {A.phases.map((ph) => <Th key={ph.key} k={ph.key} num unit={t('unit_day')}>{ph.name}</Th>)}
                 <Th k="ret" num hint={t('tbl.hReturns')}>{t('tbl.returns')}</Th>
                 <Th k="comm" num hint={t('tbl.hComments')}>{t('tbl.comments')}</Th>
               </tr></thead>
@@ -104,8 +99,7 @@
                     <td><span className="oc"><span className="o">{r.open}</span><s>/</s><span className="c">{r.closed}</span></span></td>
                     <td><span className="oc"><span className="c">{r.wV}</span><s>/</s><span className="o">{r.wV + r.wNV}</span></span></td>
                     <td><span className="oc"><span className="c">{r.appr}</span><s>/</s><span className="o">{r.issues - r.appr}</span></span></td>
-                    <td>{r.dev.toFixed(1)}</td><td>{r.rev.toFixed(1)}</td><td>{r.qawait.toFixed(1)}</td>
-                    <td>{r.qa.toFixed(1)}</td><td>{r.tofix.toFixed(1)}</td><td>{r.po.toFixed(1)}</td>
+                    {A.phases.map((ph) => <td key={ph.key}>{(r[ph.key] || 0).toFixed(1)}</td>)}
                     <td>{r.ret}</td><td>{r.comm}</td>
                   </tr>
                 )}
@@ -114,7 +108,7 @@
                   <td><span className="oc"><span className="o">{T.open}</span><s>/</s><span className="c">{T.closed}</span></span></td>
                   <td><span className="oc"><span className="c">{T.wV}</span><s>/</s><span className="o">{T.weight}</span></span></td>
                   <td><span className="oc"><span className="c">{K.approvals.with}</span><s>/</s><span className="o">{T.issues - K.approvals.with}</span></span></td>
-                  <td>{(pa.dev || 0).toFixed(1)}</td><td>{(pa.review || 0).toFixed(1)}</td><td>{(pa.qawait || 0).toFixed(1)}</td><td>{(pa.qa || 0).toFixed(1)}</td><td>{(pa.tofix || 0).toFixed(1)}</td><td>{(pa.po || 0).toFixed(1)}</td>
+                  {A.phases.map((ph) => <td key={ph.key}>{(pa[ph.key] || 0).toFixed(1)}</td>)}
                   <td>{T.ret}</td><td>{tComm}</td>
                 </tr>
               </tbody>

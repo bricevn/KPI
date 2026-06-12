@@ -3,9 +3,8 @@
 (function () {
   const { useState } = React;
   const A = window.APP;
-  const PH = [
-  { k: 'dev', pk: 'dev' }, { k: 'rev', pk: 'review' }, { k: 'qawait', pk: 'qawait' },
-  { k: 'qa', pk: 'qa' }, { k: 'tofix', pk: 'tofix' }, { k: 'po', pk: 'po' }];
+  // Phases DYNAMIQUES (clés config) : k = pk = clé de phase (plus d'alias 'rev').
+  const PH = (A.phases || []).map((ph) => ({ k: ph.key, pk: ph.key }));
 
   const FIB = A.FIB;
 

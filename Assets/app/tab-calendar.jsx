@@ -2,7 +2,8 @@
 (function () {
   const { useState } = React;
   const A = window.APP,DAYS = A.cal.DAYS,TODAY = A.cal.TODAY;
-  const PHASES = ['uiux', 'dev', 'review', 'qawait', 'qa', 'tofix', 'po'];
+  // TOUTES les phases (segments Gantt) — y compris non chronométrées (uiux) — depuis la config ; repli standard.
+  const PHASES = (A.periods && A.periods.length) ? A.periods.map((p) => p.key) : ['uiux', 'dev', 'review', 'qawait', 'qa', 'tofix', 'po'];
   const pos = (d) => d / DAYS * 100;
 
   window.TabCalendar = function TabCalendar() {
