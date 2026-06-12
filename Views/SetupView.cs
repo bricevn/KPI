@@ -16,10 +16,15 @@ namespace Kpi.Views;
 
 public static class SetupView
 {
-    public static string Page(AuthConfig auth)
+    public static string Page(AuthConfig auth, string culture = "fr")
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
-        return Html.Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance));
+        var en = culture == "en";
+        return Html
+            .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
+            .Replace("__SLANG__", en ? "en" : "fr")
+            .Replace("__SW_FR__", en ? "" : "on")
+            .Replace("__SW_EN__", en ? "on" : "");
     }
 
     private static string HtmlAttr(string s) =>
@@ -53,6 +58,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .bn{font-family:var(--disp);font-weight:700;font-size:16px;line-height:1;}
 .bs{font-size:11px;color:var(--ink-faint);margin-top:3px;}
 .count{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--ink-faint);}
+.topright{display:flex;align-items:center;gap:18px;}
+.lang-switch{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-faint);}
+.lang-switch a{color:var(--ink-faint);text-decoration:none;padding:2px 7px;border-radius:7px;}
+.lang-switch a.on{color:var(--ink);background:var(--panel-2);font-weight:600;}
+.lang-switch a:hover{color:var(--ink);}
 .step{padding:30px 36px 8px;}
 .stepper{display:flex;align-items:center;max-width:760px;margin:0 auto;}
 .node{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none;width:96px;}
@@ -196,7 +206,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
   var phaseColor=function(k){if(k==='none')return NONE_COLOR;for(var i=0;i<ST.phases.length;i++)if(ST.phases[i].id===k)return ST.phases[i].color;return NONE_COLOR;};
-  var STEP_META=[['Connexion','link'],['Projets','box'],['Phases','layers'],['Équipes','users'],['Vérif.','rocket']];
   var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'};
   function ic(n,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
   var MARK='<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="13" width="4.2" height="7" rx="1.4" fill="#fff" opacity="0.82"/><rect x="9.9" y="9" width="4.2" height="11" rx="1.4" fill="#fff" opacity="0.92"/><rect x="16.8" y="4.5" width="4.2" height="15.5" rx="1.4" fill="#fff"/><path d="M4 8.5 L11 6 L19 2.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><circle cx="19" cy="2.5" r="1.7" fill="#fff"/></svg>';
@@ -205,6 +214,82 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function avColor(id){var s=0;for(var i=0;i<id.length;i++)s+=id.charCodeAt(i);return AVC[s%AVC.length];}
   function av(id,name,sz){sz=sz||24;var ini=(name||id||'?').charAt(0).toUpperCase();return '<span class="av" style="width:'+sz+'px;height:'+sz+'px;font-size:'+(sz*0.46)+'px;background:'+avColor(id)+'">'+esc(ini)+'</span>';}
   function guessPhase(l){l=l.toLowerCase();if(l.indexOf('code')>=0&&l.indexOf('progress')>=0)return 'dev';if(l.indexOf('review')>=0)return 'review';if(l.indexOf('backlog')>=0)return 'qawait';if(l.indexOf('qa')>=0&&l.indexOf('progress')>=0)return 'qa';if(l.indexOf('to fix')>=0)return 'tofix';if(l.indexOf('validation')>=0||/\bpo\b/.test(l))return 'po';if(l.indexOf('ui/ux')>=0)return 'uiux';return 'none';}
+
+  // ---- i18n (FR/EN) ----
+  var SLANG='__SLANG__';
+  var I18N={
+    fr:{
+      bs:"Mise en service", stepOf:"Étape {n} sur 5",
+      back:"Retour", continue:"Continuer", launch:"Lancer le dashboard", saving:"Enregistrement…",
+      stepConnexion:"Connexion", stepProjets:"Projets", stepPhases:"Phases", stepEquipes:"Équipes", stepVerif:"Vérif.",
+      eb1:"Étape 1 · Connexion", eb2:"Étape 2 · Projets", eb3:"Étape 3 · Phases", eb4:"Étape 4 · Équipes", eb5:"Étape 5 · Vérification",
+      ht1:"Connexion à GitLab", ht2:"Projets à importer", ht3:"Phases de production", ht4:"Équipes", ht5:"Tout est prêt",
+      hs1:"Renseignez l'instance et un token de service pour permettre l'extraction des données.",
+      hs2:"Choisissez les projets à suivre par défaut. La liste provient de la connexion testée.",
+      hs3:"Associez les labels qui représentent une phase de production ; laissez « Non suivi » pour les autres.",
+      hs4:"Vérifiez les équipes importées (groupes GitLab) et ajustez si besoin.",
+      hs5:"Vérifiez la configuration. Vous pourrez tout modifier ensuite dans Options.",
+      baseUrl:"Base URL", serviceToken:"Token de service",
+      tokenHint:"Scope read_api. Stocké côté serveur pour l'extraction, jamais affiché aux utilisateurs.",
+      timeout:"Timeout (s)", timeoutHint:"Délai max d'une requête à l'API.",
+      selfSigned:"Certificats auto-signés", selfSignedSub:"Pour les instances internes",
+      testConn:"Tester la connexion", testing:"Test en cours…",
+      connected:"Connecté · ", accessibleProjects:" projets accessibles",
+      testFailed:"Échec · vérifiez l'URL et le token", notTested:"Non testé",
+      requiredField:"champ obligatoire · une connexion réussie est requise pour continuer.",
+      projSelectedOf:" projet(s) sélectionné(s) sur ", accessible:" accessibles.",
+      loadingLabels:"Chargement des labels des projets sélectionnés…",
+      prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
+      phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
+      labelMapping:"Association des labels", notTracked:"Non suivi",
+      teamsIntro:"Équipes importées depuis les <b>groupes GitLab</b>. <b>Lead</b> = Maintainer · <b>Membre</b> = Developer. Un membre peut appartenir à <b>plusieurs équipes</b>.",
+      glGroup:"groupe GitLab", newTeam:"nouvelle", noMembers:"Aucun membre — ajoutez-en ci-dessous",
+      addMember:"Ajouter un membre…", newTeamName:"Nouvelle équipe", roleLead:"Lead", roleMember:"Membre",
+      none:"Aucun", labelsLinked:" labels liés à une phase", teamsCount:" équipes · ", peopleCount:" personnes", edit:"Modifier",
+      starting:"Démarrage…", extracting:"Extraction des données · vous pouvez laisser cette page ouverte",
+      left:" restant", done:"Terminé — ouverture du dashboard…", failed:"Échec : ", cancel:"Annuler",
+      backToConfig:"Revenir à la configuration",
+      saveImpossible:"Enregistrement impossible.", serverUnreachable:"Serveur injoignable.",
+      newPhase:"Nouvelle phase", extractingShort:"Extraction…"
+    },
+    en:{
+      bs:"Setup", stepOf:"Step {n} of 5",
+      back:"Back", continue:"Continue", launch:"Launch dashboard", saving:"Saving…",
+      stepConnexion:"Connection", stepProjets:"Projects", stepPhases:"Phases", stepEquipes:"Teams", stepVerif:"Review",
+      eb1:"Step 1 · Connection", eb2:"Step 2 · Projects", eb3:"Step 3 · Phases", eb4:"Step 4 · Teams", eb5:"Step 5 · Verification",
+      ht1:"Connect to GitLab", ht2:"Projects to import", ht3:"Production phases", ht4:"Teams", ht5:"All set",
+      hs1:"Enter the instance and a service token to allow data extraction.",
+      hs2:"Choose the projects to track by default. The list comes from the tested connection.",
+      hs3:"Map the labels that represent a production phase; leave \"Not tracked\" for the others.",
+      hs4:"Review the imported teams (GitLab groups) and adjust if needed.",
+      hs5:"Review the configuration. You can change everything later in Options.",
+      baseUrl:"Base URL", serviceToken:"Service token",
+      tokenHint:"Scope read_api. Stored server-side for extraction, never shown to users.",
+      timeout:"Timeout (s)", timeoutHint:"Max delay for an API request.",
+      selfSigned:"Self-signed certificates", selfSignedSub:"For internal instances",
+      testConn:"Test connection", testing:"Testing…",
+      connected:"Connected · ", accessibleProjects:" accessible projects",
+      testFailed:"Failed · check URL and token", notTested:"Not tested",
+      requiredField:"required field · a successful connection is required to continue.",
+      projSelectedOf:" project(s) selected of ", accessible:" accessible.",
+      loadingLabels:"Loading labels…",
+      prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
+      phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
+      labelMapping:"Label mapping", notTracked:"Not tracked",
+      teamsIntro:"Teams imported from <b>GitLab groups</b>. <b>Lead</b> = Maintainer · <b>Member</b> = Developer. A member can belong to <b>several teams</b>.",
+      glGroup:"GitLab group", newTeam:"new", noMembers:"No members — add some below",
+      addMember:"Add a member…", newTeamName:"New team", roleLead:"Lead", roleMember:"Member",
+      none:"None", labelsLinked:" labels linked to a phase", teamsCount:" teams · ", peopleCount:" people", edit:"Edit",
+      starting:"Starting…", extracting:"Extracting data · you can leave this page open",
+      left:" left", done:"Done — opening dashboard…", failed:"Failed: ", cancel:"Cancel",
+      backToConfig:"Back to configuration",
+      saveImpossible:"Could not save.", serverUnreachable:"Server unreachable.",
+      newPhase:"New phase", extractingShort:"Extracting…"
+    }
+  };
+  var T=I18N[SLANG]||I18N.fr;
+  var STEP_META=[[T.stepConnexion,'link'],[T.stepProjets,'box'],[T.stepPhases,'layers'],[T.stepEquipes,'users'],[T.stepVerif,'rocket']];
+  var LANG_SWITCH='<div class="lang-switch"><a href="/set-lang?lang=fr&amp;return=/setup" class="__SW_FR__">FR</a><span>·</span><a href="/set-lang?lang=en&amp;return=/setup" class="__SW_EN__">EN</a></div>';
 
   var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',timeout:'60',selfSigned:false,showTok:false,
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},
@@ -216,19 +301,19 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   function render(){
     if(ST.launching){app.innerHTML=launchHtml();return;}
-    var h='<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">Mise en service</div></div></div><div class="count">Étape '+(ST.step+1)+' sur 5</div></div>';
+    var h='<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright"><div class="count">'+T.stepOf.replace('{n}',ST.step+1)+'</div>'+LANG_SWITCH+'</div></div>';
     h+='<div class="step"><div class="stepper">';
     for(var i=0;i<STEP_META.length;i++){var st=i<ST.step?'done':i===ST.step?'cur':'';h+='<div class="node '+st+'" data-act="goto:'+i+'"><div class="dot">'+(i<ST.step?ic('check',16):(i+1))+'</div><div class="nl">'+STEP_META[i][0]+'</div></div>';if(i<STEP_META.length-1)h+='<div class="line'+(i<ST.step?' done':'')+'"></div>';}
     h+='</div></div><div class="body" id="body"><div class="bodyinner"><div class="card" style="max-width:'+[560,600,640,780,600][ST.step]+'px">'+head()+stepBody()+'</div></div></div>';
-    h+='<div class="foot"><button class="btn ghost'+(ST.step===0?' disabled':'')+'" data-act="back">'+ic('chevL',16)+'Retour</button>';
-    if(ST.step===4)h+='<button class="btn primary'+(ST.saving?' disabled':'')+'" data-act="launch">'+(ST.saving?'<span class="spin"></span>Enregistrement…':ic('rocket',16)+'Lancer le dashboard')+'</button>';
-    else h+='<button class="btn primary'+(canNext()?'':' disabled')+'" data-act="next">Continuer '+ic('chevR',16)+'</button>';
+    h+='<div class="foot"><button class="btn ghost'+(ST.step===0?' disabled':'')+'" data-act="back">'+ic('chevL',16)+T.back+'</button>';
+    if(ST.step===4)h+='<button class="btn primary'+(ST.saving?' disabled':'')+'" data-act="launch">'+(ST.saving?'<span class="spin"></span>'+T.saving:ic('rocket',16)+T.launch)+'</button>';
+    else h+='<button class="btn primary'+(canNext()?'':' disabled')+'" data-act="next">'+T.continue+' '+ic('chevR',16)+'</button>';
     h+='</div></div>';
     app.innerHTML=h;
   }
   function head(){
-    var meta=[['Étape 1 · Connexion','Connexion à GitLab','link'],['Étape 2 · Projets','Projets à importer','box'],['Étape 3 · Phases','Phases de production','layers'],['Étape 4 · Équipes','Équipes','users'],['Étape 5 · Vérification','Tout est prêt','rocket']][ST.step];
-    var subs=["Renseignez l'instance et un token de service pour permettre l'extraction des données.","Choisissez les projets à suivre par défaut. La liste provient de la connexion testée.","Associez les labels qui représentent une phase de production ; laissez « Non suivi » pour les autres.","Vérifiez les équipes importées (groupes GitLab) et ajustez si besoin.","Vérifiez la configuration. Vous pourrez tout modifier ensuite dans Options."];
+    var meta=[[T.eb1,T.ht1,'link'],[T.eb2,T.ht2,'box'],[T.eb3,T.ht3,'layers'],[T.eb4,T.ht4,'users'],[T.eb5,T.ht5,'rocket']][ST.step];
+    var subs=[T.hs1,T.hs2,T.hs3,T.hs4,T.hs5];
     return '<div class="cardhead"><div class="hero">'+ic(meta[2],28)+'</div><div><div class="eyebrow">'+meta[0]+'</div><h2 class="h">'+meta[1]+'</h2></div></div><p class="sub">'+subs[ST.step]+'</p>';
   }
 
@@ -240,59 +325,59 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     return s4();
   }
   function s0(){
-    var chip=ST.test==='testing'?'<span class="chip neutral"><span class="spin"></span>Test en cours…</span>':ST.test==='ok'?'<span class="chip ok">'+ic('check',14)+'Connecté · '+ST.projects.length+' projets accessibles</span>':ST.test==='err'?'<span class="chip err">Échec · vérifiez l\u0027URL et le token</span>':'<span class="chip neutral">Non testé</span>';
-    return '<div class="field"><div class="flabel">Base URL <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
-      +'<div class="field"><div class="flabel">Token de service <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div><div class="fhint">Scope <b>read_api</b>. Stocké côté serveur pour l\u0027extraction, jamais affiché aux utilisateurs.</div></div>'
-      +'<div style="display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:start"><div class="field"><div class="flabel">Timeout (s)</div><div class="box"><input data-field="timeout" value="'+esc(ST.timeout)+'"></div><div class="fhint">Délai max d\u0027une requête à l\u0027API.</div></div>'
-      +'<div class="togrow" style="margin-top:26px"><button class="tog'+(ST.selfSigned?' on':'')+'" data-act="self"><b></b></button><div><div class="tt">Certificats auto-signés</div><div class="ts">Pour les instances internes</div></div></div></div>'
-      +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+'Tester la connexion</button>'+chip+'</div>'
-      +'<div class="req"><span class="r">*</span> champ obligatoire · une connexion réussie est requise pour continuer.</div>';
+    var chip=ST.test==='testing'?'<span class="chip neutral"><span class="spin"></span>'+T.testing+'</span>':ST.test==='ok'?'<span class="chip ok">'+ic('check',14)+T.connected+ST.projects.length+T.accessibleProjects+'</span>':ST.test==='err'?'<span class="chip err">'+T.testFailed+'</span>':'<span class="chip neutral">'+T.notTested+'</span>';
+    return '<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
+      +'<div class="field"><div class="flabel">'+T.serviceToken+' <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div><div class="fhint">'+T.tokenHint+'</div></div>'
+      +'<div style="display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:start"><div class="field"><div class="flabel">'+T.timeout+'</div><div class="box"><input data-field="timeout" value="'+esc(ST.timeout)+'"></div><div class="fhint">'+T.timeoutHint+'</div></div>'
+      +'<div class="togrow" style="margin-top:26px"><button class="tog'+(ST.selfSigned?' on':'')+'" data-act="self"><b></b></button><div><div class="tt">'+T.selfSigned+'</div><div class="ts">'+T.selfSignedSub+'</div></div></div></div>'
+      +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+T.testConn+'</button>'+chip+'</div>'
+      +'<div class="req"><span class="r">*</span> '+T.requiredField+'</div>';
   }
   function s1(){
-    var h='<div class="note">'+sic('info')+'<div><b>'+ST.importIds.length+'</b> projet(s) sélectionné(s) sur '+ST.projects.length+' accessibles.</div></div><div class="checklist">';
+    var h='<div class="note">'+sic('info')+'<div><b>'+ST.importIds.length+'</b>'+T.projSelectedOf+ST.projects.length+T.accessible+'</div></div><div class="checklist">';
     for(var i=0;i<ST.projects.length;i++){var p=ST.projects[i];var on=ST.importIds.indexOf(p.id)>=0;h+='<button class="chk'+(on?' on':'')+'" data-act="proj:'+p.id+'"><span class="chkbox">'+(on?ic('check',13):'')+'</span><span class="chkl">'+esc(p.name)+'<b>#'+p.id+'</b></span><span class="grp">'+esc(p.group||'')+'</span></button>';}
     return h+'</div>';
   }
   function s2(){
-    if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>Chargement des labels des projets sélectionnés…</div></div>';
-    var h='<div class="note">'+sic('info')+'<div><span class="prereq">Prérequis</span> Seuls les labels <b>Prod::</b> sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.</div></div>';
+    if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>'+T.loadingLabels+'</div></div>';
+    var h='<div class="note">'+sic('info')+'<div><span class="prereq">'+T.prereq+'</span> '+T.prereqText+'</div></div>';
     // Éditeur de phases : couleur (palette), nom éditable, suppression.
-    h+='<div class="subh">Phases <span class="subc">'+ST.phases.length+'</span></div><div class="phases">';
+    h+='<div class="subh">'+T.phases+' <span class="subc">'+ST.phases.length+'</span></div><div class="phases">';
     for(var i=0;i<ST.phases.length;i++){var p=ST.phases[i];
-      h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="Changer la couleur"></button>';
+      h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="'+T.changeColor+'"></button>';
       if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
-      h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="Supprimer la phase">×</button></div>';
+      h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+T.deletePhase+'">×</button></div>';
     }
-    h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+'Ajouter une phase</button>';
+    h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button>';
     // Association : labels Prod:: → phase (repli sur tous les labels si aucun Prod::).
     var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
     if(!prod.length)prod=ST.labels;
-    var phOpts=[['none','Non suivi']].concat(ST.phases.map(function(p){return [p.id,p.name];}));
-    h+='<div class="subh" style="margin-top:6px">Association des labels <span class="subc">Prod::</span></div><div class="map">';
+    var phOpts=[['none',T.notTracked]].concat(ST.phases.map(function(p){return [p.id,p.name];}));
+    h+='<div class="subh" style="margin-top:6px">'+T.labelMapping+' <span class="subc">Prod::</span></div><div class="map">';
     for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
       h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
     return h+'</div>';
   }
   function s3(){
-    var roleOpts=[['lead','Lead'],['member','Membre']];
-    var h='<div class="note">'+sic('info')+'<div>Équipes importées depuis les <b>groupes GitLab</b>. <b>Lead</b> = Maintainer · <b>Membre</b> = Developer. Un membre peut appartenir à <b>plusieurs équipes</b>.</div></div><div class="teamcol">';
+    var roleOpts=[['lead',T.roleLead],['member',T.roleMember]];
+    var h='<div class="note">'+sic('info')+'<div>'+T.teamsIntro+'</div></div><div class="teamcol">';
     for(var t=0;t<ST.teams.length;t++){var tm=ST.teams[t];var mem=ST.memberships.filter(function(m){return m.teamId===tm.id;});
-      h+='<div class="team"><div class="teamh"><input class="teamname" data-team="'+t+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">groupe GitLab</span>':'<span class="newbadge">nouvelle</span>')+'<button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div><div class="mlist">';
-      if(mem.length===0)h+='<div class="empty">Aucun membre — ajoutez-en ci-dessous</div>';
+      h+='<div class="team"><div class="teamh"><input class="teamname" data-team="'+t+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">'+T.glGroup+'</span>':'<span class="newbadge">'+T.newTeam+'</span>')+'<button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div><div class="mlist">';
+      if(mem.length===0)h+='<div class="empty">'+T.noMembers+'</div>';
       for(var j=0;j<mem.length;j++){var m=mem[j];var nm=POOLname(m.pid);h+='<div class="mrow">'+av(m.pid,nm,24)+'<span class="mname">'+esc(nm)+'</span>'+miniSel('role:'+m.pid+'~'+tm.id,m.role,roleOpts)+'<button class="mx" data-act="rmmem:'+m.pid+'~'+tm.id+'">×</button></div>';}
       var avail=allPeople().filter(function(pid){return !mem.some(function(m){return m.pid===pid;});});
-      if(avail.length){h+='<div class="addsel">'+ic('plus',14)+'<select data-add="'+tm.id+'"><option value="">Ajouter un membre…</option>';for(var a=0;a<avail.length;a++)h+='<option value="'+esc(avail[a])+'">'+esc(POOLname(avail[a]))+'</option>';h+='</select></div>';}
+      if(avail.length){h+='<div class="addsel">'+ic('plus',14)+'<select data-add="'+tm.id+'"><option value="">'+T.addMember+'</option>';for(var a=0;a<avail.length;a++)h+='<option value="'+esc(avail[a])+'">'+esc(POOLname(avail[a]))+'</option>';h+='</select></div>';}
       h+='</div></div>';
     }
-    return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+'Nouvelle équipe</button>';
+    return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+T.newTeamName+'</button>';
   }
   function s4(){
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
     var mapped=0;for(var k in ST.labelPhase)if(ST.labelPhase[k]&&ST.labelPhase[k]!=='none')mapped++;
     var ppl={};ST.memberships.forEach(function(m){ppl[m.pid]=1;});
-    var rows=[['link','Connexion',ST.baseUrl.replace(/^https?:\/\//,''),0],['box','Projets',imp.length?imp.join(', '):'Aucun',1],['layers','Phases',mapped+' labels liés à une phase',2],['users','Équipes',ST.teams.length+' équipes · '+Object.keys(ppl).length+' personnes',3]];
+    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,mapped+T.labelsLinked,2],['users',T.stepEquipes,ST.teams.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
     var h='<div class="recap">';
-    for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">Modifier</button></div>';
+    for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
     h+='</div>';
     if(ST.saveErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.saveErr)+'</div></div>';
     return h;
@@ -338,9 +423,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){return r.json();}).then(function(j){
-        if(j.ok){ ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:'Démarrage…'}; render(); setTimeout(pollProgress,500); }
-        else{ST.saving=false;ST.saveErr=j.error||'Enregistrement impossible.';render();}})
-      .catch(function(){ST.saving=false;ST.saveErr='Serveur injoignable.';render();});
+        if(j.ok){ ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:T.starting}; render(); setTimeout(pollProgress,500); }
+        else{ST.saving=false;ST.saveErr=j.error||T.saveImpossible;render();}})
+      .catch(function(){ST.saving=false;ST.saveErr=T.serverUnreachable;render();});
   }
   // Loader temps réel : poll /api/setup/progress jusqu'à done/error.
   function pollProgress(){
@@ -355,20 +440,20 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function cancelLaunch(){ fetch('/api/setup/cancel',{method:'POST'}).catch(function(){}); ST.launching=false;ST.progress=null;render(); }
   function fmtClock(s){s=Math.max(0,Math.round(s));var m=Math.floor(s/60);return m+':'+('0'+(s%60)).slice(-2);}
   function launchHtml(){
-    var pr=ST.progress||{status:'running',percent:0,message:'Démarrage…'};
+    var pr=ST.progress||{status:'running',percent:0,message:T.starting};
     var done=pr.status==='done',err=pr.status==='error',pct=Math.max(0,Math.min(100,pr.percent||0));
     var heights=[40,62,52,86,66,96],bars='';
     for(var i=0;i<heights.length;i++)bars+='<i><b style="height:'+Math.round(pct*heights[i]/100)+'%"></b></i>';
-    var eta=(pr.etaSeconds!=null&&!done&&!err)?' · ~ '+fmtClock(pr.etaSeconds)+' restant':'';
-    var status=done?('<span class="okic">'+ic('check',17)+'</span> Terminé — ouverture du dashboard…')
-      :err?('Échec : '+esc(pr.error||pr.message||''))
-      :('<span class="spin"></span> '+esc(pr.message||'Extraction…'));
-    return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">Mise en service</div></div></div></div>'
+    var eta=(pr.etaSeconds!=null&&!done&&!err)?' · ~ '+fmtClock(pr.etaSeconds)+T.left:'';
+    var status=done?('<span class="okic">'+ic('check',17)+'</span> '+T.done)
+      :err?(T.failed+esc(pr.error||pr.message||''))
+      :('<span class="spin"></span> '+esc(pr.message||T.extractingShort));
+    return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright">'+LANG_SWITCH+'</div></div>'
       +'<div class="ld-wrap"><div class="ld-bars">'+bars+'</div>'
       +'<div class="ld-pct">'+pct+'<span>%</span></div>'
       +'<div class="ld-status'+(err?' err':'')+'">'+status+'</div>'
-      +'<div class="ld-meta">'+(err?'':'Extraction des données · vous pouvez laisser cette page ouverte'+eta)+'</div>'
-      +(done?'':'<button class="btn '+(err?'outline':'ghost')+' sm" data-act="cancelLaunch">'+(err?'Revenir à la configuration':ic('chevL',15)+'Annuler')+'</button>')
+      +'<div class="ld-meta">'+(err?'':T.extracting+eta)+'</div>'
+      +(done?'':'<button class="btn '+(err?'outline':'ghost')+' sm" data-act="cancelLaunch">'+(err?T.backToConfig:ic('chevL',15)+T.cancel)+'</button>')
       +'</div></div>';
   }
   function go(n){ if(n>ST.step && !canNext())return; if(n===2 && !ST.labelsLoaded){ST.step=2;render();loadLabels(render);return;} ST.step=n; render(); document.getElementById('body').scrollTop=0; }
@@ -384,13 +469,13 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('goto:')===0){var n=+a.slice(5);if(n<ST.step||n===ST.step)go(n);}
     else if(a.indexOf('proj:')===0){var id=+a.slice(5);var k=ST.importIds.indexOf(id);if(k>=0)ST.importIds.splice(k,1);else ST.importIds.push(id);ST.labelsLoaded=false;render();}
     else if(a.indexOf('rmteam:')===0){var tid=a.slice(7);ST.memberships=ST.memberships.filter(function(m){return m.teamId!==tid;});ST.teams=ST.teams.filter(function(t){return t.id!==tid;});render();}
-    else if(a==='addteam'){ST.teams.push({id:'t'+Date.now(),name:'Nouvelle équipe',gitlab:false});render();}
+    else if(a==='addteam'){ST.teams.push({id:'t'+Date.now(),name:T.newTeamName,gitlab:false});render();}
     else if(a.indexOf('rmmem:')===0){var pr=a.slice(6).split('~');ST.memberships=ST.memberships.filter(function(m){return !(m.pid===pr[0]&&m.teamId===pr[1]);});render();}
     else if(a==='cancelLaunch'){cancelLaunch();}
     else if(a.indexOf('phcol:')===0){var pid=a.slice(6);ST.openColor=(ST.openColor===pid?null:pid);render();}
     else if(a.indexOf('phpick:')===0){var pp=a.slice(7).split('~');ST.phases.forEach(function(p){if(p.id===pp[0])p.color=pp[1];});ST.openColor=null;render();}
     else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});render();}
-    else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:'Nouvelle phase',color:PALETTE[ST.phases.length%PALETTE.length]});render();}
+    else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[ST.phases.length%PALETTE.length]});render();}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}

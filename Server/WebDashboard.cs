@@ -296,7 +296,7 @@ public sealed class WebDashboard
         {
             if (self.IsConfigured()) return Results.Redirect("/");
             if (!self.IsAdminLogin(ctx.User.Identity?.Name)) return Results.Redirect("/login");
-            return Results.Content(SetupView.Page(authCfg), "text/html; charset=utf-8");
+            return Results.Content(SetupView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
         });
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx)));
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx)));
