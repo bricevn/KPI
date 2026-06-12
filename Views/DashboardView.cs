@@ -31,7 +31,8 @@ public sealed class DashboardView
         Directory.CreateDirectory(viewsDir);
 
         // Export statique AUTONOME : payload réel inliné + page nouveau design (même rendu que le live).
-        var payloadJson = await BuildPayloadJsonAsync(outputDirectory, milestone, exports, trackedTransitions, teams, labelPhases, ct);
+        var aux = LoadAuxFromDisk(outputDirectory);
+        var payloadJson = BuildPayloadJson(milestone, exports, trackedTransitions, teams, labelPhases, aux.labels, aux.milestones, aux.lastExtracted);
         var html = BuildReferencePage(payloadJson);
         var path = Path.Combine(viewsDir, SafeFileName($"release_{milestone}.html"));
         await File.WriteAllTextAsync(path, html, new UTF8Encoding(false), ct);
@@ -39,65 +40,46 @@ public sealed class DashboardView
     }
 
     /// <summary>
-    /// Construit le JSON du payload dashboard (window.__DATA__) pour le périmètre d'issues fourni.
-    /// Réutilisé par le serveur (/api/data) : passer des exports + teams DÉJÀ filtrés selon le compte.
+    /// Construit le JSON du payload dashboard (window.__DATA__). Les données auxiliaires (couleurs de
+    /// labels, dates de milestones, date d'extraction) sont fournies par l'APPELANT, qui maîtrise le
+    /// stockage : déchiffrement multi-serveurs côté serveur, ou lecture disque pour l'export statique.
     /// </summary>
-    public static async Task<string> BuildPayloadJsonAsync(
-        string outputDirectory,
+    public static string BuildPayloadJson(
         string milestone,
         List<IssueExport> exports,
         IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
-        CancellationToken ct)
+        IReadOnlyList<Kpi.GitLab.Models.GitLabLabel> labels,
+        IReadOnlyList<Kpi.GitLab.Models.GitLabMilestone> milestones,
+        string? lastExtractedAt)
     {
         var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases);
-        await AugmentPayloadAsync(payload, outputDirectory, ct);
+        payload.lastExtractedAt = lastExtractedAt ?? "";
+        foreach (var lab in labels)
+            if (!string.IsNullOrEmpty(lab.Name))
+                payload.labelColors[lab.Name] = new LabelColorPayload { color = lab.Color ?? "", textColor = lab.TextColor ?? "" };
+        foreach (var m in milestones)
+            if (!string.IsNullOrEmpty(m.Title))
+                payload.milestoneDates[m.Title] = new MilestoneDatesPayload { startDate = m.StartDate, dueDate = m.DueDate };
         return JsonSerializer.Serialize(payload, JsonOptions);
     }
 
-    // Complète le payload : lastExtractedAt (mtime issues.json) + couleurs de labels + dates de milestones.
-    private static async Task AugmentPayloadAsync(DashboardPayload payload, string outputDirectory, CancellationToken ct)
+    /// <summary>Lit labels.json + milestones.json EN CLAIR + la date d'extraction depuis un dossier
+    /// (chemin legacy / export statique CLI). Côté serveur multi-serveurs, on déchiffre via SecureStore.</summary>
+    public static (List<Kpi.GitLab.Models.GitLabLabel> labels, List<Kpi.GitLab.Models.GitLabMilestone> milestones, string lastExtracted) LoadAuxFromDisk(string outputDirectory)
     {
-        var jsonPath = Path.Combine(outputDirectory, "issues.json");
-        if (File.Exists(jsonPath))
-            payload.lastExtractedAt = File.GetLastWriteTimeUtc(jsonPath).ToString("yyyy-MM-dd HH:mm");
-
-        var labelsPath = Path.Combine(outputDirectory, "labels.json");
-        if (File.Exists(labelsPath))
-        {
-            try
-            {
-                await using var lfs = new FileStream(labelsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var labelList = await JsonSerializer.DeserializeAsync<List<GitLab.Models.GitLabLabel>>(
-                    lfs, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
-                if (labelList != null)
-                    foreach (var lab in labelList)
-                    {
-                        if (string.IsNullOrEmpty(lab.Name)) continue;
-                        payload.labelColors[lab.Name] = new LabelColorPayload { color = lab.Color ?? "", textColor = lab.TextColor ?? "" };
-                    }
-            }
-            catch (Exception ex) { Console.WriteLine($"  [warn] Lecture labels.json impossible : {ex.Message}"); }
-        }
-
-        var milestonesPath = Path.Combine(outputDirectory, "milestones.json");
-        if (File.Exists(milestonesPath))
-        {
-            try
-            {
-                await using var mfs = new FileStream(milestonesPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var msList = await JsonSerializer.DeserializeAsync<List<GitLab.Models.GitLabMilestone>>(
-                    mfs, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
-                if (msList != null)
-                    foreach (var m in msList)
-                    {
-                        if (string.IsNullOrEmpty(m.Title)) continue;
-                        payload.milestoneDates[m.Title] = new MilestoneDatesPayload { startDate = m.StartDate, dueDate = m.DueDate };
-                    }
-            }
-            catch (Exception ex) { Console.WriteLine($"  [warn] Lecture milestones.json impossible : {ex.Message}"); }
-        }
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var labels = new List<Kpi.GitLab.Models.GitLabLabel>();
+        var milestones = new List<Kpi.GitLab.Models.GitLabMilestone>();
+        var lastExtracted = "";
+        var issuesPath = Path.Combine(outputDirectory, "issues.json");
+        if (File.Exists(issuesPath)) lastExtracted = File.GetLastWriteTimeUtc(issuesPath).ToString("yyyy-MM-dd HH:mm");
+        var lp = Path.Combine(outputDirectory, "labels.json");
+        if (File.Exists(lp)) { try { labels = JsonSerializer.Deserialize<List<Kpi.GitLab.Models.GitLabLabel>>(File.ReadAllText(lp), opts) ?? new(); } catch (Exception ex) { Console.WriteLine($"  [warn] labels.json : {ex.Message}"); } }
+        var mp = Path.Combine(outputDirectory, "milestones.json");
+        if (File.Exists(mp)) { try { milestones = JsonSerializer.Deserialize<List<Kpi.GitLab.Models.GitLabMilestone>>(File.ReadAllText(mp), opts) ?? new(); } catch (Exception ex) { Console.WriteLine($"  [warn] milestones.json : {ex.Message}"); } }
+        return (labels, milestones, lastExtracted);
     }
 
     // --- Payload construction -------------------------------------------------

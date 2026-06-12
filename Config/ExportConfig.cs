@@ -2,9 +2,55 @@ namespace Kpi.Config;
 
 public sealed class AppConfig
 {
+    /// <summary>Ancien bloc mono-serveur. CONSERVÉ pour rétro-compat pendant la migration multi-serveurs ;
+    /// sera retiré une fois tous les consommateurs basculés sur <see cref="Servers"/>.</summary>
     public GitLabConfig GitLab { get; set; } = new();
+    /// <summary>Serveurs GitLab à analyser (v2 multi-serveurs). Chacun cloisonné sous output/&lt;Id&gt;/.</summary>
+    public List<ServerConfig> Servers { get; set; } = new();
     public ExportConfig Export { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
+
+    /// <summary>
+    /// Serveurs effectifs : <see cref="Servers"/> si renseignée, sinon un serveur unique dérivé de
+    /// l'ancien bloc <see cref="GitLab"/> (rétro-compatibilité). Vide si rien n'est configuré.
+    /// </summary>
+    public List<ServerConfig> ResolveServers()
+    {
+        if (Servers is { Count: > 0 }) return Servers;
+        if (!string.IsNullOrWhiteSpace(GitLab.BaseUrl))
+            return new List<ServerConfig>
+            {
+                new()
+                {
+                    Id = "default",
+                    BaseUrl = GitLab.BaseUrl,
+                    GroupToken = GitLab.PrivateToken,
+                    ProjectIds = string.IsNullOrWhiteSpace(GitLab.ProjectId) ? new() : new List<string> { GitLab.ProjectId },
+                    AllowSelfSignedCertificates = GitLab.AllowSelfSignedCertificates,
+                    RequestTimeoutSeconds = GitLab.RequestTimeoutSeconds,
+                }
+            };
+        return new();
+    }
+}
+
+/// <summary>
+/// Un serveur GitLab à analyser. Le <see cref="GroupToken"/> (token de GROUPE, scope read_api) couvre
+/// les projets du groupe. Les données extraites sont cloisonnées sous <c>output/&lt;Id&gt;/</c> et
+/// chiffrées au repos (cf. SecureStore, sous-clé dérivée de l'Id).
+/// </summary>
+public sealed class ServerConfig
+{
+    /// <summary>Identifiant court, stable et UNIQUE (segment de dossier, ex. « interne »). [A-Za-z0-9_-].</summary>
+    public string Id { get; set; } = "";
+    /// <summary>URL racine de l'instance (sans /api/v4). Ex : https://gitlab.exemple.com</summary>
+    public string BaseUrl { get; set; } = "";
+    /// <summary>Group Access Token (scope read_api). JAMAIS exposé au client ni loggé.</summary>
+    public string GroupToken { get; set; } = "";
+    /// <summary>Projets à extraire (« groupe/projet » ou IDs). Vide = tous les projets accessibles au token.</summary>
+    public List<string> ProjectIds { get; set; } = new();
+    public bool AllowSelfSignedCertificates { get; set; }
+    public int RequestTimeoutSeconds { get; set; } = 60;
 }
 
 /// <summary>

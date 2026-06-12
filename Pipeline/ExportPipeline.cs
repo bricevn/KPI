@@ -1,8 +1,10 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Kpi.Config;
 using Kpi.Export;
 using Kpi.Export.Models;
 using Kpi.GitLab;
+using Kpi.GitLab.Models;
 using Kpi.Views;
 
 namespace Kpi.Pipeline;
@@ -111,5 +113,121 @@ public static class ExportPipeline
 
         Console.WriteLine();
         Console.WriteLine($"Terminé : {exports.Count} issues traitées.");
+    }
+
+    // ====================================================================
+    // v2 — Extraction MULTI-SERVEURS, cloisonnée par serveur et CHIFFRÉE au repos.
+    // Chemin additif : n'altère pas RunFullExportAsync (legacy) tant que le dashboard
+    // n'a pas basculé (1c). Réutilise GitLabClient/ExportService par (serveur, projet).
+    // ====================================================================
+    private static readonly JsonSerializerOptions _storeJson = new() { WriteIndented = false };
+
+    public static async Task RunMultiServerExportAsync(AppConfig config, Action<int, int>? onProgress, CancellationToken ct)
+    {
+        var servers = config.ResolveServers();
+        if (servers.Count == 0) { Console.WriteLine("Aucun serveur GitLab configuré (Servers vide)."); return; }
+
+        foreach (var server in servers)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(server.Id) || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken))
+            {
+                Console.WriteLine($"  [skip] serveur '{server.Id}' incomplet (Id/BaseUrl/GroupToken requis).");
+                continue;
+            }
+
+            var serverDir = Path.Combine(config.Export.OutputDirectory, SafeSegment(server.Id));
+            var projectIds = server.ProjectIds is { Count: > 0 }
+                ? server.ProjectIds
+                : await ListProjectsAsync(server, ct);
+            Console.WriteLine($"== Serveur '{server.Id}' ({server.BaseUrl}) : {projectIds.Count} projet(s) ==");
+
+            var allIssues = new List<IssueExport>();
+            var labels = new Dictionary<string, GitLabLabel>(StringComparer.OrdinalIgnoreCase);
+            var milestones = new Dictionary<string, GitLabMilestone>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pid in projectIds)
+            {
+                ct.ThrowIfCancellationRequested();
+                var glCfg = new GitLabConfig
+                {
+                    BaseUrl = server.BaseUrl,
+                    PrivateToken = server.GroupToken,
+                    ProjectId = pid,
+                    Milestone = "",  // pas de prérequis milestone : on extrait TOUTES les issues du projet
+                    AllowSelfSignedCertificates = server.AllowSelfSignedCertificates,
+                    RequestTimeoutSeconds = server.RequestTimeoutSeconds,
+                };
+                using var client = new GitLabClient(glCfg);
+                var service = new ExportService(client, glCfg, config.Export);
+                Console.WriteLine($"  -- projet {pid} --");
+                var issues = await service.BuildIssueExportsAsync(ct, onProgress, "");
+                allIssues.AddRange(issues);  // chaque IssueExport porte déjà son ProjectId (groupement)
+                try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
+                catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
+                try { foreach (var m in await client.GetProjectMilestonesAsync(ct)) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
+                catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
+            }
+
+            // Écriture CHIFFRÉE (sous-clé du serveur) — cloisonnée sous output/<serverId>/.
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(serverDir, "issues.json"),
+                JsonSerializer.Serialize(allIssues, _storeJson), ct);
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(serverDir, "labels.json"),
+                JsonSerializer.Serialize(labels.Values.ToList(), _storeJson), ct);
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(serverDir, "milestones.json"),
+                JsonSerializer.Serialize(milestones.Values.ToList(), _storeJson), ct);
+            Console.WriteLine($"  -> {allIssues.Count} issues chiffrées dans {serverDir}/ ({projectIds.Count} projets, {labels.Count} labels, {milestones.Count} milestones)");
+
+            // Auto-contrôle d'intégrité : on relit + déchiffre ce qu'on vient d'écrire (détecte une clé KO).
+            var back = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "issues.json"));
+            var backCount = back == null ? -1 : (JsonSerializer.Deserialize<List<IssueExport>>(back, _storeJson)?.Count ?? -1);
+            Console.WriteLine(backCount == allIssues.Count
+                ? $"  -> vérif chiffrement OK : {backCount} issues relues/déchiffrées."
+                : $"  [warn] vérif chiffrement : {backCount} relues vs {allIssues.Count} attendues.");
+        }
+        Console.WriteLine("Extraction multi-serveurs terminée.");
+        // NB (Phase 3) : CSV par serveur/projet + vues HTML d'export restent à brancher sur ce chemin.
+    }
+
+    /// <summary>Liste les projets accessibles au token de groupe d'un serveur (id numériques, en chaîne).</summary>
+    private static async Task<List<string>> ListProjectsAsync(ServerConfig server, CancellationToken ct)
+    {
+        var handler = new HttpClientHandler();
+        if (server.AllowSelfSignedCertificates) handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(server.RequestTimeoutSeconds <= 0 ? 60 : server.RequestTimeoutSeconds) };
+        var ids = new List<string>();
+        var url = server.BaseUrl.TrimEnd('/') + "/api/v4/projects?membership=true&simple=true&per_page=100&order_by=id&sort=asc";
+        while (!string.IsNullOrEmpty(url))
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Add("PRIVATE-TOKEN", server.GroupToken);
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            using var resp = await http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) { Console.WriteLine($"  [warn] liste projets serveur '{server.Id}' : HTTP {(int)resp.StatusCode}"); break; }
+            using (var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct)))
+                foreach (var p in doc.RootElement.EnumerateArray())
+                    if (p.TryGetProperty("id", out var id)) ids.Add(id.GetInt64().ToString());
+            url = NextLink(resp);
+        }
+        return ids;
+    }
+
+    private static string? NextLink(HttpResponseMessage resp)
+    {
+        if (!resp.Headers.TryGetValues("Link", out var links)) return null;
+        foreach (var link in links.SelectMany(l => l.Split(',')))
+        {
+            var parts = link.Split(';');
+            if (parts.Length >= 2 && parts[1].Contains("rel=\"next\""))
+                return parts[0].Trim().TrimStart('<').TrimEnd('>');
+        }
+        return null;
+    }
+
+    private static string SafeSegment(string s)
+    {
+        var arr = (s ?? "").Trim().Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_').ToArray();
+        var r = new string(arr);
+        return string.IsNullOrEmpty(r) ? "_" : r;
     }
 }

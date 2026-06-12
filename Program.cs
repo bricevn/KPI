@@ -22,6 +22,7 @@ bool serve = args.Any(a => a.Equals("--serve", StringComparison.OrdinalIgnoreCas
 bool fetchLabels = args.Any(a => a.Equals("--fetch-labels", StringComparison.OrdinalIgnoreCase));
 bool fetchMilestones = args.Any(a => a.Equals("--fetch-milestones", StringComparison.OrdinalIgnoreCase));
 bool fetchAll = args.Any(a => a.Equals("--fetch-all", StringComparison.OrdinalIgnoreCase));
+bool fetchServers = args.Any(a => a.Equals("--fetch-servers", StringComparison.OrdinalIgnoreCase));
 int port = ParsePort(args, defaultPort: 5050);
 
 Console.WriteLine("=== GitLab Exporter ===");
@@ -73,6 +74,14 @@ try
         var msPath = Path.Combine(appConfig.Export.OutputDirectory, "milestones.json");
         await Kpi.Export.JsonExporter.WriteJsonAtomicAsync(msPath, milestones, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
         Console.WriteLine($"  -> {milestones.Count} milestones écrites dans {msPath}");
+        return 0;
+    }
+
+    if (fetchServers)
+    {
+        // v2 : extraction MULTI-SERVEURS, cloisonnée par serveur et chiffrée au repos (output/<serverId>/).
+        Console.WriteLine("Mode     : --fetch-servers (extraction multi-serveurs chiffrée)");
+        await ExportPipeline.RunMultiServerExportAsync(appConfig, null, cts.Token);
         return 0;
     }
 

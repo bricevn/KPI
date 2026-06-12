@@ -7,6 +7,7 @@ using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Kpi.Config;
+using Kpi.Export;
 using Kpi.Export.Models;
 using Kpi.Pipeline;
 using Kpi.Views;
@@ -135,8 +136,11 @@ public sealed class WebDashboard
                     ctx.RunClaimActions(doc.RootElement);
                     // Rôles GitLab : refuser le ticket si l'utilisateur n'est ni membre du projet ni admin.
                     var uname = ctx.Identity?.Name ?? "";
-                    if (!self.IsAdminLogin(uname) && await self.GetProjectAccessLevelAsync(uname, ctx.HttpContext.RequestAborted) == null)
-                        ctx.Fail("Compte GitLab non membre du projet.");
+                    var oauthServer = self.ServerForInstance(authCfg.Authority);
+                    if (!self.IsAdminLogin(uname) && (oauthServer == null || await self.GetServerAccessLevelAsync(oauthServer, uname, ctx.HttpContext.RequestAborted) == null))
+                        ctx.Fail("Compte GitLab non membre des projets du serveur.");
+                    else if (oauthServer != null)
+                        ctx.Identity?.AddClaim(new Claim(ServerClaim, oauthServer.Id));
                 };
                 // Échec du flux OAuth (dont refus ci-dessus) → retour propre à la page de connexion.
                 o.Events.OnRemoteFailure = ctx =>
@@ -503,7 +507,13 @@ public sealed class WebDashboard
             _state.Running = true;
             _state.StartedAt = DateTime.UtcNow;
 
-            if (milestonesToRefresh.Count == 0)
+            if (_config.Servers is { Count: > 0 })
+            {
+                // v2 multi-serveurs : extraction cloisonnée + chiffrée de TOUS les projets configurés
+                // (la sélection par milestone ne s'applique qu'au chemin legacy mono-serveur).
+                await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token);
+            }
+            else if (milestonesToRefresh.Count == 0)
             {
                 await ExportPipeline.RunFullExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, "");
             }
@@ -532,9 +542,8 @@ public sealed class WebDashboard
         }
         finally
         {
-            // Données régénérées → invalider les caches mémoire.
+            // Données régénérées → invalider le cache des payloads.
             _payloadCache.Clear();
-            lock (_issuesCacheLock) { _issuesCache = null; }
             _state.Running = false;
             _refreshLock.Release();
             linked.Dispose();
@@ -596,13 +605,11 @@ public sealed class WebDashboard
             || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
             return Results.Json(new { ok = false, error = "Adresse GitLab invalide." }, statusCode: 400);
 
-        // Anti-SSRF : l'instance DOIT correspondre à Auth.Authority. Authority absent → fail-closed
-        // (sinon un POST anonyme pourrait sonder le réseau interne / les métadonnées cloud).
-        if (string.IsNullOrWhiteSpace(_config.Auth.Authority)
-            || !Uri.TryCreate(_config.Auth.Authority, UriKind.Absolute, out var allowedUri))
-            return Results.Json(new { ok = false, error = "Connexion par token non configurée sur ce serveur." }, statusCode: 503);
-        if (!string.Equals(baseUri.Host, allowedUri.Host, StringComparison.OrdinalIgnoreCase))
-            return Results.Json(new { ok = false, error = "Instance non autorisée." }, statusCode: 400);
+        // Anti-SSRF + routage : l'instance DOIT correspondre à un SERVEUR CONFIGURÉ (par hôte).
+        // Sinon fail-closed (un POST anonyme ne doit pas pouvoir faire sonder une URL arbitraire).
+        var server = ServerForInstance(instance);
+        if (server == null)
+            return Results.Json(new { ok = false, error = "Instance GitLab non configurée sur ce serveur." }, statusCode: 400);
 
         var http = SharedHttp;
         using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, "/api/v4/user"));
@@ -638,26 +645,26 @@ public sealed class WebDashboard
             if (isBot || IsBotUsername(username))
                 return Results.Json(new { ok = false, error = "Les comptes de service (bot) ne peuvent pas ouvrir de session — utilisez votre token personnel." });
 
-            // Rôles GitLab : seuls les MEMBRES du projet (ou les admins du fichier serveur) entrent.
-            if (!IsAdminLogin(username) && await GetProjectAccessLevelAsync(username, ctx.RequestAborted) == null)
-                return Results.Json(new { ok = false, error = "Votre compte GitLab n’est pas membre du projet — accès refusé." });
+            // Rôles GitLab : seuls les MEMBRES d'un projet du serveur (ou les admins) entrent.
+            if (!IsAdminLogin(username) && await GetServerAccessLevelAsync(server, username, ctx.RequestAborted) == null)
+                return Results.Json(new { ok = false, error = "Votre compte GitLab n’est pas membre des projets analysés — accès refusé." });
 
-            // Session cookie — même schéma que l'OAuth (claim Name = username). AUCUN token stocké.
-            var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username) },
+            // Session cookie : username + serverId (cloisonnement par serveur). AUCUN token stocké.
+            var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username), new Claim(ServerClaim, server.Id) },
                 CookieAuthenticationDefaults.AuthenticationScheme);
             await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
 
-            return Results.Json(new { ok = true, user = new { username } });
+            return Results.Json(new { ok = true, user = new { username }, server = server.Id });
         }
     }
 
     // --- Assistant de première mise en service (/setup) -----------------
 
-    // Configuré ? = connexion GitLab de base renseignée. Sinon `/` redirige vers /setup.
+    // Configuré ? = au moins un serveur effectif (Servers v2 OU bloc GitLab legacy via ResolveServers)
+    // a une URL + un token. Sinon `/` redirige vers /setup.
     private bool IsConfigured() =>
-        !string.IsNullOrWhiteSpace(_config.GitLab.BaseUrl)
-        && !string.IsNullOrWhiteSpace(_config.GitLab.PrivateToken)
-        && !string.IsNullOrWhiteSpace(_config.GitLab.ProjectId);
+        _config.ResolveServers().Any(s =>
+            !string.IsNullOrWhiteSpace(s.BaseUrl) && !string.IsNullOrWhiteSpace(s.GroupToken));
 
     private static async Task<JsonNode?> ReadJsonBody(HttpContext ctx)
     {
@@ -789,12 +796,35 @@ public sealed class WebDashboard
         try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
         catch { root = new JsonObject(); }
 
-        var gl = root["GitLab"] as JsonObject ?? new JsonObject(); root["GitLab"] = gl;
+        var selfSigned = b?["selfSigned"]?.GetValue<bool>() ?? false;
+        var timeout = b?["timeout"]?.GetValue<int>() ?? 60;
+        var serverId = DeriveServerId(baseUri);
+
+        // Bloc GitLab legacy CONSERVÉ (rétro-compat des ~15 consommateurs encore branchés dessus) :
+        // pointe sur le 1er projet de CE serveur. Sera retiré en 1c-D une fois tout basculé sur Servers.
+        var gl = root["GitLab"] as JsonObject;
+        if (gl == null) { gl = new JsonObject(); root["GitLab"] = gl; }
         gl["BaseUrl"] = baseUrl;
         gl["PrivateToken"] = token;
-        gl["ProjectId"] = projectIds[0].ToString();   // modèle mono-projet : projet principal = 1er sélectionné
-        gl["AllowSelfSignedCertificates"] = b?["selfSigned"]?.GetValue<bool>() ?? false;
-        gl["RequestTimeoutSeconds"] = b?["timeout"]?.GetValue<int>() ?? 60;
+        gl["ProjectId"] = projectIds[0].ToString();
+        gl["AllowSelfSignedCertificates"] = selfSigned;
+        gl["RequestTimeoutSeconds"] = timeout;
+
+        // v2 — entrée Servers cloisonnée (token de GROUPE, projets sélectionnés). Insert OU update par Id
+        // (dérivé de l'hôte) → relancer /setup pour une autre instance AJOUTE un serveur sans écraser les autres.
+        var serversArr = root["Servers"] as JsonArray;
+        if (serversArr == null) { serversArr = new JsonArray(); root["Servers"] = serversArr; }
+        JsonObject? entry = null;
+        foreach (var sNode in serversArr)
+            if (sNode is JsonObject so && string.Equals(so["Id"]?.GetValue<string>(), serverId, StringComparison.OrdinalIgnoreCase))
+            { entry = so; break; }
+        if (entry == null) { entry = new JsonObject(); serversArr.Add(entry); }
+        entry["Id"] = serverId;
+        entry["BaseUrl"] = baseUrl;
+        entry["GroupToken"] = token;
+        entry["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i.ToString())).ToArray());
+        entry["AllowSelfSignedCertificates"] = selfSigned;
+        entry["RequestTimeoutSeconds"] = timeout;
 
         var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
         ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
@@ -815,7 +845,29 @@ public sealed class WebDashboard
         try { _config = BuildConfig(); _memberCache.Clear(); _payloadCache.Clear(); }
         catch (Exception e) { Console.Error.WriteLine("SetupSave reload KO : " + e); return Results.Json(new { ok = false, error = "Configuration enregistrée, mais rechargement échoué (redémarrez le serveur)." }); }
 
+        // Fetch-all multi-serveurs en arrière-plan (best-effort) : extrait les projets sélectionnés
+        // et écrit les données CHIFFRÉES sous output/<serverId>/. Le dashboard suit l'avancement via /api/status.
+        StartSetupFetch(ctx);
+
         return Results.Json(new { ok = true });
+    }
+
+    /// <summary>Identifiant de serveur stable dérivé de l'hôte de l'instance (segment de dossier, [a-z0-9-]).</summary>
+    private static string DeriveServerId(Uri baseUri)
+    {
+        var host = baseUri.Host ?? "";
+        var r = new string(host.Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-').ToArray()).Trim('-');
+        return string.IsNullOrEmpty(r) ? "default" : r;
+    }
+
+    /// <summary>Lance l'extraction multi-serveurs en tâche de fond après une mise en service réussie
+    /// (réutilise le verrou/état/CTS du refresh ; RunRefreshAsync route vers le multi-serveur car Servers est configuré).</summary>
+    private void StartSetupFetch(HttpContext ctx)
+    {
+        if (!_refreshLock.Wait(0)) return; // une acquisition tourne déjà → ne pas doubler
+        var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
+        var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
+        _ = Task.Run(() => RunRefreshAsync(new List<string>(), serverCt));
     }
 
     // --- Résolution de compte / rôles (étape 3) -------------------------
@@ -856,49 +908,67 @@ public sealed class WebDashboard
     private static bool IsBotUsername(string username)
         => Regex.IsMatch(username ?? "", @"^(project|group)_\d+_bot\d*$", RegexOptions.IgnoreCase);
 
-    private async Task<int?> GetProjectAccessLevelAsync(string username, CancellationToken ct)
+    private const string ServerClaim = "kpi:server";
+
+    // Serveur configuré correspondant à une instance GitLab (par hôte) / à un Id.
+    private ServerConfig? ServerForInstance(string instance)
     {
-        // Les bots sont membres du projet (ils portent les tokens) mais ne sont PAS des utilisateurs :
-        // traités comme non-membres partout (login, OAuth, revalidation continue).
+        if (!Uri.TryCreate(instance, UriKind.Absolute, out var iu)) return null;
+        foreach (var s in _config.ResolveServers())
+            if (Uri.TryCreate(s.BaseUrl, UriKind.Absolute, out var su) && string.Equals(su.Host, iu.Host, StringComparison.OrdinalIgnoreCase))
+                return s;
+        return null;
+    }
+    private ServerConfig? ServerById(string? id)
+        => string.IsNullOrEmpty(id) ? null : _config.ResolveServers().FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Access level max de <paramref name="username"/> sur les PROJETS d'un serveur, résolu avec le
+    /// token de groupe du serveur. null = non membre. Cloisonné : cache par (serveur, username).
+    /// Échec lookup → prolonge la dernière valeur connue (dégradation douce) ; inconnu refusé (fail-closed).
+    /// Les bots (porteurs des tokens) sont traités comme non-membres.
+    /// </summary>
+    private async Task<int?> GetServerAccessLevelAsync(ServerConfig server, string username, CancellationToken ct)
+    {
         if (string.IsNullOrWhiteSpace(username) || IsBotUsername(username)) return null;
-        if (_memberCache.TryGetValue(username, out var hit) && hit.until > DateTime.UtcNow) return hit.level;
+        var cacheKey = server.Id + "|" + username;
+        if (_memberCache.TryGetValue(cacheKey, out var hit) && hit.until > DateTime.UtcNow) return hit.level;
         try
         {
-            var gl = _config.GitLab;
-            var http = SharedHttp;
-            var url = $"{gl.BaseUrl.TrimEnd('/')}/api/v4/projects/{Uri.EscapeDataString(gl.ProjectId)}/members/all?query={Uri.EscapeDataString(username)}&per_page=100";
-            using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Add("PRIVATE-TOKEN", gl.PrivateToken);
-            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            using var resp = await http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) throw new HttpRequestException($"members/all -> {(int)resp.StatusCode}");
-            int? level = null;
-            using (var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct)))
+            var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
+            int? best = null;
+            foreach (var pid in server.ProjectIds ?? new List<string>())
+            {
+                var url = $"{server.BaseUrl.TrimEnd('/')}/api/v4/projects/{Uri.EscapeDataString(pid)}/members/all?query={Uri.EscapeDataString(username)}&per_page=100";
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Add("PRIVATE-TOKEN", server.GroupToken);
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                using var resp = await http.SendAsync(req, ct);
+                if (!resp.IsSuccessStatusCode) continue;
+                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
                 foreach (var m in doc.RootElement.EnumerateArray())
-                    if (m.TryGetProperty("username", out var u)
-                        && string.Equals(u.GetString(), username, StringComparison.OrdinalIgnoreCase)
+                    if (m.TryGetProperty("username", out var u) && string.Equals(u.GetString(), username, StringComparison.OrdinalIgnoreCase)
                         && m.TryGetProperty("access_level", out var al))
-                    { level = al.GetInt32(); break; }
-            _memberCache[username] = (level, DateTime.UtcNow.Add(MemberCacheTtl));
-            return level;
+                    { var lvl = al.GetInt32(); if (best == null || lvl > best) best = lvl; break; }
+            }
+            _memberCache[cacheKey] = (best, DateTime.UtcNow.Add(MemberCacheTtl));
+            return best;
         }
         catch
         {
-            if (_memberCache.TryGetValue(username, out var stale))
-            {
-                _memberCache[username] = (stale.level, DateTime.UtcNow.Add(MemberCacheTtl));
-                return stale.level;
-            }
+            if (_memberCache.TryGetValue(cacheKey, out var stale)) { _memberCache[cacheKey] = (stale.level, DateTime.UtcNow.Add(MemberCacheTtl)); return stale.level; }
             return null;
         }
     }
 
-    /// <summary>Session autorisée ? (admin configuré, ou membre GitLab du projet — révocable à chaud.)</summary>
+    /// <summary>Session autorisée ? (admin, ou membre des projets du SERVEUR de la session — révocable à chaud.)</summary>
     private async Task<bool> IsAllowedAsync(HttpContext ctx)
     {
         var login = ctx.User.Identity?.Name ?? "";
         if (IsAdminLogin(login)) return true;
-        return await GetProjectAccessLevelAsync(login, ctx.RequestAborted) != null;
+        var server = ServerById(ctx.User.FindFirst(ServerClaim)?.Value) ?? _config.ResolveServers().FirstOrDefault();
+        if (server == null) return false;
+        return await GetServerAccessLevelAsync(server, login, ctx.RequestAborted) != null;
     }
 
     private static bool LeadsContain(JsonNode? account, string login)
@@ -1047,15 +1117,17 @@ public sealed class WebDashboard
         var r = ResolveAccount(login);
         var cfg = _config; // snapshot cohérent (config rechargeable à chaud)
 
-        // Cache du JSON produit : clé = périmètre du compte, signature = mtimes des fichiers source.
-        // Évite de relire/recalculer/resérialiser tout le périmètre à chaque requête (/ et /api/data).
-        var dir = cfg.Export.OutputDirectory;
-        string Mtime(string f) { var fp = Path.Combine(dir, f); return File.Exists(fp) ? File.GetLastWriteTimeUtc(fp).Ticks.ToString() : "0"; }
-        var cacheKey = $"{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}";
+        // Serveur courant = celui de la session (claim posé au login), repli sur le 1er configuré.
+        var serverId = ServerById(ctx.User.FindFirst(ServerClaim)?.Value)?.Id ?? cfg.ResolveServers().FirstOrDefault()?.Id ?? "default";
+        var (dataDir, encrypted) = ResolveServerDataDir(cfg.Export.OutputDirectory, serverId);
+
+        // Cache du JSON produit : clé = serveur + périmètre du compte, signature = mtimes des fichiers source.
+        string Mtime(string f) { var fp = Path.Combine(dataDir, f); return File.Exists(fp) ? File.GetLastWriteTimeUtc(fp).Ticks.ToString() : "0"; }
+        var cacheKey = $"{serverId}|{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}";
         var sig = $"{Mtime("issues.json")}.{Mtime("labels.json")}.{Mtime("milestones.json")}";
         if (_payloadCache.TryGetValue(cacheKey, out var cached) && cached.sig == sig) return cached.json;
 
-        var all = await LoadIssuesAsync(ctx.RequestAborted);
+        var (all, labels, milestones, lastExtracted) = await LoadServerDataAsync(serverId, dataDir, encrypted, ctx.RequestAborted);
 
         IEnumerable<IssueExport> filtered = all;
         if (r.ScopeType == "user" && !string.IsNullOrEmpty(r.ScopeValue))
@@ -1083,38 +1155,48 @@ public sealed class WebDashboard
             scopedTeams = new Dictionary<string, List<string>> { [r.ScopeValue] = tm };
         else scopedTeams = new Dictionary<string, List<string>>();
 
-        var json = await DashboardView.BuildPayloadJsonAsync(
-            cfg.Export.OutputDirectory, cfg.GitLab.Milestone, filtered.ToList(),
-            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, ctx.RequestAborted);
+        var json = DashboardView.BuildPayloadJson(
+            cfg.GitLab.Milestone, filtered.ToList(),
+            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases,
+            labels, milestones, lastExtracted);
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }
 
-    private static (DateTime mtime, List<IssueExport> data)? _issuesCache;
-    private static readonly object _issuesCacheLock = new();
-    // Cache du payload JSON sérialisé par périmètre+signature de fichiers (cf. BuildScopedPayloadAsync).
+    // Cache du payload JSON sérialisé par serveur+périmètre+signature de fichiers (cf. BuildScopedPayloadAsync).
     private static readonly ConcurrentDictionary<string, (string sig, string json)> _payloadCache = new();
-    private async Task<List<IssueExport>> LoadIssuesAsync(CancellationToken ct)
+
+    // Dossier de données d'un serveur : output/<serverId>/ s'il a des données (chiffrées), sinon repli
+    // sur output/ (legacy, en clair) tant que la migration n'est pas faite → runtime jamais cassé.
+    private static (string dir, bool encrypted) ResolveServerDataDir(string outputDirectory, string serverId)
     {
-        var p = Path.Combine(_config.Export.OutputDirectory, "issues.json");
-        if (!File.Exists(p)) return new List<IssueExport>();
-        var mtime = File.GetLastWriteTimeUtc(p);
-        lock (_issuesCacheLock) { if (_issuesCache is { } c && c.mtime == mtime) return c.data; }
-        List<IssueExport> data;
-        try
-        {
-            using var fs = new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            data = await JsonSerializer.DeserializeAsync<List<IssueExport>>(fs, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct) ?? new List<IssueExport>();
-        }
-        catch (Exception ex)
-        {
-            // issues.json corrompu/partiel (ex. pendant un refresh) : ne pas planter en 500.
-            Console.Error.WriteLine("issues.json illisible : " + ex.Message);
-            lock (_issuesCacheLock) { if (_issuesCache is { } c) return c.data; }
-            return new List<IssueExport>();
-        }
-        lock (_issuesCacheLock) { _issuesCache = (mtime, data); }
-        return data;
+        var serverDir = Path.Combine(outputDirectory, serverId);
+        if (File.Exists(Path.Combine(serverDir, "issues.json"))) return (serverDir, true);
+        return (outputDirectory, false);
+    }
+
+    // Lit un fichier de données : déchiffré (SecureStore, sous-clé serveur) si dossier serveur, sinon en clair (legacy).
+    private static string? ReadServerFile(string serverId, string dir, bool encrypted, string file)
+    {
+        var path = Path.Combine(dir, file);
+        if (encrypted) return SecureStore.TryReadDecrypted(serverId, path);
+        if (!File.Exists(path)) return null;
+        try { using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite); using var sr = new StreamReader(fs); return sr.ReadToEnd(); }
+        catch (Exception ex) { Console.Error.WriteLine($"Lecture {file} KO : {ex.Message}"); return null; }
+    }
+
+    private async Task<(List<IssueExport> issues, List<Kpi.GitLab.Models.GitLabLabel> labels, List<Kpi.GitLab.Models.GitLabMilestone> milestones, string lastExtracted)>
+        LoadServerDataAsync(string serverId, string dir, bool encrypted, CancellationToken ct)
+    {
+        await Task.CompletedTask;
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        T? Parse<T>(string? txt) { if (txt == null) return default; try { return JsonSerializer.Deserialize<T>(txt, opts); } catch (Exception ex) { Console.Error.WriteLine($"JSON illisible : {ex.Message}"); return default; } }
+        var issues = Parse<List<IssueExport>>(ReadServerFile(serverId, dir, encrypted, "issues.json")) ?? new();
+        var labels = Parse<List<Kpi.GitLab.Models.GitLabLabel>>(ReadServerFile(serverId, dir, encrypted, "labels.json")) ?? new();
+        var milestones = Parse<List<Kpi.GitLab.Models.GitLabMilestone>>(ReadServerFile(serverId, dir, encrypted, "milestones.json")) ?? new();
+        var issuesPath = Path.Combine(dir, "issues.json");
+        var lastExtracted = File.Exists(issuesPath) ? File.GetLastWriteTimeUtc(issuesPath).ToString("yyyy-MM-dd HH:mm") : "";
+        return (issues, labels, milestones, lastExtracted);
     }
 
     private static string? ReadCurrentToken()
