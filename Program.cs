@@ -16,6 +16,9 @@ var builder = new ConfigurationBuilder()
 var configRoot = builder.Build();
 var appConfig = new AppConfig();
 configRoot.Bind(appConfig);
+// 1c-D : plus de bloc GitLab global → on dérive une config client du 1er serveur pour les chemins mono-serveur.
+var gl = appConfig.PrimaryGitLab();
+var viewName = "release_" + (string.IsNullOrEmpty(gl.Milestone) ? "all" : gl.Milestone) + ".html";
 
 bool viewsOnly = args.Any(a => a.Equals("--views-only", StringComparison.OrdinalIgnoreCase));
 bool serve = args.Any(a => a.Equals("--serve", StringComparison.OrdinalIgnoreCase));
@@ -26,9 +29,9 @@ bool fetchServers = args.Any(a => a.Equals("--fetch-servers", StringComparison.O
 int port = ParsePort(args, defaultPort: 5050);
 
 Console.WriteLine("=== GitLab Exporter ===");
-Console.WriteLine($"Instance : {appConfig.GitLab.BaseUrl}");
-Console.WriteLine($"Projet   : {appConfig.GitLab.ProjectId}");
-Console.WriteLine($"Milestone: {appConfig.GitLab.Milestone}");
+Console.WriteLine($"Instance : {gl.BaseUrl}");
+Console.WriteLine($"Projet   : {gl.ProjectId}");
+Console.WriteLine($"Serveurs : {appConfig.ResolveServers().Count}");
 Console.WriteLine($"Labels   : {string.Join(", ", appConfig.Export.TrackedLabels)}");
 Console.WriteLine($"Sortie   : {Path.GetFullPath(appConfig.Export.OutputDirectory)}");
 if (viewsOnly) Console.WriteLine("Mode     : --views-only (lecture de issues.json, pas d'appel API)");
@@ -43,8 +46,7 @@ try
     if (serve)
     {
         // Vérifie qu'on a au moins un HTML à servir au démarrage.
-        var htmlPath = Path.Combine(appConfig.Export.OutputDirectory, "views",
-            $"release_{appConfig.GitLab.Milestone}.html");
+        var htmlPath = Path.Combine(appConfig.Export.OutputDirectory, "views", viewName);
         if (!File.Exists(htmlPath))
         {
             Console.WriteLine($"HTML absent ({htmlPath}). Lancement d'un export initial...");
@@ -58,7 +60,7 @@ try
     if (fetchLabels)
     {
         Console.WriteLine("Récupération des labels du projet (couleurs incluses)...");
-        using var client = new Kpi.GitLab.GitLabClient(appConfig.GitLab);
+        using var client = new Kpi.GitLab.GitLabClient(gl);
         var labels = await client.GetProjectLabelsAsync(cts.Token);
         var labelsPath = Path.Combine(appConfig.Export.OutputDirectory, "labels.json");
         await Kpi.Export.JsonExporter.WriteJsonAtomicAsync(labelsPath, labels, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
@@ -69,7 +71,7 @@ try
     if (fetchMilestones)
     {
         Console.WriteLine("Récupération des milestones du projet (start_date / due_date)...");
-        using var client = new Kpi.GitLab.GitLabClient(appConfig.GitLab);
+        using var client = new Kpi.GitLab.GitLabClient(gl);
         var milestones = await client.GetProjectMilestonesAsync(cts.Token);
         var msPath = Path.Combine(appConfig.Export.OutputDirectory, "milestones.json");
         await Kpi.Export.JsonExporter.WriteJsonAtomicAsync(msPath, milestones, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
@@ -115,7 +117,7 @@ try
         await new DashboardView()
             .GenerateAsync(
                 appConfig.Export.OutputDirectory,
-                appConfig.GitLab.Milestone,
+                gl.Milestone,
                 exports,
                 appConfig.Export.TrackedTransitions,
                 appConfig.Export.Teams,

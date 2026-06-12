@@ -1,36 +1,37 @@
+using System.Linq;
+
 namespace Kpi.Config;
 
 public sealed class AppConfig
 {
-    /// <summary>Ancien bloc mono-serveur. CONSERVÉ pour rétro-compat pendant la migration multi-serveurs ;
-    /// sera retiré une fois tous les consommateurs basculés sur <see cref="Servers"/>.</summary>
-    public GitLabConfig GitLab { get; set; } = new();
+    // 1c-D : le bloc mono-serveur `GitLab` a été RETIRÉ — la config est 100% multi-serveur (`Servers`).
+    // Migration d'une ancienne config : voir docs/MIGRATION.md (convertir GitLab → une entrée Servers).
     /// <summary>Serveurs GitLab à analyser (v2 multi-serveurs). Chacun cloisonné sous output/&lt;Id&gt;/.</summary>
     public List<ServerConfig> Servers { get; set; } = new();
     public ExportConfig Export { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
 
+    /// <summary>Serveurs configurés. Plus de repli legacy : <see cref="Servers"/> est l'unique source.</summary>
+    public List<ServerConfig> ResolveServers() => Servers ?? new();
+
     /// <summary>
-    /// Serveurs effectifs : <see cref="Servers"/> si renseignée, sinon un serveur unique dérivé de
-    /// l'ancien bloc <see cref="GitLab"/> (rétro-compatibilité). Vide si rien n'est configuré.
+    /// Config client GitLab dérivée du PREMIER serveur, pour les chemins mono-serveur encore en place
+    /// (export complet CLI, fetch labels/milestones, vues statiques). Milestone vide = toutes les issues.
+    /// Le multi-serveur passe lui par <see cref="ServerConfig"/> directement (RunMultiServerExportAsync).
     /// </summary>
-    public List<ServerConfig> ResolveServers()
+    public GitLabConfig PrimaryGitLab()
     {
-        if (Servers is { Count: > 0 }) return Servers;
-        if (!string.IsNullOrWhiteSpace(GitLab.BaseUrl))
-            return new List<ServerConfig>
-            {
-                new()
-                {
-                    Id = "default",
-                    BaseUrl = GitLab.BaseUrl,
-                    GroupToken = GitLab.PrivateToken,
-                    ProjectIds = string.IsNullOrWhiteSpace(GitLab.ProjectId) ? new() : new List<string> { GitLab.ProjectId },
-                    AllowSelfSignedCertificates = GitLab.AllowSelfSignedCertificates,
-                    RequestTimeoutSeconds = GitLab.RequestTimeoutSeconds,
-                }
-            };
-        return new();
+        var s = ResolveServers().FirstOrDefault();
+        if (s == null) return new GitLabConfig();
+        return new GitLabConfig
+        {
+            BaseUrl = s.BaseUrl,
+            PrivateToken = s.GroupToken,
+            ProjectId = s.ProjectIds is { Count: > 0 } ? s.ProjectIds[0] : "",
+            Milestone = "",
+            AllowSelfSignedCertificates = s.AllowSelfSignedCertificates,
+            RequestTimeoutSeconds = s.RequestTimeoutSeconds,
+        };
     }
 }
 

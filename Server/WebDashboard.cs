@@ -55,7 +55,7 @@ public sealed class WebDashboard
         if (!strict) h.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
         return new HttpClient(h) { Timeout = TimeSpan.FromSeconds(15) };
     }
-    private HttpClient SharedHttp => _config.GitLab.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
+    private HttpClient SharedHttp => (_config.ResolveServers().FirstOrDefault()?.AllowSelfSignedCertificates ?? false) ? _sharedHttpRelaxed : _sharedHttp;
 
     private WebDashboard(AppConfig config) => _config = config;
 
@@ -335,7 +335,7 @@ public sealed class WebDashboard
         Console.WriteLine($"Ouvrir : http://localhost:{port}/");
         if (authCfg.OAuthConfigured) Console.WriteLine($"Auth   : OAuth GitLab ({authCfg.Authority}) · callback {authCfg.CallbackPath}");
         else Console.WriteLine("Auth   : connexion par token GitLab (page /login) — OAuth non configuré.");
-        Console.WriteLine($"Rôles  : accès réservé aux membres GitLab du projet {config.GitLab.ProjectId} · admins (fichier serveur) : {string.Join(", ", authCfg.AdminUsers)}");
+        Console.WriteLine($"Rôles  : accès réservé aux membres GitLab des projets configurés ({config.ResolveServers().Count} serveur(s)) · admins (fichier serveur) : {string.Join(", ", authCfg.AdminUsers)}");
         Console.WriteLine("Ctrl+C pour arrêter.");
 
         // Arrêt propre quand le token de Program.cs (Ctrl+C) est annulé.
@@ -860,15 +860,8 @@ public sealed class WebDashboard
         var timeout = b?["timeout"]?.GetValue<int>() ?? 60;
         var serverId = DeriveServerId(baseUri);
 
-        // Bloc GitLab legacy CONSERVÉ (rétro-compat des ~15 consommateurs encore branchés dessus) :
-        // pointe sur le 1er projet de CE serveur. Sera retiré en 1c-D une fois tout basculé sur Servers.
-        var gl = root["GitLab"] as JsonObject;
-        if (gl == null) { gl = new JsonObject(); root["GitLab"] = gl; }
-        gl["BaseUrl"] = baseUrl;
-        gl["PrivateToken"] = token;
-        gl["ProjectId"] = projectIds[0].ToString();
-        gl["AllowSelfSignedCertificates"] = selfSigned;
-        gl["RequestTimeoutSeconds"] = timeout;
+        // 1c-D : on n'écrit plus le bloc GitLab legacy ; on retire un éventuel bloc résiduel pour une config propre.
+        if (root["GitLab"] != null) root.Remove("GitLab");
 
         // v2 — entrée Servers cloisonnée (token de GROUPE, projets sélectionnés). Insert OU update par Id
         // (dérivé de l'hôte) → relancer /setup pour une autre instance AJOUTE un serveur sans écraser les autres.
@@ -1254,7 +1247,7 @@ public sealed class WebDashboard
         else scopedTeams = new Dictionary<string, List<string>>();
 
         var json = DashboardView.BuildPayloadJson(
-            cfg.GitLab.Milestone, filtered.ToList(),
+            "", filtered.ToList(), // v2 : pas de milestone global (filtre UI) ; le payload couvre toutes les issues du périmètre
             cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, cfg.Export.Periods,
             labels, milestones, lastExtracted);
         _payloadCache[cacheKey] = (sig, json);

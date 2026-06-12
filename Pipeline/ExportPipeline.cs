@@ -23,8 +23,9 @@ public static class ExportPipeline
     {
         // milestoneOverride : null = utilise la config (Milestone d'appsettings),
         //                     "" = TOUTES les milestones, "X" = nom précis.
-        using var client = new GitLabClient(config.GitLab);
-        var service = new ExportService(client, config.GitLab, config.Export);
+        var gl = config.PrimaryGitLab(); // 1c-D : 1er serveur (le bloc GitLab legacy a été retiré)
+        using var client = new GitLabClient(gl);
+        var service = new ExportService(client, gl, config.Export);
         var exports = await service.BuildIssueExportsAsync(ct, onProgress, milestoneOverride);
 
         // Récupération des labels du projet (avec couleurs) — sauvegardé dans labels.json
@@ -104,7 +105,7 @@ public static class ExportPipeline
         await new DashboardView()
             .GenerateAsync(
                 config.Export.OutputDirectory,
-                config.GitLab.Milestone,
+                gl.Milestone,
                 exports,
                 config.Export.TrackedTransitions,
                 config.Export.Teams,

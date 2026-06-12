@@ -35,7 +35,7 @@ public sealed class DashboardView
         var aux = LoadAuxFromDisk(outputDirectory);
         var payloadJson = BuildPayloadJson(milestone, exports, trackedTransitions, teams, labelPhases, periods, aux.labels, aux.milestones, aux.lastExtracted);
         var html = BuildReferencePage(payloadJson);
-        var path = Path.Combine(viewsDir, SafeFileName($"release_{milestone}.html"));
+        var path = Path.Combine(viewsDir, SafeFileName($"release_{(string.IsNullOrEmpty(milestone) ? "all" : milestone)}.html"));
         await File.WriteAllTextAsync(path, html, new UTF8Encoding(false), ct);
         Console.WriteLine($"  HTML écrit : {path}");
     }
