@@ -1,6 +1,6 @@
-# GitLab Exporter
+# KPI — Knowledge, Progress & Impact
 
-Outil .NET 10 qui exporte les issues d'un projet GitLab pour une milestone donnée, avec :
+**KPI** (*Knowledge, Progress & Impact*) est un tableau de bord d'analytics des issues GitLab (.NET 10, ASP.NET Core). Il extrait les issues d'un projet GitLab pour une milestone donnée, avec :
 - les labels actuels, le statut, le poids, les assignés ;
 - l'historique daté des changements de labels (sur une liste de labels configurable) ;
 - les transitions configurées (paires `From → To`) avec leurs **dates** et **durées** ;
