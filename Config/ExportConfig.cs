@@ -112,6 +112,31 @@ public sealed class ExportConfig
     /// l'agrégation multi-projets reste à étendre côté extraction. Persisté pour un usage ultérieur.
     /// </summary>
     public List<int> ProjectIds { get; set; } = new();
+
+    /// <summary>
+    /// Catalogue des périodes (phases) dynamiques défini par l'admin via /setup : SOURCE DE VÉRITÉ
+    /// unique des keys/libellés/couleurs. <see cref="LabelPhases"/> ne fait que pointer vers ces keys.
+    /// VIDE ⇒ aucune phase calculée ni affichée (PAS de repli Prod::* historique — c'est le contrat v2).
+    /// L'ordre de la liste = ordre des colonnes/légende côté UI.
+    /// </summary>
+    public List<PeriodDefinition> Periods { get; set; } = new();
+}
+
+/// <summary>
+/// Une période de temps (phase) du cycle de production. Renommable / couleur ajustable par l'admin.
+/// La <see cref="Key"/> est l'identifiant stable référencé par <see cref="ExportConfig.LabelPhases"/>
+/// et par le payload <c>window.__DATA__.periods</c>.
+/// </summary>
+public sealed class PeriodDefinition
+{
+    /// <summary>Clé stable, minuscule [a-z0-9]+ (ex. « dev »). Référencée par LabelPhases et le payload.</summary>
+    public string Key { get; set; } = "";
+    /// <summary>Libellé affiché (ex. « Développement »). Renommable par l'admin.</summary>
+    public string Name { get; set; } = "";
+    /// <summary>Couleur hex (#RRGGBB).</summary>
+    public string Color { get; set; } = "";
+    /// <summary>Si true, la période est chronométrée (compte dans les durées). Ex. uiux=false (segment Gantt seul).</summary>
+    public bool Timed { get; set; } = true;
 }
 
 public sealed class LabelTransitionConfig

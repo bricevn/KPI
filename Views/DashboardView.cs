@@ -25,6 +25,7 @@ public sealed class DashboardView
         IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
+        IReadOnlyList<PeriodDefinition> periods,
         CancellationToken ct)
     {
         var viewsDir = Path.Combine(outputDirectory, "views");
@@ -32,7 +33,7 @@ public sealed class DashboardView
 
         // Export statique AUTONOME : payload réel inliné + page nouveau design (même rendu que le live).
         var aux = LoadAuxFromDisk(outputDirectory);
-        var payloadJson = BuildPayloadJson(milestone, exports, trackedTransitions, teams, labelPhases, aux.labels, aux.milestones, aux.lastExtracted);
+        var payloadJson = BuildPayloadJson(milestone, exports, trackedTransitions, teams, labelPhases, periods, aux.labels, aux.milestones, aux.lastExtracted);
         var html = BuildReferencePage(payloadJson);
         var path = Path.Combine(viewsDir, SafeFileName($"release_{milestone}.html"));
         await File.WriteAllTextAsync(path, html, new UTF8Encoding(false), ct);
@@ -50,11 +51,12 @@ public sealed class DashboardView
         IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
+        IReadOnlyList<PeriodDefinition> periods,
         IReadOnlyList<Kpi.GitLab.Models.GitLabLabel> labels,
         IReadOnlyList<Kpi.GitLab.Models.GitLabMilestone> milestones,
         string? lastExtractedAt)
     {
-        var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases);
+        var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
         foreach (var lab in labels)
             if (!string.IsNullOrEmpty(lab.Name))
@@ -89,7 +91,8 @@ public sealed class DashboardView
         List<IssueExport> exports,
         IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
-        IReadOnlyDictionary<string, string> labelPhases)
+        IReadOnlyDictionary<string, string> labelPhases,
+        IReadOnlyList<PeriodDefinition> periods)
     {
         var availableLabels = exports
             .SelectMany(e => e.Labels)
@@ -133,6 +136,18 @@ public sealed class DashboardView
                     ?? new Dictionary<string, List<string>>(),
             labelPhases = labelPhases?.ToDictionary(kv => kv.Key, kv => kv.Value)
                     ?? new Dictionary<string, string>(),
+            // Catalogue dynamique des périodes (source de vérité keys/libellés/couleurs côté UI).
+            // « none » est exclu : ce n'est pas une période mais le marqueur « non suivi » de labelPhases.
+            periods = (periods ?? Array.Empty<PeriodDefinition>())
+                    .Where(p => !string.IsNullOrEmpty(p.Key) && !string.Equals(p.Key, "none", StringComparison.OrdinalIgnoreCase))
+                    .Select(p => new PeriodPayload
+                    {
+                        key = p.Key,
+                        name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name,        // jamais de libellé vide
+                        color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, // jamais de couleur vide
+                        timed = p.Timed,
+                    })
+                    .ToList(),
             issues = exports.Select(ToPayload).ToList(),
         };
     }
@@ -251,6 +266,7 @@ public sealed class DashboardView
         public List<string> availableMilestones { get; set; } = new();
         public Dictionary<string, List<string>> teams { get; set; } = new();
         public Dictionary<string, string> labelPhases { get; set; } = new();
+        public List<PeriodPayload> periods { get; set; } = new();
         public Dictionary<string, LabelColorPayload> labelColors { get; set; } = new();
         public Dictionary<string, MilestoneDatesPayload> milestoneDates { get; set; } = new();
         public List<IssuePayload> issues { get; set; } = new();
@@ -260,6 +276,14 @@ public sealed class DashboardView
     {
         public string from { get; set; } = "";
         public string to { get; set; } = "";
+    }
+
+    private sealed class PeriodPayload
+    {
+        public string key { get; set; } = "";
+        public string name { get; set; } = "";
+        public string color { get; set; } = "";
+        public bool timed { get; set; }
     }
 
     private sealed class LabelColorPayload

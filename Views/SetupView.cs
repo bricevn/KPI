@@ -287,6 +287,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     ST.saving=true;ST.saveErr='';render();
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       projectIds:ST.importIds,labelPhases:ST.labelPhase,
+      periods:PHASES.filter(function(p){return p[0]!=='none';}).map(function(p){return {key:p[0],name:p[1],color:p[2],timed:p[0]!=='uiux'};}),
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){return r.json();}).then(function(j){if(j.ok){window.location.href='/';}else{ST.saving=false;ST.saveErr=j.error||'Enregistrement impossible.';render();}})

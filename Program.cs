@@ -120,6 +120,7 @@ try
                 appConfig.Export.TrackedTransitions,
                 appConfig.Export.Teams,
                 appConfig.Export.LabelPhases,
+                appConfig.Export.Periods,
                 cts.Token);
 
         Console.WriteLine();

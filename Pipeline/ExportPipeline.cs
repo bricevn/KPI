@@ -109,6 +109,7 @@ public static class ExportPipeline
                 config.Export.TrackedTransitions,
                 config.Export.Teams,
                 config.Export.LabelPhases,
+                config.Export.Periods,
                 ct);
 
         Console.WriteLine();

@@ -772,11 +772,39 @@ public sealed class WebDashboard
         var projectIds = (b?["projectIds"]?.AsArray() ?? new JsonArray()).Select(n => n!.GetValue<int>()).ToList();
         if (projectIds.Count == 0) return Results.Json(new { ok = false, error = "Sélectionnez au moins un projet." });
 
+        // Catalogue des périodes (phases) — normalisé en PascalCase pour matcher le DTO PeriodDefinition
+        // (binding tolérant à la casse, mais on reste explicite). « none » exclu (marqueur, pas une période).
+        // Extraction robuste contre les types JSON inattendus (admin pouvant envoyer un body malformé).
+        static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+        var periodsArr = new JsonArray();
+        var validPeriodKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in b?["periods"]?.AsArray() ?? new JsonArray())
+        {
+            if (p is not JsonObject po) continue;
+            var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(key) || key == "none" || !validPeriodKeys.Add(key)) continue;
+            var name = (Str(po["name"]) ?? "").Trim();
+            if (string.IsNullOrEmpty(name)) name = key;                       // « » → repli sur la clé
+            var color = (Str(po["color"]) ?? "").Trim();
+            if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc"; // hex strict, sinon défaut
+            var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
+            periodsArr.Add(new JsonObject
+            {
+                ["Key"]   = key,
+                ["Name"]  = name,
+                ["Color"] = color,
+                ["Timed"] = timed,
+            });
+        }
+
         var trackedLabels = new List<string>();
         var labelPhases = new Dictionary<string, string>();
         foreach (var kv in (b?["labelPhases"]?.AsObject() ?? new JsonObject()))
         {
             var ph = kv.Value?.GetValue<string>() ?? "none";
+            // Validation croisée : un label pointant vers une période inexistante est rétrogradé en « none »
+            // (pas de key orpheline). Si aucune période n'est transmise → on accepte tel quel (rétro-compat).
+            if (ph != "none" && validPeriodKeys.Count > 0 && !validPeriodKeys.Contains(ph)) ph = "none";
             labelPhases[kv.Key] = ph;
             if (ph != "none") trackedLabels.Add(kv.Key);
         }
@@ -831,6 +859,9 @@ public sealed class WebDashboard
         ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
         ex["Teams"] = teams;
         ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
+        // Catalogue des périodes : on n'écrit QUE si le wizard a transmis le champ (même vide = volonté
+        // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
+        if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
 
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try
@@ -1157,7 +1188,7 @@ public sealed class WebDashboard
 
         var json = DashboardView.BuildPayloadJson(
             cfg.GitLab.Milestone, filtered.ToList(),
-            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases,
+            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, cfg.Export.Periods,
             labels, milestones, lastExtracted);
         _payloadCache[cacheKey] = (sig, json);
         return json;
