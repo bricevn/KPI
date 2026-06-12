@@ -167,7 +167,8 @@ window.buildAPP = function (D) {
       iid: iss.iid, title: iss.title || '', type: t ? t.key : 'untyped', weight: (iss.weight == null ? 0 : iss.weight),
       assignees: iss.assignees || [], state: closed ? 'closed' : 'open',
       validated: closed, approval: approval, retours: tm.retours, _times: tm,
-      seg: seg, start: start, end: end, mrCount: mrs.length, comments: iss.commentsCount || 0,
+      seg: seg, start: start, end: end, mrCount: mrs.length,
+      mrs: mrs.map(function (m) { return { iid: m.iid, state: m.state }; }), comments: iss.commentsCount || 0,
       labels: iss.labels || [], approvers: approvers, closedBy: closed ? (approvers[0] || (iss.assignees || [])[0] || null) : null,
       noMilestone: !iss.milestone, noType: !t, noPrio: !labelsL.some(function (l) { return l.indexOf('prio::') === 0; }),
       multiType: (iss.labels || []).filter(function (l) { return l.toLowerCase().indexOf('type::') === 0; }).length > 1,
@@ -300,7 +301,7 @@ window.buildAPP = function (D) {
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
     superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, weightBuckets: weightBuckets,
     milestone: milestone, meta: meta, FIB: FIB,
-    filterOptions: { milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
+    filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     cal: { START: new Date(START), DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, dayDate: function (d) { return new Date(START + d * MS_DAY); }, fmtDay: function (d) { return fmtFr(START + d * MS_DAY); } },
     tabs: [
       { id: 'dashboard', label: 'Dashboard' }, { id: 'charts', label: 'Graphiques' },

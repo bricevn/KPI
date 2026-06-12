@@ -13,6 +13,7 @@
     };
     const rows = [...A.pivot];
     rows.sort((a, b) => sorter(a, b, get));
+    const t = window.t;
     const Th = ({ k, children, num, unit, hint }) => <th className={'sortable' + (num ? ' num' : '')} onClick={() => onSort(k)} title={hint}>{children}{unit && <span className="th-unit">{unit}</span>} <span className="ar">{arrow(k)}</span></th>;
 
     const validated = A.detail.filter((d) => d.validated);
@@ -22,6 +23,17 @@
     const tComm = A.pivot.reduce((s, r) => s + r.comm, 0);
     // phase total = sum of average phase durations (mean lead time across phases)
     const phaseTotal = A.phaseAvg.reduce((s, p) => s + p.days, 0);
+    // moyennes de phase indexées par key (pour la ligne Total) + max pour l'échelle des barres.
+    const pa = {}; A.phaseAvg.forEach((p) => { pa[p.key] = p.days; });
+    const phaseMax = Math.max(1, ...A.phaseAvg.map((p) => p.days));
+    // tendance RÉELLE du cycle : moyenne du temps de cycle (_times.total) des issues regroupées
+    // par jour de complétion (d.end) en 6 tranches sur la fenêtre. Delta = dernière vs première tranche non vide.
+    const cycleTrend = (function () {
+      const N = 6, span = Math.max(1, A.cal.DAYS), buckets = Array.from({ length: N }, () => []);
+      A.detail.forEach((d) => { const tot = d._times && d._times.total; if (!(tot > 0)) return; const bi = Math.min(N - 1, Math.max(0, Math.floor(d.end / span * N))); buckets[bi].push(tot); });
+      return buckets.map((b) => b.length ? Math.round(b.reduce((s, x) => s + x, 0) / b.length * 10) / 10 : 0);
+    })();
+    const cycleDelta = (function () { const nz = cycleTrend.filter((x) => x > 0); if (nz.length < 2) return null; return Math.round((nz[nz.length - 1] - nz[0]) / nz[0] * 100); })();
 
     const Kard = ({ anchor, chip, chipBg, label, value, suffix, pct, color, onClick, cue, bottom, cap }) => (
       <div className={'kcard' + (onClick ? ' clickable' : '')} data-comment-anchor={anchor} onClick={onClick} title={cue || undefined}>
@@ -41,49 +53,49 @@
     return (
       <React.Fragment>
         <div className="kpis">
-          <Kard anchor="1da3d31e09-div-17-11" chip={window.ICONS.issueDot} chipBg="var(--c-done)" label="Avancement"
+          <Kard anchor="1da3d31e09-div-17-11" chip={window.ICONS.issueDot} chipBg="var(--c-done)" label={t('dash.advancement')}
             value={K.progress.pct + '%'} pct={K.progress.pct} color={window.pctColor(K.progress.pct)}
-            cap={[{ v: K.progress.closed, label: 'fermées', color: 'var(--c-done)' }, { v: T.open, label: 'ouvertes' }]}
-            cue="Voir les issues fermées"
-            onClick={() => setDrill({ title: 'Avancement', headline: K.progress.pct + '%', subtitle: `${closed.length} fermées · ${T.open} ouvertes`, issues: closed, recap: 'issues' })} />
-          <Kard chip={window.ICONS.weight} chipBg="var(--c-good)" label="Poids validé"
+            cap={[{ v: K.progress.closed, label: t('dash.closed'), color: 'var(--c-done)' }, { v: T.open, label: t('dash.open') }]}
+            cue={t('dash.seeClosed')}
+            onClick={() => setDrill({ title: t('dash.advancement'), headline: K.progress.pct + '%', subtitle: t('dash.subClosed', { closed: closed.length, open: T.open }), issues: closed, recap: 'issues' })} />
+          <Kard chip={window.ICONS.weight} chipBg="var(--c-good)" label={t('dash.weightValidated')}
             value={K.weight.pct + '%'} pct={K.weight.pct} color={window.pctColor(K.weight.pct)}
-            cap={[{ v: K.weight.v, label: 'validés', color: 'var(--c-good)' }, { v: K.weight.total - K.weight.v, label: 'non validés' }]}
-            cue="Voir les issues validées"
-            onClick={() => setDrill({ title: 'Poids validé', headline: K.weight.pct + '%', subtitle: `${K.weight.v}/${K.weight.total} pts validés · ${validated.length} issues`, issues: validated, recap: 'weight' })} />
-          <Kard chip={window.ICONS.approve} chipBg="var(--c-regression)" label="Approvals"
+            cap={[{ v: K.weight.v, label: t('dash.validated'), color: 'var(--c-good)' }, { v: K.weight.total - K.weight.v, label: t('dash.notValidated') }]}
+            cue={t('dash.seeValidated')}
+            onClick={() => setDrill({ title: t('dash.weightValidated'), headline: K.weight.pct + '%', subtitle: t('dash.subWeight', { v: K.weight.v, total: K.weight.total, n: validated.length }), issues: validated, recap: 'weight' })} />
+          <Kard chip={window.ICONS.approve} chipBg="var(--c-regression)" label={t('dash.approvals')}
             value={K.approvals.pct + '%'} pct={K.approvals.pct} color={window.pctColor(K.approvals.pct)}
-            cap={[{ v: K.approvals.with, label: 'faits', color: 'var(--c-regression)' }, { v: K.approvals.total - K.approvals.with, label: 'non faits' }]}
-            cue="Voir les issues approuvées"
-            onClick={() => setDrill({ title: 'Approvals', headline: K.approvals.pct + '%', subtitle: `${approved.length} faits · ${A.detail.length - approved.length} non faits`, issues: approved, recap: 'issues' })} />
-          <Kard chip={window.ICONS.clock} chipBg="var(--p-qawait)" label="Cycle moyen"
-            value={K.cycle.days} suffix="j"
-            cue="Voir les issues les plus longues"
-            onClick={() => setDrill({ title: 'Cycle — temps par issue', subtitle: 'Temps de cycle complet par issue (création → fermeture), des plus longues aux plus courtes', issues: byCycle, recap: false, mode: 'cycle' })}
-            bottom={
+            cap={[{ v: K.approvals.with, label: t('dash.done'), color: 'var(--c-regression)' }, { v: K.approvals.total - K.approvals.with, label: t('dash.notDone') }]}
+            cue={t('dash.seeApproved')}
+            onClick={() => setDrill({ title: t('dash.approvals'), headline: K.approvals.pct + '%', subtitle: t('dash.subApprovals', { done: approved.length, notDone: A.detail.length - approved.length }), issues: approved, recap: 'issues' })} />
+          <Kard chip={window.ICONS.clock} chipBg="var(--p-qawait)" label={t('dash.avgCycle')}
+            value={K.cycle.days} suffix={t('unit_day')}
+            cue={t('dash.seeLongest')}
+            onClick={() => setDrill({ title: t('dash.cycleTitle'), subtitle: t('dash.cycleSub'), issues: byCycle, recap: false, mode: 'cycle' })}
+            bottom={cycleTrend.some((x) => x > 0) &&
             <div className="kcard-trend">
-                <window.SparkLine data={[16, 14, 13, 12, 11.8, 11.3]} color="var(--p-qawait)" />
-                <span className="trend-delta" style={{ color: 'var(--c-good)' }}>↘ −29 %</span>
+                <window.SparkLine data={cycleTrend} color="var(--p-qawait)" />
+                {cycleDelta != null && <span className="trend-delta" style={{ color: cycleDelta <= 0 ? 'var(--c-good)' : 'var(--c-bad)' }}>{cycleDelta <= 0 ? '↘' : '↗'} {cycleDelta > 0 ? '+' : ''}{cycleDelta} %</span>}
               </div>} />
         </div>
 
         <div className="pnl">
-          <div className="pnl-h"><h3>KPIs par Type::*</h3><window.InfoTip text="Temps moyen passé dans chaque phase, en jours. Cliquez sur une colonne pour trier les types." /></div>
+          <div className="pnl-h"><h3>{t('dash.kpisByType')}</h3><window.InfoTip text={t('dash.kpisByTypeTip')} /></div>
           <div className="tbl-scroll">
             <table className="tbl big">
               <thead><tr>
-                <Th k="type" hint="Catégorie d'issue (label Type::*)">Type</Th>
-                <Th k="issues" num hint="Issues ouvertes / fermées — tri par nombre total">Issues O/F</Th>
-                <Th k="wpc" num hint="Poids validé / poids total — tri par taux de validation">Poids V/T</Th>
-                <Th k="apc" num hint="Approvals faits / non faits — tri par nombre d'approbations">Approvals F/N</Th>
-                <Th k="dev" num unit="j" hint="Temps moyen en phase Dev (jours)">Dev</Th>
-                <Th k="rev" num unit="j" hint="Temps moyen en Review (jours)">Review</Th>
-                <Th k="qawait" num unit="j" hint="Temps moyen en attente de QA (jours)">QA att.</Th>
-                <Th k="qa" num unit="j" hint="Temps moyen en QA (jours)">QA</Th>
-                <Th k="tofix" num unit="j" hint="Temps moyen en To fix (jours)">To fix</Th>
-                <Th k="po" num unit="j" hint="Temps moyen en validation PO (jours)">PO</Th>
-                <Th k="ret" num hint="Nombre de retours (aller-retours QA / To fix)">Retours</Th>
-                <Th k="comm" num hint="Nombre de commentaires">Comm.</Th>
+                <Th k="type" hint={t('tbl.hType')}>{t('tbl.type')}</Th>
+                <Th k="issues" num hint={t('tbl.hIssues')}>{t('tbl.issuesOF')}</Th>
+                <Th k="wpc" num hint={t('tbl.hWeight')}>{t('tbl.weightVT')}</Th>
+                <Th k="apc" num hint={t('tbl.hApprovals')}>{t('tbl.approvalsFN')}</Th>
+                <Th k="dev" num unit={t('unit_day')} hint={t('tbl.hDev')}>{t('tbl.dev')}</Th>
+                <Th k="rev" num unit={t('unit_day')} hint={t('tbl.hReview')}>{t('tbl.review')}</Th>
+                <Th k="qawait" num unit={t('unit_day')} hint={t('tbl.hQaWait')}>{t('tbl.qaWait')}</Th>
+                <Th k="qa" num unit={t('unit_day')} hint={t('tbl.hQa')}>{t('tbl.qa')}</Th>
+                <Th k="tofix" num unit={t('unit_day')} hint={t('tbl.hToFix')}>{t('tbl.toFix')}</Th>
+                <Th k="po" num unit={t('unit_day')} hint={t('tbl.hPo')}>{t('tbl.po')}</Th>
+                <Th k="ret" num hint={t('tbl.hReturns')}>{t('tbl.returns')}</Th>
+                <Th k="comm" num hint={t('tbl.hComments')}>{t('tbl.comments')}</Th>
               </tr></thead>
               <tbody>
                 {rows.map((r) =>
@@ -98,11 +110,11 @@
                   </tr>
                 )}
                 <tr className="total">
-                  <td>Total</td>
+                  <td>{t('tbl.total')}</td>
                   <td><span className="oc"><span className="o">{T.open}</span><s>/</s><span className="c">{T.closed}</span></span></td>
                   <td><span className="oc"><span className="c">{T.wV}</span><s>/</s><span className="o">{T.weight}</span></span></td>
-                  <td><span className="oc"><span className="c">154</span><s>/</s><span className="o">{T.issues - 154}</span></span></td>
-                  <td>4.2</td><td>1.8</td><td>2.3</td><td>1.4</td><td>0.9</td><td>0.7</td>
+                  <td><span className="oc"><span className="c">{K.approvals.with}</span><s>/</s><span className="o">{T.issues - K.approvals.with}</span></span></td>
+                  <td>{(pa.dev || 0).toFixed(1)}</td><td>{(pa.review || 0).toFixed(1)}</td><td>{(pa.qawait || 0).toFixed(1)}</td><td>{(pa.qa || 0).toFixed(1)}</td><td>{(pa.tofix || 0).toFixed(1)}</td><td>{(pa.po || 0).toFixed(1)}</td>
                   <td>{T.ret}</td><td>{tComm}</td>
                 </tr>
               </tbody>
@@ -111,7 +123,7 @@
         </div>
 
         <div className="pnl">
-          <div className="pnl-h"><h3>Labels transversaux</h3><window.InfoTip text="Labels transverses (CONTRACTUAL, Unplanned, Surcharge QA) qui recoupent plusieurs Type::*. Comptés à part du total, en % du périmètre filtré." /></div>
+          <div className="pnl-h"><h3>{t('dash.transversal')}</h3><window.InfoTip text={t('dash.transversalTip')} /></div>
           <div className="pnl-b">
             <div className="tv-cards">
               {A.transversal.map((r) => {
@@ -121,25 +133,25 @@
                   <div key={r.key} className="tv-card">
                     <div className="tv-card-h">
                       <span className="tv-card-name">{r.name}</span>
-                      <span className="tv-card-ratio">{r.ratio}% du périmètre</span>
+                      <span className="tv-card-ratio">{t('dash.ofScope', { p: r.ratio })}</span>
                     </div>
-                    <div className="tv-card-issues"><b>{r.issues}</b> issues · <b>{r.open}</b> ouvertes · <b>{r.closed}</b> fermées</div>
+                    <div className="tv-card-issues"><b>{r.issues}</b> {t('issues')} · <b>{r.open}</b> {t('dash.open')} · <b>{r.closed}</b> {t('dash.closed')}</div>
                     <div className="tv-prog">
                       <div className="tv-prog-row">
-                        <span className="tv-prog-lbl">Avancement</span>
+                        <span className="tv-prog-lbl">{t('dash.advancement')}</span>
                         <span className="tv-track"><i style={{ width: clo + '%', background: window.pctColor(clo) }}></i></span>
                         <span className="tv-prog-v">{clo}%</span>
                       </div>
                       <div className="tv-prog-row">
-                        <span className="tv-prog-lbl">Poids validé</span>
+                        <span className="tv-prog-lbl">{t('dash.weightValidated')}</span>
                         <span className="tv-track"><i style={{ width: val + '%', background: window.pctColor(val) }}></i></span>
                         <span className="tv-prog-v">{r.wV}/{r.wV + r.wNV}</span>
                       </div>
                     </div>
                     <div className="tv-card-foot">
-                      <span><b>{r.appr}</b> approvals</span>
-                      <span><b>{r.ret}</b> retours</span>
-                      <span><b>{r.comm}</b> comm.</span>
+                      <span><b>{r.appr}</b> {t('dash.approvalsWord')}</span>
+                      <span><b>{r.ret}</b> {t('dash.returnsWord')}</span>
+                      <span><b>{r.comm}</b> {t('dash.commWord')}</span>
                     </div>
                   </div>);
               })}
@@ -148,20 +160,20 @@
         </div>
 
         <div className="pnl">
-          <div className="pnl-h"><h3>Temps moyen par phase</h3><window.InfoTip text="Durée moyenne en jours, toutes issues confondues." /></div>
+          <div className="pnl-h"><h3>{t('dash.avgTimePhase')}</h3><window.InfoTip text={t('dash.avgTimePhaseTip')} /></div>
           <div className="pnl-b">
             <div className="phase-grid">
               {A.phaseAvg.map((p) =>
               <div key={p.key} className="phase">
                   <span className="nm">{p.name}</span>
-                  <span className="tr"><i style={{ width: p.days / 4.2 * 100 + '%', background: window.phaseColor(p.key) }}></i></span>
-                  <span className="v">{p.days.toFixed(1)}j</span>
+                  <span className="tr"><i style={{ width: Math.min(100, p.days / phaseMax * 100) + '%', background: window.phaseColor(p.key) }}></i></span>
+                  <span className="v">{p.days.toFixed(1)}{t('unit_day')}</span>
                 </div>
               )}
             </div>
             <div className="phase-total">
-              <span className="nm">Total (lead time moyen)</span>
-              <span className="v">{phaseTotal.toFixed(1)} j</span>
+              <span className="nm">{t('dash.totalLead')}</span>
+              <span className="v">{phaseTotal.toFixed(1)} {t('unit_day')}</span>
             </div>
           </div>
         </div>

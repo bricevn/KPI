@@ -22,7 +22,7 @@
   }
 
   function StatusBadge({ state }) {
-    return <span className={'st-badge ' + (state === 'closed' ? 'st-closed' : 'st-open')}><span className="sd"></span>{state === 'closed' ? 'Fermée' : 'Ouverte'}</span>;
+    return <span className={'st-badge ' + (state === 'closed' ? 'st-closed' : 'st-open')}><span className="sd"></span>{state === 'closed' ? window.t('common.closedF') : window.t('common.openF')}</span>;
   }
 
   function Row({ d }) {
@@ -36,7 +36,7 @@
           <span className="issue-meta">
             <span className="chip"><span className="dot" style={{ background: window.typeColor(d.type) }}></span>{A.typeByKey[d.type].short}</span>
             {d.mrCount > 0 && <span className="chip">{window.ICONS.git}{d.mrCount} MR</span>}
-            <span className="wchip-l" title="Poids estimé (Fibonacci)"><span className="lk">Poids</span>{d.weight}</span>
+            <span className="wchip-l" title="Poids estimé (Fibonacci)"><span className="lk">{window.t('common.weight')}</span>{d.weight}</span>
             <span className="av-stack">{d.assignees.map((a) => <window.Avatar key={a} pid={a} />)}</span>
             <StatusBadge state={d.state} />
           </span>
@@ -45,31 +45,31 @@
         <div className="issue-body">
             <div className="ib-grid">
               <div className="ib-row">
-                <span className="ib-k">Labels</span>
+                <span className="ib-k">{window.t('iss.labels')}</span>
                 <span className="ib-v ib-chips">{d.labels.map((l) => <span key={l} className="lbl-chip"><span className="dot" style={{ background: labelColor(l, d) }}></span>{l}</span>)}</span>
               </div>
               <div className="ib-row">
-                <span className="ib-k">Merge requests</span>
+                <span className="ib-k">{window.t('iss.mergeRequests')}</span>
                 <span className="ib-v">
                   {d.mrCount > 0 ?
                   <span className="mr-line">
-                      <span className="chip">{window.ICONS.git}!{d.iid % 900 + 120} · {d.state === 'closed' ? 'mergée' : 'ouverte'}</span>
+                      {(d.mrs || []).map((m) => <span key={m.iid} className="chip">{window.ICONS.git}!{m.iid} · {(m.state || '').toLowerCase() === 'merged' ? window.t('iss.merged') : window.t('iss.openMR')}</span>)}
                       {d.approvers.length ?
-                      <span className="mr-appr">approuvée par <span className="av-stack">{d.approvers.map((a) => <window.Avatar key={a} pid={a} size={20} />)}</span> {d.approvers.map((a) => A.peopleById[a].name).join(', ')}</span> :
-                      <span className="muted">en attente d’approbation</span>}
+                      <span className="mr-appr">{window.t('iss.approvedByPre')} <span className="av-stack">{d.approvers.map((a) => <window.Avatar key={a} pid={a} size={20} />)}</span> {d.approvers.map((a) => A.peopleById[a].name).join(', ')}</span> :
+                      <span className="muted">{window.t('iss.awaiting')}</span>}
                     </span> :
-                  <span className="muted">Aucune merge request liée</span>}
+                  <span className="muted">{window.t('iss.noMR')}</span>}
                 </span>
               </div>
             </div>
-            <div className="ib-k" style={{ margin: '4px 0 6px' }}>Historique des labels</div>
+            <div className="ib-k" style={{ margin: '4px 0 6px' }}>{window.t('iss.history')}</div>
             <table className="evt">
-              <thead><tr><th>Date</th><th>Action</th><th>Label</th><th>Auteur</th></tr></thead>
+              <thead><tr><th>{window.t('iss.date')}</th><th>{window.t('iss.action')}</th><th>{window.t('iss.label')}</th><th>{window.t('iss.author')}</th></tr></thead>
               <tbody>
                 {events(d).map((e, i) =>
                 <tr key={i}>
                     <td className="muted">{A.cal.fmtDay(e.day)}</td>
-                    <td className={e.action === 'add' ? 'act-add' : 'act-rm'}>{e.action === 'add' ? 'ajout' : 'retrait'}</td>
+                    <td className={e.action === 'add' ? 'act-add' : 'act-rm'}>{e.action === 'add' ? window.t('iss.add') : window.t('iss.remove')}</td>
                     <td><span className="type"><span className="dot" style={{ background: window.phaseColor(e.phase) }}></span>{e.label}</span></td>
                     <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><window.Avatar pid={e.user} size={20} />{A.peopleById[e.user] ? A.peopleById[e.user].name : '—'}</span></td>
                   </tr>
@@ -98,15 +98,15 @@
       <React.Fragment>
         <div className="search">
           {window.ICONS.search}
-          <input placeholder="Rechercher par IID ou titre…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input placeholder={window.t('iss.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div style={{ marginTop: 16 }}>
           {list.length ?
           <React.Fragment>
-              <Group title="Ouvertes" items={opened} tone="var(--c-warn)" />
-              <Group title="Fermées" items={closed} tone="var(--c-done)" />
+              <Group title={window.t('iss.open')} items={opened} tone="var(--c-warn)" />
+              <Group title={window.t('iss.closed')} items={closed} tone="var(--c-done)" />
             </React.Fragment> :
-          <div className="empty">Aucune issue ne correspond.</div>}
+          <div className="empty">{window.t('iss.none')}</div>}
         </div>
       </React.Fragment>);
 

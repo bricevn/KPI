@@ -55,7 +55,7 @@
 .sb-theme button.on{background:var(--accent); color:#fff;}
 
 /* ---------- main + header ---------- */
-.main{flex:1; min-width:0; padding:20px 24px 36px; display:flex; flex-direction:column; gap:16px; max-width:1640px;}
+.main{flex:1; min-width:0; padding:20px 24px 36px; display:flex; flex-direction:column; gap:16px;}
 .hd{display:flex; align-items:center; gap:16px;}
 .hd h1{margin:0; font-size:21px; font-weight:700;}
 .hd .meta{font-size:12px; color:var(--ink-faint); margin-top:2px;}
@@ -375,8 +375,8 @@
 .opt-sec .lead{font-size:12.5px; color:var(--ink-faint); margin:0 0 14px;}
 .opt-row{display:flex; align-items:center; gap:14px; padding:11px 0; border-top:1px solid var(--line-2);}
 .opt-row:first-of-type{border-top:0;}
-.opt-row .lbl{font-size:13px; font-weight:500; flex:1;}
-.opt-row .lbl span{display:block; font-size:11.5px; color:var(--ink-faint); font-weight:400; margin-top:2px;}
+.opt-row .lbl{font-size:13.5px; font-weight:600; color:var(--ink); flex:1;}
+.opt-row .lbl span{display:block; font-size:11.5px; color:var(--ink-dim); font-weight:400; margin-top:3px;}
 .field{display:flex; flex-direction:column; gap:5px; margin-bottom:13px;}
 .field label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint);}
 .field input,.field select{border:1px solid var(--line); border-radius:9px; background:var(--panel-2); color:var(--ink); font:14px system-ui,sans-serif; padding:9px 12px; outline:none;}
@@ -394,6 +394,31 @@
 .checklist label.on{border-color:var(--accent); color:var(--accent); background:var(--accent-soft);}
 .tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:5px 11px; border-radius:999px; background:var(--panel-2); color:var(--ink-dim); font-weight:600;}
 .tag .x{color:var(--ink-faint); cursor:pointer;}
+/* options configuration — sous-sections alignées sur le setup */
+.opt-sub{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin:18px 0 10px; display:flex; align-items:center; gap:9px;}
+.opt-sub:first-of-type{margin-top:6px;}
+.opt-note{font-size:12px; color:var(--ink-faint); margin:0 0 12px; line-height:1.45;}
+.opt-prereq{font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); background:var(--accent-soft); padding:2px 7px; border-radius:999px;}
+.opt-map{border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel-2);}
+.opt-maprow{display:flex; align-items:center; gap:11px; padding:8px 13px;}
+.opt-maprow + .opt-maprow{border-top:1px solid var(--line-2);}
+.opt-dot{width:9px; height:9px; border-radius:50%; flex:none;}
+.opt-mlabel{flex:1; min-width:0; font-family:var(--font-mono,monospace); font-size:12.5px; color:var(--ink);}
+.opt-mini{border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font:13px system-ui,sans-serif; padding:6px 10px; outline:none; cursor:pointer;}
+.opt-mini:focus{border-color:var(--accent);}
+.opt-role{font-size:10px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:999px; margin-left:2px;}
+/* options — éditeur de phases */
+.opt-phases{display:flex; flex-direction:column; gap:7px; margin-bottom:12px;}
+.opt-phrow{display:flex; align-items:center; gap:10px;}
+.opt-swatchwrap{position:relative; flex:none;}
+.opt-swatch{width:26px; height:26px; border-radius:8px; border:1px solid rgba(255,255,255,.14); cursor:pointer; padding:0;}
+.opt-pop{position:absolute; top:32px; left:0; z-index:20; display:grid; grid-template-columns:repeat(5,1fr); gap:6px; padding:8px; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.4);}
+.opt-pc{width:22px; height:22px; border-radius:6px; border:1px solid rgba(255,255,255,.14); cursor:pointer; padding:0;}
+.opt-pc.on{outline:2px solid var(--ink); outline-offset:1px;}
+.opt-phname{flex:1; min-width:0; background:var(--panel-2); border:1px solid var(--line); border-radius:9px; color:var(--ink); font:600 13.5px system-ui,sans-serif; padding:8px 11px; outline:none;}
+.opt-phname:focus{border-color:var(--accent);}
+.opt-phx{flex:none; border:0; background:none; color:var(--ink-faint); font-size:20px; line-height:1; cursor:pointer; padding:0 6px; border-radius:6px;}
+.opt-phx:hover{color:var(--bad);}
 
 /* ---- KPI progress bar + line sparkline (review) ---- */
 .kbar{height:9px; border-radius:6px; background:var(--panel-3); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden; margin-top:12px;}
@@ -563,6 +588,9 @@
 .sb-collapse{display:flex; align-items:center; gap:11px; margin-top:6px; padding:9px 11px; border:0; background:transparent;
   color:var(--ink-faint); font:600 12px system-ui,sans-serif; cursor:pointer; border-radius:11px; width:100%;}
 .sb-collapse:hover{background:var(--panel-2); color:var(--ink);}
+.sb-logout{color:var(--ink-faint);}
+.sb-logout:hover{background:color-mix(in srgb, var(--c-bad) 12%, transparent); color:var(--c-bad);}
+.sb-logout:hover svg{color:var(--c-bad);}
 .sb-collapse-ic{display:inline-grid; place-items:center; transform:rotate(180deg);}
 .sb-collapse-ic svg{width:18px; height:18px;}
 .sb.collapsed{width:68px; padding:18px 10px;}

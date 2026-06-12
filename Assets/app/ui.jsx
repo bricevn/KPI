@@ -105,7 +105,7 @@
       if (single) {onChange([o]);setOpen(false);return;}
       onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
     };
-    const summary = value.length === 0 ? 'Tous' : single ? value[0] : value.length === 1 ? value[0] : value.length + ' sélectionnés';
+    const summary = value.length === 0 ? window.t('common.all') : single ? value[0] : value.length === 1 ? value[0] : value.length + ' ' + window.t('common.selected');
     return (
       <div className="ms" ref={ref}>
         <button className={'pill' + (open ? ' on' : '')} onClick={() => setOpen((o) => !o)}>
@@ -113,7 +113,7 @@
         </button>
         {open &&
         <div className="ms-pop">
-          {!single && <div className="ms-head">{value.length} sur {options.length}<button className="ms-clear" onClick={() => onChange([])}>Effacer</button></div>}
+          {!single && <div className="ms-head">{value.length} {window.t('common.of')} {options.length}<button className="ms-clear" onClick={() => onChange([])}>{window.t('common.clear')}</button></div>}
           {options.map((o) =>
           <label key={o} className={'ms-opt' + (value.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>
             <span className="ms-box">{value.includes(o) ? '✓' : ''}</span>{o}
@@ -142,16 +142,11 @@
       {ICONS.info}
     </span>;
 
-  // GitLab issue hyperlink — used wherever an issue IID appears.
-  // La base d'URL est dérivée du webUrl RÉEL des issues (window.APP.meta.issueBase) → générique :
-  // marche pour n'importe quelle instance/projet GitLab, sans rien câbler en dur.
-  const IssueLink = ({ iid, className }) => {
-    const base = (window.APP && window.APP.meta && window.APP.meta.issueBase) || '';
-    const href = base ? base + iid : null;
-    return (
-      <a className={'iid-link' + (className ? ' ' + className : '')} href={href || undefined} target="_blank" rel="noopener noreferrer"
-        title={'Ouvrir l’issue #' + iid + ' sur GitLab'} onClick={(e) => e.stopPropagation()}>#{iid}</a>);
-  };
+  // GitLab issue hyperlink — used wherever an issue IID appears
+  const ISSUE_BASE = 'https://gitlab.obvious.tech/hypervisor/-/issues/';
+  const IssueLink = ({ iid, className }) =>
+  <a className={'iid-link' + (className ? ' ' + className : '')} href={ISSUE_BASE + iid} target="_blank" rel="noopener noreferrer"
+  title={'Ouvrir l’issue #' + iid + ' sur GitLab'} onClick={(e) => e.stopPropagation()}>#{iid}</a>;
 
   // progress → colour by value (colour-blind safe + glyph elsewhere)
   const pctColor = (pct, scheme) => {
@@ -174,7 +169,7 @@
           <div className="modal-h">
             <div className="modal-h-txt"><h3>{title}</h3>{subtitle && <div className="modal-sub">{subtitle}</div>}</div>
             {headline != null && <span className="modal-headline">{headline}</span>}
-            <button className="modal-x" onClick={onClose} aria-label="Fermer">✕</button>
+            <button className="modal-x" onClick={onClose} aria-label={window.t('common.close')}>✕</button>
           </div>
           <div className="modal-b">{children}</div>
         </div>
@@ -237,15 +232,13 @@
       try {for (const rule of sheet.cssRules) css += rule.cssText + '\n';} catch (e) {/* cross-origin font sheet */}
     }
     const A = window.APP;
-    // Échappement HTML des données interpolées dans le document exporté (nom de milestone, etc.).
-    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const stamp = new Date().toLocaleString('fr-FR');
     const doc = `<!doctype html>
-<html lang="fr" data-theme="${esc(theme)}">
+<html lang="fr" data-theme="${theme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Graphiques — Release ${esc(A.milestone.name)}</title>
+<title>Graphiques — Release ${A.milestone.name}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -259,11 +252,11 @@
 </style>
 </head>
 <body>
-<div class="app kpi-root" data-theme="${esc(theme)}" style="${esc(appStyle)}; display:block; min-height:0;">
+<div class="app kpi-root" data-theme="${theme}" style="${appStyle}; display:block; min-height:0;">
   <div class="export-wrap">
     <div class="export-head">
-      <h1 class="disp">Graphiques — Release ${esc(A.milestone.name)}</h1>
-      <div class="sub">${esc(A.meta.project)} · ${A.totals.issues} issues · export du ${esc(stamp)}</div>
+      <h1 class="disp">Graphiques — Release ${A.milestone.name}</h1>
+      <div class="sub">${A.meta.project} · ${A.totals.issues} issues · export du ${stamp}</div>
     </div>
     ${node.outerHTML}
   </div>
@@ -274,7 +267,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `graphiques-${String(A.milestone.name).replace(/[^\w.-]+/g, '_')}.html`;
+    a.download = `graphiques-${A.milestone.name}.html`;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
@@ -363,7 +356,7 @@
   // groups (optional): [{label, issues, recap}] renders labelled sections instead of a flat list.
   function IssueDrill({ title, subtitle, headline, issues, recap, mode, groups, onClose }) {
     const layout = typeof window !== 'undefined' && window.__drillLayout || 'modal';
-    const cyc = (d) => Math.round((d.end - d.start) * 10) / 10;
+    const cyc = (d) => d.end - d.start;
     const metric = recap === 'issues' ? 'issues' : 'weight';
 
     const Section = ({ items, recap: rc, metric: mc }) =>
@@ -372,7 +365,7 @@
         <div className="drill-list">
           {items.length ? items.map((d) =>
         <IssueRowMini key={d.iid} d={d}
-        meta={mode === 'cycle' ? <span className="cyc-badge" style={{ color: cycleTone(cyc(d)), borderColor: cycleTone(cyc(d)) }}>{window.fmt1(cyc(d))} j</span> : null} />
+        meta={mode === 'cycle' ? <span className="cyc-badge" style={{ color: cycleTone(cyc(d)), borderColor: cycleTone(cyc(d)) }}>{cyc(d)} j</span> : null} />
         ) : <div className="empty">Aucune issue.</div>}
         </div>
       </React.Fragment>;
@@ -380,16 +373,16 @@
     let cycSummary = null;
     if (mode === 'cycle' && issues && issues.length) {
       const ds = issues.map(cyc).sort((a, b) => a - b);
-      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: ds[Math.floor(ds.length / 2)], avg: Math.round(ds.reduce((s, x) => s + x, 0) / ds.length * 10) / 10 };
+      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: ds[Math.floor(ds.length / 2)], avg: Math.round(ds.reduce((s, x) => s + x, 0) / ds.length) };
     }
     return (
       <Modal title={title} subtitle={subtitle} headline={headline} onClose={onClose} wide layout={layout}>
         {mode === 'cycle' && cycSummary &&
         <div className="cycstat">
-            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{window.fmt1(cycSummary.avg)} j</span><span className="cl">moyenne</span></div>
-            <div className="cycstat-item"><span className="cv">{window.fmt1(cycSummary.med)} j</span><span className="cl">médiane</span></div>
-            <div className="cycstat-item"><span className="cv">{window.fmt1(cycSummary.min)} j</span><span className="cl">le plus court</span></div>
-            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{window.fmt1(cycSummary.max)} j</span><span className="cl">le plus long</span></div>
+            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{cycSummary.avg} j</span><span className="cl">moyenne</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.med} j</span><span className="cl">médiane</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.min} j</span><span className="cl">le plus court</span></div>
+            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max} j</span><span className="cl">le plus long</span></div>
           </div>}
         {groups ?
         groups.map((g, i) =>

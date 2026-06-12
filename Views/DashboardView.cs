@@ -229,6 +229,10 @@ public sealed class DashboardView
         }
         else
             sb.AppendLine("  <script>" + A("app", "data.js") + "</script>");
+        // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
+        // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.
+        sb.AppendLine("  <script>window.__LANG__ = \"fr\";</script>");
+        sb.AppendLine("  <script>" + A("app", "i18n.js") + "</script>");
         foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");

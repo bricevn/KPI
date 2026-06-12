@@ -16,7 +16,7 @@
   const inprogFor = (pid, wk) => A.detail.filter((d) => !d.validated && (d.seg.dev || []).some(([a, b, who]) =>
   who === pid && Math.floor(a / 7) <= wk && Math.floor((b - 1) / 7) >= wk));
 
-  const INFO = 'Chaque case = une semaine. La partie haute (couleur) = poids validé par type, la partie basse (hachurée) = travail en cours. Cliquez sur un type pour trier les personnes, sur une semaine pour voir le détail. Le poids d’une issue multi-assignés est réparti au prorata du temps de dev.';
+  const INFO = () => window.t('vel.tip');
 
   window.TabVelocity = function TabVelocity() {
     const { s, onSort, arrow } = window.useSort('', 'desc');
@@ -33,11 +33,11 @@
     return (
       <React.Fragment>
         <div className="cal-toolbar">
-          <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>Poids validé / semaine</span>
-          <window.InfoTip text={INFO} />
+          <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>{window.t('vel.validatedPerWeek')}</span>
+          <window.InfoTip text={INFO()} />
           <div className="cal-legend" style={{ marginLeft: 6 }}>
             {TYPES.map((k) => <span key={k} className={'cal-lg' + (s.key === k ? ' sort' : '')} style={{ cursor: 'pointer' }} onClick={() => onSort(k)}><span className="sw" style={{ background: window.typeColor(k) }}></span>{A.typeByKey[k].short} <span className="ar">{arrow(k)}</span></span>)}
-            <span className="cal-lg" style={{ cursor: 'default' }}><span className="sw hatch"></span>en cours</span>
+            <span className="cal-lg" style={{ cursor: 'default' }}><span className="sw hatch"></span>{window.t('vel.inProgress')}</span>
           </div>
           <Nav />
         </div>
@@ -46,12 +46,12 @@
           <div className={'gantt-scroll gantt-drag' + (dragging ? ' grabbing' : '')} ref={scrollRef}>
             <div className="gantt-grid" style={gridStyle}>
               <div className="gantt-axis vel-axis">
-                <div className="gantt-axis-corner">Membre</div>
+                <div className="gantt-axis-corner">{window.t('vel.member')}</div>
                 {Array.from({ length: WEEKS }, (_, i) =>
                 <span key={i} className={'wk' + (i === CUR_WEEK ? ' cur' : '')} title={weekLabel(i)}>
-                    <span className="wk-n">S{i + 1}</span>
+                    <span className="wk-n">{window.t('common.weekShort')}{i + 1}</span>
                     <span className="wk-d">{A.cal.fmtDay(i * 7)}</span>
-                    {i === CUR_WEEK && <span className="wk-now">en cours</span>}
+                    {i === CUR_WEEK && <span className="wk-now">{window.t('vel.now')}</span>}
                   </span>
                 )}
               </div>
@@ -69,9 +69,9 @@
                       <div className="top">
                         <window.Avatar pid={p.id} size={30} />
                         <span className="nm">{p.name}</span>
-                        <span className="vavg" title="Poids validé moyen par semaine">{'moy. ' + window.fmt1(weekAvg) + '/sem.'}</span>
+                        <span className="vavg" title={window.t('vel.avgTitle')}>{window.t('vel.avgPre') + ' ' + window.fmt1(weekAvg) + window.t('vel.avgSuf')}</span>
                       </div>
-                      <div className="vdist" title="Répartition des poids (nombre d’issues par valeur)">
+                      <div className="vdist" title={window.t('vel.distTitle')}>
                         {FIB.map((w) => {
                           const n = v.fib[w] || 0;
                           return (
@@ -88,8 +88,16 @@
                         const tot = w.total + w.inprog;
                         return (
                           <div key={i} className={'vweek clickable' + (i === CUR_WEEK ? ' cur' : '')}
-                          title={weekLabel(i) + ' · ' + window.fmt1(w.total) + ' pts validés' + (w.inprog ? ' · ' + window.fmt1(w.inprog) + ' en cours' : '')}
-                          onClick={() => setDrill({ pid: p.id, name: p.name, wk: i })}>
+                          title={weekLabel(i) + ' · ' + window.fmt1(w.total) + ' ' + window.t('vel.ptsValidated') + (w.inprog ? ' · ' + window.fmt1(w.inprog) + ' ' + window.t('vel.inProgress') : '')}
+                          onClick={() => setDrill({
+                            title: p.name + ' · ' + window.t('vel.week') + ' ' + (i + 1),
+                            headline: window.fmt1(w.total) + ' ' + window.t('vel.pts'),
+                            subtitle: weekLabel(i) + (w.inprog ? ' · ' + window.fmt1(w.inprog) + ' ' + window.t('vel.ptsInProgress') : ''),
+                            groups: [
+                            { label: window.t('vel.validatedGroup'), issues: issuesFor(p.id, i), recap: 'weight', color: 'var(--c-good)' },
+                            { label: window.t('vel.inProgressGroup'), issues: inprogFor(p.id, i), color: 'var(--ink-faint)' }]
+
+                          })}>
                             <div className="vbar" style={{ height: tot / gmax * H + 'px' }}>
                               {w.inprog > 0 && <i className="vseg-prog" style={{ height: w.inprog / tot * 100 + '%' }}></i>}
                               {TYPES.filter((k) => w.byType[k]).map((k) =>
@@ -105,17 +113,7 @@
           </div>
         </div>
 
-        {drill && (() => {
-          const dp = A.vel[drill.pid] && A.vel[drill.pid].weeks[drill.wk] || { total: 0, inprog: 0 };
-          return <window.IssueDrill
-            title={drill.name + ' · semaine ' + (drill.wk + 1)}
-            headline={window.fmt1(dp.total) + ' pts'}
-            subtitle={weekLabel(drill.wk) + (dp.inprog ? ' · ' + window.fmt1(dp.inprog) + ' pts en cours' : '')}
-            groups={[
-              { label: 'Validées', issues: issuesFor(drill.pid, drill.wk), recap: 'weight', color: 'var(--c-good)' },
-              { label: 'En cours (non validé)', issues: inprogFor(drill.pid, drill.wk), color: 'var(--ink-faint)' }]}
-            onClose={() => setDrill(null)} />;
-        })()}
+        {drill && <window.IssueDrill {...drill} onClose={() => setDrill(null)} />}
       </React.Fragment>);
 
   };
