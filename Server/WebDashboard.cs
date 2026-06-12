@@ -20,7 +20,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -157,6 +159,17 @@ public sealed class WebDashboard
             o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
         });
 
+        // Localisation FR/EN (i18n hybride : le serveur choisit la culture, le client rend les chaînes).
+        // Sélection : cookie .AspNetCore.Culture (posé par /set-lang) → Accept-Language ; défaut FR.
+        builder.Services.AddLocalization();
+        builder.Services.Configure<RequestLocalizationOptions>(o =>
+        {
+            var cultures = Kpi.Localization.Loc.Supported.Select(c => new CultureInfo(c)).ToArray();
+            o.DefaultRequestCulture = new RequestCulture(Kpi.Localization.Loc.Default);
+            o.SupportedCultures = cultures;
+            o.SupportedUICultures = cultures;
+        });
+
         // Derrière un reverse proxy : récupérer le vrai schéma (https), l'hôte et l'IP cliente.
         // L'app étant liée à localhost, seul le proxy l'atteint → on fait confiance aux en-têtes transmis.
         builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -184,6 +197,8 @@ public sealed class WebDashboard
         var app = builder.Build();
 
         app.UseForwardedHeaders();
+        // Pose CultureInfo.CurrentUICulture (cookie/Accept-Language) AVANT auth/endpoints → vues localisées.
+        app.UseRequestLocalization();
 
         // En-têtes de sécurité (anti-sniff, anti-clickjacking, CSP). 'unsafe-inline' requis car le
         // dashboard embarque scripts/styles inline ; le reste verrouille les sources.
@@ -244,6 +259,19 @@ public sealed class WebDashboard
         // Les handlers async renvoyant Task<IResult> avec un paramètre HttpContext DOIVENT être typés
         // explicitement en Func<HttpContext, Task<IResult>> : sinon ils se lient à l'overload
         // RequestDelegate (Func<HttpContext, Task>) et l'IResult est IGNORÉ (réponse 200 vide).
+        // Changement de langue : pose le cookie de culture puis revient à la page d'origine.
+        // Anonyme (utilisable avant login). @return validé chemin local (anti open-redirect).
+        app.MapGet("/set-lang", (HttpContext ctx, string lang, string? @return) =>
+        {
+            var c = (lang == "en") ? "en" : "fr";
+            ctx.Response.Cookies.Append(
+                CookieRequestCultureProvider.DefaultCookieName,
+                CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(c)),
+                new CookieOptions { HttpOnly = false, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(365), IsEssential = true });
+            var back = (!string.IsNullOrEmpty(@return) && @return.StartsWith("/") && !@return.StartsWith("//")) ? @return : "/";
+            return Results.Redirect(back);
+        }).AllowAnonymous();
+
         app.MapGet("/", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         app.MapGet("/index.html", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         // App de référence (Claude Design) — DONNÉES DE DÉMO. Exposée uniquement en développement.
@@ -328,7 +356,8 @@ public sealed class WebDashboard
         // Dashboard = app de référence Claude Design ; le payload réel (filtré par compte) est
         // inliné et window.APP est construit par le mapper AVANT le rendu React.
         var json = await BuildScopedPayloadAsync(ctx);
-        return Results.Content(DashboardView.BuildReferencePage(json), "text/html; charset=utf-8");
+        var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName; // "fr"/"en" (posée par UseRequestLocalization)
+        return Results.Content(DashboardView.BuildReferencePage(json, lang), "text/html; charset=utf-8");
     }
 
     private async Task<IResult> ServeConfigAsync(HttpContext ctx)

@@ -39,7 +39,7 @@
     const [compact, setCompact] = useState(() => load('app-compact', '0') === '1');
     const [sbCollapsed, setSbCollapsed] = useState(() => load('app-sb', '0') === '1');
     const [drillLayout, setDrillLayout] = useState(() => load('app-drill', 'modal'));
-    const [lang, setLang] = useState(() => load('app-lang', 'fr'));
+    const [lang, setLang] = useState(() => window.__LANG__ || load('app-lang', 'fr')); // serveur (cookie) prioritaire
     // Filtres : options et valeurs par défaut DÉRIVÉES des données réelles (A.filterOptions), pas en dur.
     const [fProject, setFProject] = useState(() => { try { const ps = (window.APP.filterOptions || {}).projects || []; return ps.length ? [ps[0]] : []; } catch (e) { return []; } });
     const [fMilestone, setFMilestone] = useState([window.t('whole_project')]); // « Tout le projet » = toutes les milestones
@@ -110,7 +110,7 @@
         <main className="main">
           <div className="hd">
             <div>
-              <h1 className="disp">{A.milestone.name} · {window.t('nav_' + tab)}</h1>
+              <h1 className="disp">{(realMs.length ? A.milestone.name : window.t('whole_project'))} · {window.t('nav_' + tab)}</h1>
               <div className="meta">{A.meta.project} · {window.t('hd_gen')} {A.meta.generated} · {A.totals.issues} {window.t('issues')}</div>
             </div>
             <div className="hd-ms">

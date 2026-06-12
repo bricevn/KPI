@@ -44,7 +44,7 @@
           <p className="lead">{window.t('opt.appearanceLead')}</p>
           <div className="opt-row">
             <div className="lbl">{window.t('lang')}<span>{window.t('lang_sub')}</span></div>
-            <select style={selStyle} value={appearance.lang} onChange={(e) => appearance.setLang(e.target.value)}>
+            <select style={selStyle} value={appearance.lang} onChange={(e) => { window.location.href = '/set-lang?lang=' + encodeURIComponent(e.target.value) + '&return=' + encodeURIComponent(window.location.pathname); }}>
               {(appearance.langs || [['fr', 'Français'], ['en', 'English']]).map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
             </select>
           </div>
