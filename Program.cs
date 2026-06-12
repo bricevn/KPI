@@ -43,7 +43,7 @@ try
     {
         // Vérifie qu'on a au moins un HTML à servir au démarrage.
         var htmlPath = Path.Combine(appConfig.Export.OutputDirectory, "views",
-            $"release_{appConfig.GitLab.Milestone}_hypervisor.html");
+            $"release_{appConfig.GitLab.Milestone}.html");
         if (!File.Exists(htmlPath))
         {
             Console.WriteLine($"HTML absent ({htmlPath}). Lancement d'un export initial...");
@@ -103,7 +103,7 @@ try
 
         Console.WriteLine();
         Console.WriteLine("Génération des vues HTML...");
-        await new HypervisorReleaseView()
+        await new DashboardView()
             .GenerateAsync(
                 appConfig.Export.OutputDirectory,
                 appConfig.GitLab.Milestone,

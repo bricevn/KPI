@@ -244,7 +244,7 @@ public sealed class WebDashboard
         app.MapGet("/index.html", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         // App de référence (Claude Design) — DONNÉES DE DÉMO. Exposée uniquement en développement.
         if (app.Environment.IsDevelopment())
-            app.MapGet("/ref", () => Results.Content(Kpi.Views.HypervisorReleaseView.BuildReferencePage(), "text/html; charset=utf-8")).AllowAnonymous();
+            app.MapGet("/ref", () => Results.Content(Kpi.Views.DashboardView.BuildReferencePage(), "text/html; charset=utf-8")).AllowAnonymous();
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
         app.MapGet("/api/config", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeConfigAsync(ctx)));
         app.MapGet("/api/config/token", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeTokenAsync(ctx)));
@@ -324,7 +324,7 @@ public sealed class WebDashboard
         // Dashboard = app de référence Claude Design ; le payload réel (filtré par compte) est
         // inliné et window.APP est construit par le mapper AVANT le rendu React.
         var json = await BuildScopedPayloadAsync(ctx);
-        return Results.Content(HypervisorReleaseView.BuildReferencePage(json), "text/html; charset=utf-8");
+        return Results.Content(DashboardView.BuildReferencePage(json), "text/html; charset=utf-8");
     }
 
     private async Task<IResult> ServeConfigAsync(HttpContext ctx)
@@ -1083,7 +1083,7 @@ public sealed class WebDashboard
             scopedTeams = new Dictionary<string, List<string>> { [r.ScopeValue] = tm };
         else scopedTeams = new Dictionary<string, List<string>>();
 
-        var json = await HypervisorReleaseView.BuildPayloadJsonAsync(
+        var json = await DashboardView.BuildPayloadJsonAsync(
             cfg.Export.OutputDirectory, cfg.GitLab.Milestone, filtered.ToList(),
             cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, ctx.RequestAborted);
         _payloadCache[cacheKey] = (sig, json);

@@ -99,7 +99,7 @@ public static class ExportPipeline
 
         Console.WriteLine();
         Console.WriteLine("Génération des vues HTML...");
-        await new HypervisorReleaseView()
+        await new DashboardView()
             .GenerateAsync(
                 config.Export.OutputDirectory,
                 config.GitLab.Milestone,

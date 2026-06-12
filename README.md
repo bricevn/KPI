@@ -194,9 +194,9 @@ Encodage UTF-8 avec BOM, ouvrables directement dans Excel FR.
 
 | Fichier | Contenu |
 |---|---|
-| `views/release_<milestone>_hypervisor.html` | **Dashboard interactif complet** (un seul fichier autonome : HTML + CSS + JS + données embarquées, aucune dépendance réseau). Contient tous les onglets décrits plus haut. Les données `issues.json` / `labels.json` / `milestones.json` sont injectées à la génération. |
+| `views/release_<milestone>.html` | **Dashboard interactif complet** (un seul fichier autonome : HTML + CSS + JS + données embarquées, aucune dépendance réseau). Contient tous les onglets décrits plus haut. Les données `issues.json` / `labels.json` / `milestones.json` sont injectées à la génération. |
 
-Ouvrir un fichier HTML : double-clic ou via PowerShell : `Start-Process .\output\views\release_2026-R2_hypervisor.html`. Le mode `--serve` sert ce même fichier mais permet en plus le bouton « Rafraîchir ».
+Ouvrir un fichier HTML : double-clic ou via PowerShell : `Start-Process .\output\views\release_2026-R2.html`. Le mode `--serve` sert ce même fichier mais permet en plus le bouton « Rafraîchir ».
 
 ## Définitions importantes
 

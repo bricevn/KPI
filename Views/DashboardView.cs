@@ -14,7 +14,7 @@ namespace Kpi.Views;
 /// - Le rendu (tableau principal + sections "Issues sans poids" / "sans approval")
 ///   est recalculé côté JS à chaque changement de filtre.
 /// </summary>
-public sealed class HypervisorReleaseView
+public sealed class DashboardView
 {
     private const string DefaultPrimaryLabel = "";
 
@@ -33,7 +33,7 @@ public sealed class HypervisorReleaseView
         // Export statique AUTONOME : payload réel inliné + page nouveau design (même rendu que le live).
         var payloadJson = await BuildPayloadJsonAsync(outputDirectory, milestone, exports, trackedTransitions, teams, labelPhases, ct);
         var html = BuildReferencePage(payloadJson);
-        var path = Path.Combine(viewsDir, SafeFileName($"release_{milestone}_hypervisor.html"));
+        var path = Path.Combine(viewsDir, SafeFileName($"release_{milestone}.html"));
         await File.WriteAllTextAsync(path, html, new UTF8Encoding(false), ct);
         Console.WriteLine($"  HTML écrit : {path}");
     }
