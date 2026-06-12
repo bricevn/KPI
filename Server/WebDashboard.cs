@@ -301,6 +301,9 @@ public sealed class WebDashboard
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx)));
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx)));
         app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx)));
+        // Progression du scrap post-setup (loader temps réel) + annulation (réutilise CancelAsync).
+        app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx));
+        app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
 
         // --- Endpoints d'authentification ---
         // Page de connexion designée (OAuth + token). Déjà connecté → dashboard.
@@ -909,7 +912,7 @@ public sealed class WebDashboard
         // et écrit les données CHIFFRÉES sous output/<serverId>/. Le dashboard suit l'avancement via /api/status.
         StartSetupFetch(ctx);
 
-        return Results.Json(new { ok = true });
+        return Results.Json(new { ok = true, jobId = "setup" });
     }
 
     /// <summary>Identifiant de serveur stable dérivé de l'hôte de l'instance (segment de dossier, [a-z0-9-]).</summary>
@@ -925,9 +928,44 @@ public sealed class WebDashboard
     private void StartSetupFetch(HttpContext ctx)
     {
         if (!_refreshLock.Wait(0)) return; // une acquisition tourne déjà → ne pas doubler
+        // État posé SYNCHRONEMENT (avant le Task.Run) : sinon le 1er poll /api/setup/progress verrait
+        // Running=false et conclurait 'done' à tort → redirection prématurée vers le dashboard.
+        _state.Reset();
+        _state.Running = true;
+        _state.StartedAt = DateTime.UtcNow;
         var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
         var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
         _ = Task.Run(() => RunRefreshAsync(new List<string>(), serverCt));
+    }
+
+    /// <summary>Progression du scrap post-setup, mappée sur l'état du job (loader temps réel côté /setup).</summary>
+    private IResult SetupProgress(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var s = _state.Snapshot();
+        var status = s.running ? "running" : (!string.IsNullOrEmpty(s.lastError) ? "error" : "done");
+        var percent = s.total > 0 ? Math.Min(99, (int)Math.Round(s.current * 100.0 / s.total)) : (s.running ? 3 : 100);
+        if (status == "done") percent = 100;
+        double? eta = null;
+        var started = _state.StartedAt;
+        if (status == "running" && percent > 0 && started != null)
+        {
+            var el = (DateTime.UtcNow - started.Value).TotalSeconds;
+            if (el > 0) eta = Math.Round(el / percent * (100 - percent));
+        }
+        return Results.Json(new
+        {
+            status,
+            percent,
+            stage = "issues",
+            project = (string?)null,
+            message = status == "done" ? "Terminé"
+                : status == "error" ? (s.lastError ?? "Erreur")
+                : (s.total > 0 ? $"Extraction des données… ({s.current}/{s.total})" : "Démarrage de l'extraction…"),
+            etaSeconds = eta,
+            counts = new { issues = new[] { s.current, s.total } },
+            error = string.IsNullOrEmpty(s.lastError) ? null : s.lastError,
+        });
     }
 
     // --- Résolution de compte / rôles (étape 3) -------------------------

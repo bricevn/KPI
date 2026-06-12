@@ -157,6 +157,32 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .redit{border:0;background:none;color:var(--ink-faint);font-size:12.5px;cursor:pointer;padding:5px 9px;border-radius:8px;flex:none;}
 .redit:hover{color:var(--accent);background:var(--accent-soft);}
 .foot{display:flex;align-items:center;justify-content:space-between;padding:20px 36px;border-top:1px solid var(--line-2);}
+/* étape Phases : éditeur (couleur/nom/ajout/suppr) + sous-titres */
+.prereq{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:999px;margin-right:6px;}
+.subh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin:16px 0 9px;display:flex;align-items:center;gap:8px;}
+.subc{font-family:var(--mono);font-weight:600;color:var(--ink-dim);font-size:11px;background:var(--panel-3);padding:1px 7px;border-radius:999px;}
+.phases{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
+.phrow{display:flex;align-items:center;gap:10px;}
+.swatchwrap{position:relative;flex:none;}
+.swatch{width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.14);cursor:pointer;padding:0;}
+.pop{position:absolute;top:32px;left:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+.pc{width:22px;height:22px;border-radius:6px;border:1px solid rgba(255,255,255,.14);cursor:pointer;padding:0;}
+.pc.on{outline:2px solid var(--ink);outline-offset:1px;}
+.phname{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:600 13.5px var(--sans);padding:8px 11px;outline:none;}
+.phname:focus{border-color:var(--accent);}
+.phx{flex:none;border:0;background:none;color:var(--ink-faint);font-size:20px;line-height:1;cursor:pointer;padding:0 6px;border-radius:6px;}
+.phx:hover{color:var(--bad);}
+/* écran de chargement post-setup (loader temps réel) */
+.ld-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px;}
+.ld-bars{display:flex;align-items:flex-end;gap:9px;height:120px;}
+.ld-bars i{display:block;width:16px;height:100%;background:var(--panel-2);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden;}
+.ld-bars b{display:block;width:100%;background:var(--accent);border-radius:6px;transition:height .5s var(--ease);}
+.ld-pct{font-family:var(--disp);font-weight:700;font-size:48px;line-height:1;color:var(--ink);}
+.ld-pct span{font-size:26px;color:var(--ink-faint);margin-left:2px;}
+.ld-status{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink-dim);font-weight:600;}
+.ld-status.err{color:var(--bad);}
+.ld-status .okic{color:var(--good);display:flex;}
+.ld-meta{font-size:12px;color:var(--ink-faint);}
 @media(max-width:720px){.checklist{grid-template-columns:1fr;}.suA-top,.foot{padding-left:20px;padding-right:20px;}.bodyinner{padding:14px 20px 24px;}}
 </style>
 </head>
@@ -164,8 +190,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 <div id="app"></div>
 <script>
 (function(){
-  var PHASES=[['none','Non suivi','#5f6b7a'],['dev','Développement','#2188ff'],['review','Revue de code','#8957e5'],['qawait','Attente QA','#b8800a'],['qa','QA','#c79a06'],['tofix','À corriger','#ec4899'],['po','Validation PO','#0f9e8e'],['uiux','UI/UX','#2dd4bf']];
-  var phaseColor=function(k){for(var i=0;i<PHASES.length;i++)if(PHASES[i][0]===k)return PHASES[i][2];return PHASES[0][2];};
+  // Périodes par défaut PROPOSÉES (éditables à l'étape 3 : renommer / couleur / ajouter / supprimer).
+  var DEFAULT_PHASES=[{id:'dev',name:'Développement',color:'#2188ff'},{id:'review',name:'Revue de code',color:'#8957e5'},{id:'qawait',name:'Attente QA',color:'#b8800a'},{id:'qa',name:'QA',color:'#c79a06'},{id:'tofix',name:'À corriger',color:'#ec4899'},{id:'po',name:'Validation PO',color:'#0f9e8e'},{id:'uiux',name:'UI/UX',color:'#2dd4bf'}];
+  var PALETTE=['#2188ff','#8957e5','#b8800a','#c79a06','#ec4899','#0f9e8e','#2dd4bf','#e0792e','#d6336c','#5f6b7a'];
+  var NONE_COLOR='#5f6b7a';
+  // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
+  var phaseColor=function(k){if(k==='none')return NONE_COLOR;for(var i=0;i<ST.phases.length;i++)if(ST.phases[i].id===k)return ST.phases[i].color;return NONE_COLOR;};
   var STEP_META=[['Connexion','link'],['Projets','box'],['Phases','layers'],['Équipes','users'],['Vérif.','rocket']];
   var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'};
   function ic(n,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
@@ -177,12 +207,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function guessPhase(l){l=l.toLowerCase();if(l.indexOf('code')>=0&&l.indexOf('progress')>=0)return 'dev';if(l.indexOf('review')>=0)return 'review';if(l.indexOf('backlog')>=0)return 'qawait';if(l.indexOf('qa')>=0&&l.indexOf('progress')>=0)return 'qa';if(l.indexOf('to fix')>=0)return 'tofix';if(l.indexOf('validation')>=0||/\bpo\b/.test(l))return 'po';if(l.indexOf('ui/ux')>=0)return 'uiux';return 'none';}
 
   var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',timeout:'60',selfSigned:false,showTok:false,
-    test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},teams:[],memberships:[],saving:false,saveErr:''};
+    test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},
+    phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,
+    teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
 
   function canNext(){return ST.step!==0||ST.test==='ok';}
 
   function render(){
+    if(ST.launching){app.innerHTML=launchHtml();return;}
     var h='<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">Mise en service</div></div></div><div class="count">Étape '+(ST.step+1)+' sur 5</div></div>';
     h+='<div class="step"><div class="stepper">';
     for(var i=0;i<STEP_META.length;i++){var st=i<ST.step?'done':i===ST.step?'cur':'';h+='<div class="node '+st+'" data-act="goto:'+i+'"><div class="dot">'+(i<ST.step?ic('check',16):(i+1))+'</div><div class="nl">'+STEP_META[i][0]+'</div></div>';if(i<STEP_META.length-1)h+='<div class="line'+(i<ST.step?' done':'')+'"></div>';}
@@ -222,8 +255,22 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   }
   function s2(){
     if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>Chargement des labels des projets sélectionnés…</div></div>';
-    var h='<div class="note">'+sic('info')+'<div>Associez les labels qui représentent une phase ; laissez <b>Non suivi</b> pour les autres. Tous les labels des projets sélectionnés sont listés.</div></div><div class="map">';
-    for(var i=0;i<ST.labels.length;i++){var l=ST.labels[i];var ph=ST.labelPhase[l]||'none';h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(ph)+'"></span><span class="mlabel">'+esc(l)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+i,ph,PHASES.map(function(p){return [p[0],p[1]];}))+'</div>';}
+    var h='<div class="note">'+sic('info')+'<div><span class="prereq">Prérequis</span> Seuls les labels <b>Prod::</b> sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.</div></div>';
+    // Éditeur de phases : couleur (palette), nom éditable, suppression.
+    h+='<div class="subh">Phases <span class="subc">'+ST.phases.length+'</span></div><div class="phases">';
+    for(var i=0;i<ST.phases.length;i++){var p=ST.phases[i];
+      h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="Changer la couleur"></button>';
+      if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
+      h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="Supprimer la phase">×</button></div>';
+    }
+    h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+'Ajouter une phase</button>';
+    // Association : labels Prod:: → phase (repli sur tous les labels si aucun Prod::).
+    var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
+    if(!prod.length)prod=ST.labels;
+    var phOpts=[['none','Non suivi']].concat(ST.phases.map(function(p){return [p.id,p.name];}));
+    h+='<div class="subh" style="margin-top:6px">Association des labels <span class="subc">Prod::</span></div><div class="map">';
+    for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
+      h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
     return h+'</div>';
   }
   function s3(){
@@ -287,11 +334,42 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     ST.saving=true;ST.saveErr='';render();
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       projectIds:ST.importIds,labelPhases:ST.labelPhase,
-      periods:PHASES.filter(function(p){return p[0]!=='none';}).map(function(p){return {key:p[0],name:p[1],color:p[2],timed:p[0]!=='uiux'};}),
+      periods:ST.phases.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};}),
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(r){return r.json();}).then(function(j){if(j.ok){window.location.href='/';}else{ST.saving=false;ST.saveErr=j.error||'Enregistrement impossible.';render();}})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j.ok){ ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:'Démarrage…'}; render(); setTimeout(pollProgress,500); }
+        else{ST.saving=false;ST.saveErr=j.error||'Enregistrement impossible.';render();}})
       .catch(function(){ST.saving=false;ST.saveErr='Serveur injoignable.';render();});
+  }
+  // Loader temps réel : poll /api/setup/progress jusqu'à done/error.
+  function pollProgress(){
+    if(!ST.launching)return;
+    fetch('/api/setup/progress').then(function(r){return r.json();}).then(function(s){
+      if(!ST.launching)return; ST.progress=s; render();
+      if(s.status==='done'){ setTimeout(function(){window.location.href='/';},700); return; }
+      if(s.status==='error'){ return; }
+      setTimeout(pollProgress,700);
+    }).catch(function(){ if(ST.launching) setTimeout(pollProgress,1200); });
+  }
+  function cancelLaunch(){ fetch('/api/setup/cancel',{method:'POST'}).catch(function(){}); ST.launching=false;ST.progress=null;render(); }
+  function fmtClock(s){s=Math.max(0,Math.round(s));var m=Math.floor(s/60);return m+':'+('0'+(s%60)).slice(-2);}
+  function launchHtml(){
+    var pr=ST.progress||{status:'running',percent:0,message:'Démarrage…'};
+    var done=pr.status==='done',err=pr.status==='error',pct=Math.max(0,Math.min(100,pr.percent||0));
+    var heights=[40,62,52,86,66,96],bars='';
+    for(var i=0;i<heights.length;i++)bars+='<i><b style="height:'+Math.round(pct*heights[i]/100)+'%"></b></i>';
+    var eta=(pr.etaSeconds!=null&&!done&&!err)?' · ~ '+fmtClock(pr.etaSeconds)+' restant':'';
+    var status=done?('<span class="okic">'+ic('check',17)+'</span> Terminé — ouverture du dashboard…')
+      :err?('Échec : '+esc(pr.error||pr.message||''))
+      :('<span class="spin"></span> '+esc(pr.message||'Extraction…'));
+    return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">Mise en service</div></div></div></div>'
+      +'<div class="ld-wrap"><div class="ld-bars">'+bars+'</div>'
+      +'<div class="ld-pct">'+pct+'<span>%</span></div>'
+      +'<div class="ld-status'+(err?' err':'')+'">'+status+'</div>'
+      +'<div class="ld-meta">'+(err?'':'Extraction des données · vous pouvez laisser cette page ouverte'+eta)+'</div>'
+      +(done?'':'<button class="btn '+(err?'outline':'ghost')+' sm" data-act="cancelLaunch">'+(err?'Revenir à la configuration':ic('chevL',15)+'Annuler')+'</button>')
+      +'</div></div>';
   }
   function go(n){ if(n>ST.step && !canNext())return; if(n===2 && !ST.labelsLoaded){ST.step=2;render();loadLabels(render);return;} ST.step=n; render(); document.getElementById('body').scrollTop=0; }
 
@@ -308,10 +386,16 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('rmteam:')===0){var tid=a.slice(7);ST.memberships=ST.memberships.filter(function(m){return m.teamId!==tid;});ST.teams=ST.teams.filter(function(t){return t.id!==tid;});render();}
     else if(a==='addteam'){ST.teams.push({id:'t'+Date.now(),name:'Nouvelle équipe',gitlab:false});render();}
     else if(a.indexOf('rmmem:')===0){var pr=a.slice(6).split('~');ST.memberships=ST.memberships.filter(function(m){return !(m.pid===pr[0]&&m.teamId===pr[1]);});render();}
+    else if(a==='cancelLaunch'){cancelLaunch();}
+    else if(a.indexOf('phcol:')===0){var pid=a.slice(6);ST.openColor=(ST.openColor===pid?null:pid);render();}
+    else if(a.indexOf('phpick:')===0){var pp=a.slice(7).split('~');ST.phases.forEach(function(p){if(p.id===pp[0])p.color=pp[1];});ST.openColor=null;render();}
+    else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});render();}
+    else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:'Nouvelle phase',color:PALETTE[ST.phases.length%PALETTE.length]});render();}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
-    var tn=e.target.closest('[data-team]');if(tn){ST.teams[+tn.dataset.team].name=tn.value;}
+    var tn=e.target.closest('[data-team]');if(tn){ST.teams[+tn.dataset.team].name=tn.value;return;}
+    var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ST.phases.forEach(function(p){if(p.id===pid)p.name=pn.value;});}
   });
   app.addEventListener('change',function(e){
     var s=e.target.closest('[data-sel]');if(s){var a=s.dataset.sel;
