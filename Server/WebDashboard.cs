@@ -263,7 +263,7 @@ public sealed class WebDashboard
         // Anonyme (utilisable avant login). @return validé chemin local (anti open-redirect).
         app.MapGet("/set-lang", (HttpContext ctx, string lang, string? @return) =>
         {
-            var c = (lang == "en") ? "en" : "fr";
+            var c = Kpi.Localization.Loc.Normalize(lang); // valide contre la liste des langues supportées
             ctx.Response.Cookies.Append(
                 CookieRequestCultureProvider.DefaultCookieName,
                 CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(c)),

@@ -21,7 +21,7 @@
 
   // ---- i18n : le dictionnaire + window.t vivent dans i18n.js (chargé avant les .jsx). ----
   // Ici on ne garde que la liste des langues exposée au sélecteur d'Options.
-  const LANGS = [['fr', 'Français'], ['en', 'English']];
+  const LANGS = (typeof window !== 'undefined' && window.__LANGS__) || [['fr', 'Français'], ['en', 'English']];
 
   const CHART_TWEAKS = /*EDITMODE-BEGIN*/{
     "recapStyle": "cartes",

@@ -13,6 +13,7 @@
 //     {instance}/api/v4/user, then signs a cookie with ONLY the username.
 //     The personal access token is used once and never persisted.
 //
+using System.Linq;
 using System.Text;
 using Kpi.Config;
 
@@ -24,8 +25,10 @@ public static class LoginView
     public static string Page(AuthConfig auth, string culture = "fr")
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
-        var en = culture == "en";
-        string T(string k) => Kpi.Localization.Loc.T(en ? "en" : "fr", k);
+        var lc = Kpi.Localization.Loc.Normalize(culture);
+        string T(string k) => Kpi.Localization.Loc.T(lc, k);
+        var langOptions = string.Join("", Kpi.Localization.Loc.List().Select(l =>
+            $"<option value=\"{l[0]}\"{(l[0] == lc ? " selected" : "")}>{HtmlAttr(l[1])}</option>"));
         // Chaînes utilisées par le <script> inline (échappées en JSON valide, sûres en <script>).
         var jsI18n = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
@@ -37,9 +40,10 @@ public static class LoginView
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
             .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
-            .Replace("__LANG__", en ? "en" : "fr")
+            .Replace("__LANG__", lc)
+            .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
             .Replace("__JS_I18N__", jsI18n)
-            .Replace("__SW_FR__", en ? "" : "on").Replace("__SW_EN__", en ? "on" : "")
+            .Replace("__LANG_OPTIONS__", langOptions)
             .Replace("__T_TAG1__", T("login.tag1")).Replace("__T_TAG2__", T("login.tag2"))
             .Replace("__T_DESC__", T("login.desc")).Replace("__T_ENCRYPTED__", T("login.encrypted"))
             .Replace("__T_WELCOME__", T("login.welcome")).Replace("__T_WELCOMESUB__", T("login.welcomeSub"))
@@ -58,7 +62,7 @@ public static class LoginView
     // ---------------------------------------------------------------- login
     private const string Html = """
 <!DOCTYPE html>
-<html lang="__LANG__">
+<html lang="__LANG__"__DIR__>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -86,10 +90,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
 .bgrid{position:absolute;inset:0;opacity:.5;background:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(circle at 30% 30%,#000,transparent 75%);}
 .split-form{flex:none;width:480px;background:var(--panel);display:flex;align-items:center;justify-content:center;padding:40px;border-left:1px solid var(--line);}
 .form-inner{width:100%;max-width:360px;}
-.lang-switch{display:flex;justify-content:flex-end;gap:6px;align-items:center;font-size:12px;margin-bottom:12px;color:var(--ink-faint);}
-.lang-switch a{color:var(--ink-faint);text-decoration:none;padding:2px 7px;border-radius:7px;}
-.lang-switch a.on{color:var(--ink);background:var(--panel-2);font-weight:600;}
-.lang-switch a:hover{color:var(--ink);}
+.lang-switch{display:flex;justify-content:flex-end;margin-bottom:12px;}
+.lang-sel{background:var(--panel-2);color:var(--ink-dim);border:1px solid var(--line);border-radius:8px;font-size:12px;padding:4px 8px;cursor:pointer;outline:none;}
+.lang-sel:focus{border-color:var(--accent);}
 .brand{display:flex;align-items:center;gap:11px;position:relative;}
 .brand-mark{width:38px;height:38px;border-radius:11px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:none;}
 .brand-name{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:-.01em;line-height:1;}
@@ -185,7 +188,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
     </div>
   </div>
   <div class="split-form"><div class="form-inner">
-    <div class="lang-switch"><a href="/set-lang?lang=fr&amp;return=/login" class="__SW_FR__">FR</a><span>·</span><a href="/set-lang?lang=en&amp;return=/login" class="__SW_EN__">EN</a></div>
+    <div class="lang-switch"><select class="lang-sel" onchange="location.href='/set-lang?lang='+encodeURIComponent(this.value)+'&return=/login'">__LANG_OPTIONS__</select></div>
     <h1 class="a-title">__T_WELCOME__</h1>
     <p class="a-sub">__T_WELCOMESUB__</p>
     <div class="fld">

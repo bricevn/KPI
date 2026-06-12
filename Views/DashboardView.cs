@@ -195,7 +195,8 @@ public sealed class DashboardView
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
-        sb.AppendLine("<html lang=\"" + (lang == "en" ? "en" : "fr") + "\">");
+        var lc = Kpi.Localization.Loc.Normalize(lang);
+        sb.AppendLine("<html lang=\"" + lc + "\"" + (Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "") + ">");
         sb.AppendLine("<head>");
         sb.AppendLine("  <meta charset=\"utf-8\">");
         sb.AppendLine("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
@@ -231,7 +232,8 @@ public sealed class DashboardView
             sb.AppendLine("  <script>" + A("app", "data.js") + "</script>");
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.
-        sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lang == "en" ? "en" : "fr") + ";</script>");
+        sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
+            + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
         sb.AppendLine("  <script>" + A("app", "i18n.js") + "</script>");
         foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("app", f) + "</script>");
