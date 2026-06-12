@@ -1,0 +1,4 @@
+# Normalise les fins de ligne entre OS (évite le bruit CRLF/LF en multi-contributeurs)
+* text=auto eol=lf
+*.sln text eol=crlf
+*.csproj text eol=crlf

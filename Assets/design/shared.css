@@ -1,0 +1,60 @@
+/* ============================================================
+   SHARED — colorblind-safe palette (Okabe-Ito derived)
+   Applied on .kpi-root; each direction adds its own surfaces.
+   Categorical + status hues are IDENTICAL across all 3 directions
+   so the data reads the same everywhere ("briques homogènes").
+   ============================================================ */
+
+.kpi-root {
+  /* categorical type hues — SYNCED to GitLab label colors (labels.json):
+     Feature / Enhancement = purple #9400d3 · Bug / Client Bug / Regression = red.
+     GitLab reuses one hue per family, so we keep the family hue but separate the
+     members by LUMINANCE (works for all colour-vision types) — the text label is
+     always shown alongside, so colour is reinforcement, not the sole signal. */
+  --c-feature:    #9400d3;   /* GitLab purple            */
+  --c-enh:        #c77dff;   /* lighter violet (same fam) */
+  --c-bug:        #e5392f;   /* GitLab red (bright)       */
+  --c-clientbug:  #a51d16;   /* dark red (same fam)       */
+  --c-regression: #ff8f6b;   /* salmon (light red, same fam) */
+  /* status — never red+green alone; paired with a glyph in the UI */
+  --c-good:  #008A63;   /* validated  (bluish green) */
+  --c-warn:  #C77F00;   /* attention  (amber)        */
+  --c-bad:   #D55E00;   /* risk       (vermillion)   */
+  --c-done:  #0072B2;   /* closed/done (blue)        */
+  --c-neutral: #6B7682; /* open / inactive (slate)   */
+  /* phase hues — SYNCED to the canonical Calendrier / Vélocité colours */
+  --p-dev:    #2188ff;
+  --p-review: #8957e5;
+  --p-qawait: #b8800a;
+  --p-qa:     #c79a06;
+  --p-tofix:  #ec4899;
+  --p-po:     #0f9e8e;
+}
+
+.kpi-root[data-theme="dark"] {
+  --c-feature:    #b86fe0;
+  --c-enh:        #dcb3ff;
+  --c-bug:        #ff6f63;
+  --c-clientbug:  #c75b50;
+  --c-regression: #ffb59a;
+  --c-good:  #2FB88E;
+  --c-warn:  #F2B441;
+  --c-bad:   #F0813B;
+  --c-done:  #4DA3E0;
+  --c-neutral: #8893A0;
+  --p-dev:    #58a6ff;
+  --p-review: #a978f0;
+  --p-qawait: #f0a13b;
+  --p-qa:     #eab308;
+  --p-tofix:  #f472b6;
+  --p-po:     #2dd4bf;
+}
+
+.kpi-root * { box-sizing: border-box; }
+.kpi-root { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* Tiny shared helper: a status pip that ALSO carries a glyph,
+   so meaning never depends on hue alone (daltonien-safe). */
+.kpi-pip { display:inline-flex; align-items:center; justify-content:center;
+  width:14px; height:14px; border-radius:50%; font-size:9px; font-weight:800;
+  color:#fff; flex:none; }

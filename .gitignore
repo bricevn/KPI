@@ -1,0 +1,11 @@
+bin/
+obj/
+output/
+*.user
+.vs/
+dp-keys/
+*.tmp
+
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
