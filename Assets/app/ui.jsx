@@ -3,7 +3,8 @@
 (function () {
   const TYPE_VAR = { feature: 'var(--c-feature)', enh: 'var(--c-enh)', bug: 'var(--c-bug)', clientbug: 'var(--c-clientbug)', regression: 'var(--c-regression)' };
   const PHASE_VAR = { uiux: 'var(--c-enh)', dev: 'var(--p-dev)', review: 'var(--p-review)', qawait: 'var(--p-qawait)', qa: 'var(--p-qa)', tofix: 'var(--p-tofix)', po: 'var(--p-po)' };
-  const PHASE_NAME = { uiux: 'UI/UX', dev: 'Dev', review: 'Review', qawait: 'QA wait', qa: 'QA', tofix: 'To fix', po: 'PO' };
+  // Noms de phase : défauts surchargés par les périodes configurées (Export.Periods) si présentes.
+  const PHASE_NAME = (function () { var m = { uiux: 'UI/UX', dev: 'Dev', review: 'Review', qawait: 'QA wait', qa: 'QA', tofix: 'To fix', po: 'PO' }; try { (window.APP.periods || []).forEach(function (p) { if (p.key && p.name) m[p.key] = p.name; }); } catch (e) {} return m; })();
   const typeColor = (k) => TYPE_VAR[k] || 'var(--ink-faint)';
   const phaseColor = (k) => PHASE_VAR[k] || 'var(--ink-faint)';
   const fmt1 = (n) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');

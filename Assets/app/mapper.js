@@ -21,7 +21,12 @@ window.buildAPP = function (D) {
     'prod::qa inprogress': 'qa', 'prod::qa hotfix inprogress': 'qa',
     'prod::to fix': 'tofix', 'prod:: po validation': 'po'
   };
-  var TIMED = { dev: 1, review: 1, qawait: 1, qa: 1, tofix: 1, po: 1 };
+  // Catalogue des périodes (Export.Periods, payload window.__DATA__.periods). Source de vérité des
+  // noms/couleurs/flag timed. Repli sur les phases standard si non configuré (rétro-compat).
+  var PERIODS = (D.periods || []).filter(function (p) { return p && p.key; });
+  var TIMED = {};
+  if (PERIODS.length) PERIODS.forEach(function (p) { if (p.timed) TIMED[p.key] = 1; });
+  else TIMED = { dev: 1, review: 1, qawait: 1, qa: 1, tofix: 1, po: 1 };
   var cfgLP = D.labelPhases || {};
   var PH_HAS_CFG = false, PH_MAP = {};
   Object.keys(cfgLP).forEach(function (k) { var v = cfgLP[k]; if (v && v !== 'none') { PH_MAP[String(k).toLowerCase()] = v; PH_HAS_CFG = true; } });
@@ -218,7 +223,10 @@ window.buildAPP = function (D) {
   }).filter(function (g) { return g.issues > 0; });
 
   // ---------- temps moyen par phase (global) ----------
-  var PH = [['dev', 'Dev'], ['review', 'Review'], ['qawait', 'QA wait'], ['qa', 'QA'], ['tofix', 'To fix'], ['po', 'PO']];
+  // Phases chronométrées (clé+nom) PILOTÉES par les périodes configurées (ordre admin), repli standard.
+  var PH = PERIODS.length
+    ? PERIODS.filter(function (p) { return TIMED[p.key]; }).map(function (p) { return [p.key, p.name || p.key]; })
+    : [['dev', 'Dev'], ['review', 'Review'], ['qawait', 'QA wait'], ['qa', 'QA'], ['tofix', 'To fix'], ['po', 'PO']];
   var phaseAvg = PH.map(function (p) {
     var arr = detail.map(function (d) { return d._times[p[0]]; }).filter(function (x) { return x > 0; });
     return { key: p[0], name: p[1], days: arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0 };
@@ -297,7 +305,7 @@ window.buildAPP = function (D) {
   var anomCount = Object.keys(anomalies).reduce(function (s, k) { return s + anomalies[k].length; }, 0);
 
   return {
-    types: types, typeByKey: typeByKey, phases: phases, people: people, peopleById: peopleById,
+    types: types, typeByKey: typeByKey, phases: phases, periods: PERIODS, people: people, peopleById: peopleById,
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
     superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, weightBuckets: weightBuckets,
     milestone: milestone, meta: meta, FIB: FIB,

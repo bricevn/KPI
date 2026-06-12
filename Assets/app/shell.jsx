@@ -76,6 +76,8 @@
       '--accent-soft': `color-mix(in srgb, ${accent} 15%, transparent)`,
       '--disp-font': NUM_FONTS[numFont] || NUM_FONTS.grotesk
     };
+    // Couleurs de phase pilotées par la config (Export.Periods) : surcharge les --p-<key> du CSS.
+    (A.periods || []).forEach((p) => { if (p.key && p.color) rootStyle['--p-' + p.key] = p.color; });
 
     // Filtrage réel : on ne garde de fMilestone que les VRAIES milestones (le sentinel « Tout le projet »
     // n'en est pas une → []=toutes). Reconstruit window.APP EN PLACE (mémoïsé par signature).
