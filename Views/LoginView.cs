@@ -22,7 +22,7 @@ namespace Kpi.Views;
 public static class LoginView
 {
     /// <summary>Designed login page. OAuth button shown only when OAuth is configured. Bilingue FR/EN.</summary>
-    public static string Page(AuthConfig auth, string culture = "fr")
+    public static string Page(AuthConfig auth, string culture = "en")
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
         var lc = Kpi.Localization.Loc.Normalize(culture);

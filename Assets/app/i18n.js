@@ -2110,12 +2110,12 @@
   };
 
   function lang() {
-    var l = (typeof window !== 'undefined' && window.__LANG__) ? String(window.__LANG__).slice(0, 2).toLowerCase() : 'fr';
-    return I18N[l] ? l : 'fr';
+    var l = (typeof window !== 'undefined' && window.__LANG__) ? String(window.__LANG__).slice(0, 2).toLowerCase() : 'en';
+    return I18N[l] ? l : 'en';
   }
   window.t = function (key, vars) {
-    var d = I18N[lang()] || I18N.fr;
-    var s = (d[key] != null ? d[key] : (I18N.fr[key] != null ? I18N.fr[key] : key));
+    var d = I18N[lang()] || I18N.en;
+    var s = (d[key] != null ? d[key] : (I18N.en[key] != null ? I18N.en[key] : key));
     if (vars) for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k]));
     return s;
   };

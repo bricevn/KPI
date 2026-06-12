@@ -95,7 +95,7 @@ window.buildAPP = function (D) {
     msName = selMs.length === 1 ? selMs[0] : selMs.join(' + ');
   } else if (D.selectedMilestones && D.selectedMilestones.length === 0) {
     // Filtre explicitement « Toutes » : fenêtre = étendue réelle des issues affichées (repli events ci-dessous).
-    msName = 'Toutes les milestones'; START = NaN; END = NaN;
+    msName = 'All milestones'; START = NaN; END = NaN;
   } else {
     // Appel initial (sans info de filtre) : milestone CONFIGURÉE du compte.
     msName = D.milestone || '';
@@ -295,11 +295,11 @@ window.buildAPP = function (D) {
   };
 
   // ---------- divers ----------
-  var fmtFr = function (ms) { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } };
+  var fmtFr = function (ms) { try { return new Date(ms).toLocaleDateString('en', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } };
   var milestone = { name: msName, start: fmtFr(START), end: fmtFr(END - 1) + ' ' + new Date(END - 1).getFullYear(), dayPct: Math.max(0, Math.min(100, pct(NOW - START, END - START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
   // URL d'issue + nom de projet DÉRIVÉS du webUrl réel (générique : toute instance/projet GitLab, rien en dur).
   var sampleUrl = ''; for (var su = 0; su < CAT.length; su++) { if (CAT[su].webUrl) { sampleUrl = CAT[su].webUrl; break; } }
-  var issueBase = '', projName = 'Projet';
+  var issueBase = '', projName = 'Project';
   var mB = sampleUrl.match(/^(.*\/-\/issues\/)/); if (mB) issueBase = mB[1];
   var mP = sampleUrl.match(/^https?:\/\/[^/]+\/(.+?)\/-\/issues\//); if (mP) { var pp = mP[1].split('/'); projName = pp[pp.length - 1]; }
   var meta = { generated: D.generatedAt || '', extracted: D.lastExtractedAt || '', project: projName, issueBase: issueBase };

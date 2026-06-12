@@ -189,7 +189,7 @@ public sealed class DashboardView
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string? payloadJson = null, string lang = "fr")
+    public static string BuildReferencePage(string? payloadJson = null, string lang = "en")
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));

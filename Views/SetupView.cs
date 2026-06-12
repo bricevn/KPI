@@ -17,7 +17,7 @@ namespace Kpi.Views;
 
 public static class SetupView
 {
-    public static string Page(AuthConfig auth, string culture = "fr")
+    public static string Page(AuthConfig auth, string culture = "en")
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
         var lc = Kpi.Localization.Loc.Normalize(culture);
@@ -204,7 +204,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 <script>
 (function(){
   // Périodes par défaut PROPOSÉES (éditables à l'étape 3 : renommer / couleur / ajouter / supprimer).
-  var DEFAULT_PHASES=[{id:'dev',name:'Développement',color:'#2188ff'},{id:'review',name:'Revue de code',color:'#8957e5'},{id:'qawait',name:'Attente QA',color:'#b8800a'},{id:'qa',name:'QA',color:'#c79a06'},{id:'tofix',name:'À corriger',color:'#ec4899'},{id:'po',name:'Validation PO',color:'#0f9e8e'},{id:'uiux',name:'UI/UX',color:'#2dd4bf'}];
+  var DEFAULT_PHASES=[{id:'dev',name:'Development',color:'#2188ff'},{id:'review',name:'Code review',color:'#8957e5'},{id:'qawait',name:'QA wait',color:'#b8800a'},{id:'qa',name:'QA',color:'#c79a06'},{id:'tofix',name:'To fix',color:'#ec4899'},{id:'po',name:'PO validation',color:'#0f9e8e'},{id:'uiux',name:'UI/UX',color:'#2dd4bf'}];
   var PALETTE=['#2188ff','#8957e5','#b8800a','#c79a06','#ec4899','#0f9e8e','#2dd4bf','#e0792e','#d6336c','#5f6b7a'];
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
@@ -906,7 +906,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "抽出中…",
     },
   };
-  var T=I18N[SLANG]||I18N.fr;
+  var T=I18N[SLANG]||I18N.en;
   var STEP_META=[[T.stepConnexion,'link'],[T.stepProjets,'box'],[T.stepPhases,'layers'],[T.stepEquipes,'users'],[T.stepVerif,'rocket']];
   var LANG_SWITCH='<div class="lang-switch"><select class="lang-sel" data-setlang>__LANG_OPTIONS__</select></div>';
 

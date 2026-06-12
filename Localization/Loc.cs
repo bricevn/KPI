@@ -19,8 +19,8 @@ public static class Loc
     // DashboardView, et les sélecteurs de langue côté client via window.__LANGS__). Ajouter une langue :
     // 1) ajouter son code ici + son libellé natif dans Native (+ Rtl si droite-à-gauche) ;
     // 2) ajouter son bloc de traductions dans Strings (ci-dessous), Assets/app/i18n.js et Views/SetupView.cs.
-    public static readonly string[] Supported = { "fr", "en", "es", "de", "it", "pt", "ru", "ar", "zh", "ja" };
-    public const string Default = "fr";
+    public static readonly string[] Supported = { "en", "fr", "es", "de", "it", "pt", "ru", "ar", "zh", "ja" };
+    public const string Default = "en"; // anglais = langue de base (défaut + repli)
 
     /// <summary>Libellé NATIF de chaque langue (pour les sélecteurs).</summary>
     public static readonly Dictionary<string, string> Native = new()
