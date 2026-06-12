@@ -1,11 +1,11 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using GitLabExporter.Config;
-using GitLabExporter.Export;
-using GitLabExporter.Export.Models;
+using Kpi.Config;
+using Kpi.Export;
+using Kpi.Export.Models;
 
-namespace GitLabExporter.Views;
+namespace Kpi.Views;
 
 /// <summary>
 /// Dashboard interactif (auto-contenu) :

@@ -1,6 +1,6 @@
 // SetupView.cs — assistant de première mise en service du dashboard KPI.
 //
-// Drop ce fichier dans GitLabExporter/Views/ (namespace GitLabExporter.Views).
+// Drop ce fichier dans Kpi/Views/ (namespace Kpi.Views).
 // Page autonome (CSS + JS inline, CSP-safe) : aucun JS externe (seules Google Fonts,
 // déjà autorisées par la CSP), et la page ne parle qu'à des endpoints same-origin.
 //
@@ -10,9 +10,9 @@
 //   3. POST /api/setup          → écrit appsettings.json + recharge → redirige vers /
 //
 // Voir WebDashboard.setup.patch.md pour le câblage serveur.
-using GitLabExporter.Config;
+using Kpi.Config;
 
-namespace GitLabExporter.Views;
+namespace Kpi.Views;
 
 public static class SetupView
 {

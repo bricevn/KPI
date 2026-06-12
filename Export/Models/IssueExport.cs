@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using GitLabExporter.GitLab.Models;
+using Kpi.GitLab.Models;
 
-namespace GitLabExporter.Export.Models;
+namespace Kpi.Export.Models;
 
 /// <summary>
 /// Vue enrichie d'une issue, prête à être sérialisée en JSON ou aplatie en CSV.

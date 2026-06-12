@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Web;
-using GitLabExporter.Config;
-using GitLabExporter.GitLab.Models;
+using Kpi.Config;
+using Kpi.GitLab.Models;
 
-namespace GitLabExporter.GitLab;
+namespace Kpi.GitLab;
 
 public sealed class GitLabClient : IDisposable
 {

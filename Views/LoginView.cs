@@ -1,6 +1,6 @@
 // LoginView.cs — designed login + welcome pages for the KPI dashboard.
 //
-// Drop this file in GitLabExporter/Views/ (namespace GitLabExporter.Views).
+// Drop this file in Kpi/Views/ (namespace Kpi.Views).
 // It returns self-contained HTML strings (inline CSS+JS, CSP-safe):
 //   • no external JS (only Google Fonts, already allowed by the dashboard CSP);
 //   • the page talks ONLY to same-origin endpoints (connect-src 'self').
@@ -14,9 +14,9 @@
 //     The personal access token is used once and never persisted.
 //
 using System.Text;
-using GitLabExporter.Config;
+using Kpi.Config;
 
-namespace GitLabExporter.Views;
+namespace Kpi.Views;
 
 public static class LoginView
 {

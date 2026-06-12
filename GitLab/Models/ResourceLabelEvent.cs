@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GitLabExporter.GitLab.Models;
+namespace Kpi.GitLab.Models;
 
 public sealed class ResourceLabelEvent
 {

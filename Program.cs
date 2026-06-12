@@ -1,17 +1,17 @@
 using System.Text.Json;
-using GitLabExporter.Config;
-using GitLabExporter.Export;
-using GitLabExporter.Export.Models;
-using GitLabExporter.Pipeline;
-using GitLabExporter.Server;
-using GitLabExporter.Views;
+using Kpi.Config;
+using Kpi.Export;
+using Kpi.Export.Models;
+using Kpi.Pipeline;
+using Kpi.Server;
+using Kpi.Views;
 using Microsoft.Extensions.Configuration;
 
 var builder = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
     .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables(prefix: "GITLAB_EXPORTER_");
+    .AddEnvironmentVariables(prefix: "KPI_");
 
 var configRoot = builder.Build();
 var appConfig = new AppConfig();
@@ -57,10 +57,10 @@ try
     if (fetchLabels)
     {
         Console.WriteLine("Récupération des labels du projet (couleurs incluses)...");
-        using var client = new GitLabExporter.GitLab.GitLabClient(appConfig.GitLab);
+        using var client = new Kpi.GitLab.GitLabClient(appConfig.GitLab);
         var labels = await client.GetProjectLabelsAsync(cts.Token);
         var labelsPath = Path.Combine(appConfig.Export.OutputDirectory, "labels.json");
-        await GitLabExporter.Export.JsonExporter.WriteJsonAtomicAsync(labelsPath, labels, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
+        await Kpi.Export.JsonExporter.WriteJsonAtomicAsync(labelsPath, labels, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
         Console.WriteLine($"  -> {labels.Count} labels écrits dans {labelsPath}");
         return 0;
     }
@@ -68,10 +68,10 @@ try
     if (fetchMilestones)
     {
         Console.WriteLine("Récupération des milestones du projet (start_date / due_date)...");
-        using var client = new GitLabExporter.GitLab.GitLabClient(appConfig.GitLab);
+        using var client = new Kpi.GitLab.GitLabClient(appConfig.GitLab);
         var milestones = await client.GetProjectMilestonesAsync(cts.Token);
         var msPath = Path.Combine(appConfig.Export.OutputDirectory, "milestones.json");
-        await GitLabExporter.Export.JsonExporter.WriteJsonAtomicAsync(msPath, milestones, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
+        await Kpi.Export.JsonExporter.WriteJsonAtomicAsync(msPath, milestones, new JsonSerializerOptions { WriteIndented = true }, cts.Token);
         Console.WriteLine($"  -> {milestones.Count} milestones écrites dans {msPath}");
         return 0;
     }

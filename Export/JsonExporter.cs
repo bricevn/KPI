@@ -1,8 +1,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using GitLabExporter.Export.Models;
+using Kpi.Export.Models;
 
-namespace GitLabExporter.Export;
+namespace Kpi.Export;
 
 public static class JsonExporter
 {

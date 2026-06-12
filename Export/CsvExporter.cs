@@ -1,10 +1,10 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
-using GitLabExporter.Config;
-using GitLabExporter.Export.Models;
+using Kpi.Config;
+using Kpi.Export.Models;
 
-namespace GitLabExporter.Export;
+namespace Kpi.Export;
 
 public sealed class CsvExporter
 {

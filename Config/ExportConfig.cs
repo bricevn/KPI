@@ -1,4 +1,4 @@
-namespace GitLabExporter.Config;
+namespace Kpi.Config;
 
 public sealed class AppConfig
 {

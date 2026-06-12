@@ -1,11 +1,11 @@
 using System.Text.Json;
-using GitLabExporter.Config;
-using GitLabExporter.Export;
-using GitLabExporter.Export.Models;
-using GitLabExporter.GitLab;
-using GitLabExporter.Views;
+using Kpi.Config;
+using Kpi.Export;
+using Kpi.Export.Models;
+using Kpi.GitLab;
+using Kpi.Views;
 
-namespace GitLabExporter.Pipeline;
+namespace Kpi.Pipeline;
 
 /// <summary>
 /// Pipeline d'export complet (API → JSON → CSV → vues HTML).

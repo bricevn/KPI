@@ -53,7 +53,7 @@ Toute la configuration est dans [appsettings.json](appsettings.json) (gitignoré
 
 ## Commandes
 
-Depuis le dossier `GitLabExporter/`. Compilez une fois après chaque modif de code C# :
+Depuis le dossier `Kpi/`. Compilez une fois après chaque modif de code C# :
 
 ```powershell
 dotnet build
@@ -132,7 +132,7 @@ Un bandeau de **filtres globaux** (Milestone · Label · Équipe · Utilisateur)
 - Sinon, depuis un autre terminal PowerShell :
 
 ```powershell
-Get-Process GitLabExporter -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process Kpi -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
 #### Endpoints du serveur
@@ -247,7 +247,7 @@ Parmi les MR retournées par l'endpoint `issues/:iid/closed_by`, on choisit :
 L'app est un service Kestrel qui écoute sur `localhost:5050`, **conçu pour tourner derrière un reverse proxy qui assure le HTTPS**. Pour l'héberger sur un domaine :
 
 1. **Publier** : `dotnet publish -c Release -o /chemin/app`. Copier le dossier publié **+** `appsettings.json` **+** `output/` ; créer un dossier `dp-keys/` inscriptible.
-2. **Lancer en service** (systemd / service Windows / conteneur) avec `--serve`. Fournir le token de service par **variable d'environnement** plutôt qu'en clair : `GITLAB_EXPORTER_GitLab__PrivateToken=...`.
+2. **Lancer en service** (systemd / service Windows / conteneur) avec `--serve`. Fournir le token de service par **variable d'environnement** plutôt qu'en clair : `KPI_GitLab__PrivateToken=...`.
 3. **Reverse proxy + TLS** (Caddy = HTTPS automatique, ou nginx/IIS) vers `127.0.0.1:5050`, en transmettant `X-Forwarded-Proto/Host/For`. Le proxy doit être sur le **même hôte** (les en-têtes ne sont acceptés que depuis loopback) ; sinon ajuster `KnownProxies`.
 4. **OAuth (optionnel)** : enregistrer le Redirect URI `https://<domaine>/signin-gitlab` (scope `read_user`) et renseigner `Auth.ClientId/ClientSecret`.
 

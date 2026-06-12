@@ -6,10 +6,10 @@ using System.Text;
 using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using GitLabExporter.Config;
-using GitLabExporter.Export.Models;
-using GitLabExporter.Pipeline;
-using GitLabExporter.Views;
+using Kpi.Config;
+using Kpi.Export.Models;
+using Kpi.Pipeline;
+using Kpi.Views;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
@@ -25,7 +25,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace GitLabExporter.Server;
+namespace Kpi.Server;
 
 /// <summary>
 /// Serveur du dashboard sur ASP.NET Core (Kestrel). Remplace l'ancien HttpListener.
@@ -106,7 +106,7 @@ public sealed class WebDashboard
         // (ou remplacer par PersistKeysToStackExchangeRedis / Azure Blob).
         builder.Services.AddDataProtection()
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dp-keys")))
-            .SetApplicationName("GitLabExporter");
+            .SetApplicationName("Kpi");
 
         if (authCfg.OAuthConfigured)
         {
@@ -244,7 +244,7 @@ public sealed class WebDashboard
         app.MapGet("/index.html", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         // App de référence (Claude Design) — DONNÉES DE DÉMO. Exposée uniquement en développement.
         if (app.Environment.IsDevelopment())
-            app.MapGet("/ref", () => Results.Content(GitLabExporter.Views.HypervisorReleaseView.BuildReferencePage(), "text/html; charset=utf-8")).AllowAnonymous();
+            app.MapGet("/ref", () => Results.Content(Kpi.Views.HypervisorReleaseView.BuildReferencePage(), "text/html; charset=utf-8")).AllowAnonymous();
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
         app.MapGet("/api/config", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeConfigAsync(ctx)));
         app.MapGet("/api/config/token", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeTokenAsync(ctx)));
@@ -552,7 +552,7 @@ public sealed class WebDashboard
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "GitLabExporter.csproj")))
+            if (File.Exists(Path.Combine(dir.FullName, "Kpi.csproj")))
             {
                 var p = Path.Combine(dir.FullName, "appsettings.json");
                 return File.Exists(p) ? p : null;
@@ -1133,7 +1133,7 @@ public sealed class WebDashboard
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
             .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
-            .AddEnvironmentVariables(prefix: "GITLAB_EXPORTER_");
+            .AddEnvironmentVariables(prefix: "KPI_");
         var cfg = new AppConfig();
         b.Build().Bind(cfg);
         return cfg;

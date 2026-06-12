@@ -1,9 +1,9 @@
-using GitLabExporter.Config;
-using GitLabExporter.Export.Models;
-using GitLabExporter.GitLab;
-using GitLabExporter.GitLab.Models;
+using Kpi.Config;
+using Kpi.Export.Models;
+using Kpi.GitLab;
+using Kpi.GitLab.Models;
 
-namespace GitLabExporter.Export;
+namespace Kpi.Export;
 
 public sealed class ExportService
 {
