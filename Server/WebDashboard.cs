@@ -308,12 +308,13 @@ public sealed class WebDashboard
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
 
         // --- Endpoints d'authentification ---
-        // Page de connexion designée (OAuth + token). Déjà connecté → dashboard.
+        // Page de connexion designée (OAuth + token) = page d'accueil. Déjà connecté → dashboard.
         app.MapGet("/login", (HttpContext ctx) =>
         {
-            if (!self.IsConfigured()) return Results.Redirect("/setup"); // 1re mise en service : on guide vers l'assistant
+            // Sinon on AFFICHE la page, y compris à la 1re mise en service (non configuré) : elle montre
+            // alors un CTA « Commencer la configuration » → /setup (pas de connexion possible sans serveur).
             if (ctx.User.Identity?.IsAuthenticated ?? false) return Results.Redirect("/");
-            return Results.Content(LoginView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+            return Results.Content(LoginView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, self.IsConfigured()), "text/html; charset=utf-8");
         }).AllowAnonymous().RequireRateLimiting("login");
 
         // Bouton « Se connecter avec GitLab » → challenge OAuth de l'instance configurée (Auth.Authority).

@@ -21,8 +21,10 @@ namespace Kpi.Views;
 
 public static class LoginView
 {
-    /// <summary>Designed login page. OAuth button shown only when OAuth is configured. Bilingue FR/EN.</summary>
-    public static string Page(AuthConfig auth, string culture = "en")
+    /// <summary>Designed login page. OAuth button shown only when OAuth is configured. Bilingue FR/EN.
+    /// <paramref name="configured"/> = false → 1re mise en service : on masque la connexion (impossible
+    /// sans serveur configuré) et on affiche un CTA « Commencer la configuration » vers /setup.</summary>
+    public static string Page(AuthConfig auth, string culture = "en", bool configured = true)
     {
         var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
         var lc = Kpi.Localization.Loc.Normalize(culture);
@@ -36,9 +38,12 @@ public static class LoginView
             ["errNoInstance"] = T("login.errNoInstance"), ["errNoToken"] = T("login.errNoToken"),
             ["verifying"] = T("login.verifying"), ["signin"] = T("login.signin"),
             ["cantConnect"] = T("login.cantConnect"), ["unreachable"] = T("login.unreachable"),
+            ["frTag1"] = T("login.frTag1"), ["frTag2"] = T("login.frTag2"),
+            ["frDesc"] = T("login.frDesc"), ["setupOpening"] = T("login.setupOpening"),
         });
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
+            .Replace("__CONFIGURED__", configured ? "true" : "false")
             .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
             .Replace("__LANG__", lc)
             .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
@@ -49,7 +54,15 @@ public static class LoginView
             .Replace("__T_WELCOME__", T("login.welcome")).Replace("__T_WELCOMESUB__", T("login.welcomeSub"))
             .Replace("__T_INSTANCE__", T("login.instance")).Replace("__T_WITHGITLAB__", T("login.withGitlab"))
             .Replace("__T_USETOKEN__", T("login.useToken")).Replace("__T_TOKENPERSONAL__", T("login.tokenPersonal"))
-            .Replace("__T_SIGNIN__", T("login.signin")).Replace("__T_TOKENNOTE__", T("login.tokenNote"));
+            .Replace("__T_SIGNIN__", T("login.signin")).Replace("__T_TOKENNOTE__", T("login.tokenNote"))
+            .Replace("__T_SETUP_CTA__", T("login.setupCta"))
+            .Replace("__T_FR_BADGE__", T("login.firstRunBadge"))
+            .Replace("__T_FR_TITLE__", T("login.firstRunTitle"))
+            .Replace("__T_FR_SUB__", T("login.firstRunSub"))
+            .Replace("__T_FR_STEP1__", T("login.firstRunStep1"))
+            .Replace("__T_FR_STEP2__", T("login.firstRunStep2"))
+            .Replace("__T_FR_STEP3__", T("login.firstRunStep3"))
+            .Replace("__T_FR_ADMINS__", T("login.firstRunAdmins"));
     }
 
     /// <summary>Blank success page with a logout button.</summary>
@@ -113,6 +126,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
 .brand-foot{position:relative;font-size:11.5px;color:var(--ink-faint);display:flex;align-items:center;gap:7px;}
 .a-title{font-family:var(--disp);font-weight:700;font-size:25px;letter-spacing:-.02em;margin:0 0 7px;}
 .a-sub{font-size:13.5px;line-height:1.5;color:var(--ink-dim);margin:0 0 22px;}
+/* first-run (espace non configuré) */
+.fr-hero{width:60px;height:60px;border-radius:17px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:22px;}
+.fr-badge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);background:var(--accent-soft);padding:4px 11px;border-radius:999px;margin-bottom:14px;}
+.fr-steps{list-style:none;margin:20px 0 24px;padding:0;display:flex;flex-direction:column;gap:12px;}
+.fr-steps li{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--ink-dim);}
+.fr-steps .n{width:24px;height:24px;border-radius:8px;flex:none;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:12px;color:var(--ink);}
+.fr-foot{margin-top:18px;text-align:center;font-size:11.5px;color:var(--ink-faint);display:flex;align-items:center;justify-content:center;gap:7px;}
 .gl-btn{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;height:52px;border:0;border-radius:13px;cursor:pointer;font-family:var(--disp);font-weight:600;font-size:15.5px;color:#fff;background:linear-gradient(180deg,#fc6d26,#e24329);box-shadow:0 6px 18px rgba(226,67,41,.32);transition:transform .12s var(--ease-out),box-shadow .12s,filter .12s;}
 .gl-btn:hover{filter:brightness(1.05);transform:translateY(-1px);}
 .gl-btn:disabled{cursor:default;filter:saturate(.4) brightness(.8);transform:none;box-shadow:none;}
@@ -189,6 +209,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
   </div>
   <div class="split-form"><div class="form-inner">
     <div class="lang-switch"><select class="lang-sel" onchange="location.href='/set-lang?lang='+encodeURIComponent(this.value)+'&return=/login'">__LANG_OPTIONS__</select></div>
+    <!-- FIRST-RUN : espace non encore configuré → accueil + CTA vers l'assistant (affiché via JS quand !CONFIGURED). -->
+    <div id="firstRunView" class="hidden">
+      <div class="fr-hero"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path></svg></div>
+      <span class="fr-badge">__T_FR_BADGE__</span>
+      <h1 class="a-title">__T_FR_TITLE__</h1>
+      <p class="a-sub">__T_FR_SUB__</p>
+      <ol class="fr-steps">
+        <li><span class="n">1</span>__T_FR_STEP1__</li>
+        <li><span class="n">2</span>__T_FR_STEP2__</li>
+        <li><span class="n">3</span>__T_FR_STEP3__</li>
+      </ol>
+      <button class="gl-btn" id="setupBtn" type="button" style="background:linear-gradient(180deg,var(--accent-2),var(--accent));box-shadow:0 6px 18px var(--accent-soft)"><span id="setupLabel">__T_SETUP_CTA__</span><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+      <div class="fr-foot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>__T_FR_ADMINS__</div>
+    </div>
+    <!-- LOGIN : espace déjà configuré (OAuth + token). -->
+    <div id="loginView">
     <h1 class="a-title">__T_WELCOME__</h1>
     <p class="a-sub">__T_WELCOMESUB__</p>
     <div class="fld">
@@ -217,20 +253,34 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
       <button class="sub-btn" id="tokenBtn" type="button">__T_SIGNIN__</button>
       <div class="a-foot">__T_TOKENNOTE__</div>
     </div>
+    </div>
   </div></div>
 </div></div>
 <script>
 (function(){
   var OAUTH_CONFIGURED = __OAUTH__;
+  var CONFIGURED = __CONFIGURED__;
   var I18N = __JS_I18N__;
   var $ = function(id){return document.getElementById(id);};
-  var instance=$('instance'),token=$('token'),tokenWrap=$('tokenWrap'),oauthBtn=$('oauthBtn'),revealBtn=$('revealBtn'),tokenBtn=$('tokenBtn'),errBox=$('errBox'),errMsg=$('errMsg'),tokenBox=$('tokenBox'),footInstance=$('footInstance');
+  var instance=$('instance'),token=$('token'),tokenWrap=$('tokenWrap'),oauthBtn=$('oauthBtn'),revealBtn=$('revealBtn'),tokenBtn=$('tokenBtn'),errBox=$('errBox'),errMsg=$('errMsg'),tokenBox=$('tokenBox'),footInstance=$('footInstance'),setupBtn=$('setupBtn');
   function normInstance(){var v=(instance.value||'').trim().replace(/\/+$/,'');if(v&&!/^https?:\/\//i.test(v))v='https://'+v;return v;}
   function syncFoot(){var v=normInstance();footInstance.textContent=v?(I18N.encryptedTo+v.replace(/^https?:\/\//,'')):I18N.encrypted;}
   instance.addEventListener('input',syncFoot);syncFoot();
   function openToken(){tokenWrap.style.maxHeight='360px';tokenWrap.style.opacity='1';revealBtn.classList.add('hidden');setTimeout(function(){token.focus();},120);}
   revealBtn.addEventListener('click',openToken);
-  if(!OAUTH_CONFIGURED){oauthBtn.classList.add('hidden');revealBtn.classList.add('hidden');openToken();}
+  var firstRunView=$('firstRunView'),loginView=$('loginView');
+  if(!CONFIGURED){
+    // 1re mise en service : aucune connexion possible (pas de serveur configuré) → écran d'accueil + CTA /setup.
+    firstRunView.classList.remove('hidden');loginView.classList.add('hidden');
+    var tagEl=document.querySelector('.split-tag');if(tagEl)tagEl.innerHTML=I18N.frTag1+'<br><em>'+I18N.frTag2+'</em>';
+    var descEl=document.querySelector('.split-desc');if(descEl)descEl.textContent=I18N.frDesc;
+    footInstance.textContent=I18N.encrypted;
+    setupBtn.addEventListener('click',function(){
+      setupBtn.disabled=true;$('setupLabel').textContent=I18N.setupOpening;
+      var ar=$('setupLabel').nextElementSibling;if(ar)ar.outerHTML='<span class="spin"></span>';
+      setTimeout(function(){window.location.href='/setup';},450);
+    });
+  } else if(!OAUTH_CONFIGURED){oauthBtn.classList.add('hidden');revealBtn.classList.add('hidden');openToken();}
   $('eyeBtn').addEventListener('click',function(){token.type=token.type==='password'?'text':'password';});
   function showError(m){errMsg.textContent=m;errBox.classList.remove('hidden');tokenBox.classList.add('err');}
   function clearError(){errBox.classList.add('hidden');tokenBox.classList.remove('err');}
