@@ -111,55 +111,54 @@ public sealed class WebDashboard
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dp-keys")))
             .SetApplicationName("Kpi");
 
-        if (authCfg.OAuthConfigured)
+        // OAuth GitLab enregistré INCONDITIONNELLEMENT : les identifiants sont relus EN DIRECT depuis la config
+        // (self._config.Auth) à chaque (re)construction des options. Non configuré → placeholders (la validation
+        // ne jette pas) ; le challenge est de toute façon gardé par OAuthConfigured (live) dans /auth/oauth.
+        // Après saisie des creds via /api/setup/oauth, on invalide le cache d'options → reconfig À CHAUD (sans redémarrage).
+        authBuilder.AddOAuth("gitlab", o =>
         {
-            var gl = authCfg.Authority.TrimEnd('/');
-            authBuilder.AddOAuth("gitlab", o =>
+            var a = self._config.Auth;
+            var configured = a.OAuthConfigured;
+            var gl = (configured ? a.Authority : "https://oauth.invalid").TrimEnd('/');
+            o.ClientId = configured ? a.ClientId : "unconfigured";
+            o.ClientSecret = configured ? a.ClientSecret : "unconfigured";
+            o.CallbackPath = string.IsNullOrWhiteSpace(a.CallbackPath) ? "/signin-gitlab" : a.CallbackPath;
+            o.AuthorizationEndpoint = gl + "/oauth/authorize";
+            o.TokenEndpoint = gl + "/oauth/token";
+            o.UserInformationEndpoint = gl + "/api/v4/user";
+            o.Scope.Add("read_user");
+            o.SaveTokens = false;
+            o.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+            o.ClaimActions.MapJsonKey(ClaimTypes.Name, "username");
+            o.ClaimActions.MapJsonKey("display_name", "name");
+            o.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+            o.Events.OnCreatingTicket = async ctx =>
             {
-                o.ClientId = authCfg.ClientId;
-                o.ClientSecret = authCfg.ClientSecret;
-                o.CallbackPath = authCfg.CallbackPath;
-                o.AuthorizationEndpoint = gl + "/oauth/authorize";
-                o.TokenEndpoint = gl + "/oauth/token";
-                o.UserInformationEndpoint = gl + "/api/v4/user";
-                o.Scope.Add("read_user");
-                o.SaveTokens = false;
-                o.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
-                o.ClaimActions.MapJsonKey(ClaimTypes.Name, "username");
-                o.ClaimActions.MapJsonKey("display_name", "name");
-                o.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
-                o.Events.OnCreatingTicket = async ctx =>
+                using var req = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
+                using var resp = await ctx.Backchannel.SendAsync(req, ctx.HttpContext.RequestAborted);
+                resp.EnsureSuccessStatusCode();
+                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+                ctx.RunClaimActions(doc.RootElement);
+                var uname = ctx.Identity?.Name ?? "";
+                // Bootstrap (non configuré) : tout compte GitLab valide passe (il deviendra l'admin). Gardé par
+                // !IsConfigured() : une fois Auth.AdminUsers écrit, la vérification d'appartenance redevient obligatoire.
+                if (self.IsConfigured())
                 {
-                    using var req = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
-                    req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
-                    using var resp = await ctx.Backchannel.SendAsync(req, ctx.HttpContext.RequestAborted);
-                    resp.EnsureSuccessStatusCode();
-                    using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-                    ctx.RunClaimActions(doc.RootElement);
-                    var uname = ctx.Identity?.Name ?? "";
-                    // 1re mise en service (non configuré) : aucun serveur/admin défini → on autorise tout compte
-                    // GitLab VALIDE (il deviendra l'admin via /setup). La permissivité est strictement gardée par
-                    // !IsConfigured() : dès que /setup écrit Auth.AdminUsers, IsConfigured() passe true et la
-                    // vérification d'appartenance ci-dessous redevient obligatoire (la faille se referme).
-                    if (self.IsConfigured())
-                    {
-                        // Rôles GitLab : refuser le ticket si l'utilisateur n'est ni membre du projet ni admin.
-                        var oauthServer = self.ServerForInstance(authCfg.Authority);
-                        if (!self.IsAdminLogin(uname) && (oauthServer == null || await self.GetServerAccessLevelAsync(oauthServer, uname, ctx.HttpContext.RequestAborted) == null))
-                            ctx.Fail("Compte GitLab non membre des projets du serveur.");
-                        else if (oauthServer != null)
-                            ctx.Identity?.AddClaim(new Claim(ServerClaim, oauthServer.Id));
-                    }
-                };
-                // Échec du flux OAuth (dont refus ci-dessus) → retour propre à la page de connexion.
-                o.Events.OnRemoteFailure = ctx =>
-                {
-                    ctx.Response.Redirect("/login");
-                    ctx.HandleResponse();
-                    return Task.CompletedTask;
-                };
-            });
-        }
+                    var oauthServer = self.ServerForInstance(self._config.Auth.Authority);
+                    if (!self.IsAdminLogin(uname) && (oauthServer == null || await self.GetServerAccessLevelAsync(oauthServer, uname, ctx.HttpContext.RequestAborted) == null))
+                        ctx.Fail("Compte GitLab non membre des projets du serveur.");
+                    else if (oauthServer != null)
+                        ctx.Identity?.AddClaim(new Claim(ServerClaim, oauthServer.Id));
+                }
+            };
+            o.Events.OnRemoteFailure = ctx =>
+            {
+                ctx.Response.Redirect("/login");
+                ctx.HandleResponse();
+                return Task.CompletedTask;
+            };
+        });
         builder.Services.AddAuthorization(o =>
         {
             // Tout exige une authentification, sauf endpoints marqués AllowAnonymous (/login, /auth/oauth, /api/auth/token).
@@ -304,12 +303,13 @@ public sealed class WebDashboard
         app.MapGet("/setup", (HttpContext ctx) =>
         {
             if (!self.IsConfigured() || self.IsAdminLogin(ctx.User.Identity?.Name))
-                return Results.Content(SetupView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+                return Results.Content(SetupView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
             return (ctx.User.Identity?.IsAuthenticated ?? false) ? Results.Redirect("/") : Results.Redirect("/login");
         }).AllowAnonymous();
         // Endpoints de l'assistant : ouverts au bootstrap (non configuré), sinon admin-only (RequireSetupAccess).
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup/oauth",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupOAuthSaveAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx))).AllowAnonymous();
         app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx)).AllowAnonymous();
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
@@ -321,13 +321,13 @@ public sealed class WebDashboard
             // Sinon on AFFICHE la page, y compris à la 1re mise en service (non configuré) : elle montre
             // alors un CTA « Commencer la configuration » → /setup (pas de connexion possible sans serveur).
             if (ctx.User.Identity?.IsAuthenticated ?? false) return Results.Redirect("/");
-            return Results.Content(LoginView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, self.IsConfigured()), "text/html; charset=utf-8");
+            return Results.Content(LoginView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, self.IsConfigured()), "text/html; charset=utf-8");
         }).AllowAnonymous().RequireRateLimiting("login");
 
         // Bouton « Se connecter avec GitLab » → challenge OAuth de l'instance configurée (Auth.Authority).
         app.MapGet("/auth/oauth", (HttpContext ctx, string? @return) =>
         {
-            if (!authCfg.OAuthConfigured) return Results.Redirect("/login");
+            if (!self._config.Auth.OAuthConfigured) return Results.Redirect("/login");
             // @return validé chemin local (anti open-redirect) : permet à /setup de revenir au wizard après OAuth.
             var back = (!string.IsNullOrEmpty(@return) && @return.StartsWith("/") && !@return.StartsWith("//")) ? @return : "/";
             return Results.Challenge(new AuthenticationProperties { RedirectUri = back }, new[] { "gitlab" });
@@ -823,6 +823,53 @@ public sealed class WebDashboard
             perProject.Add(new JsonObject { ["id"] = pid, ["count"] = count, ["ok"] = ok });
         }
         return Results.Json(new { ok = true, labels = set, total = set.Count, perProject });
+    }
+
+    // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority
+    // dans appsettings.json, recharge la config, et INVALIDE le cache des options OAuth → reconfiguration À CHAUD
+    // (le bouton SSO devient actif sans redémarrage). Le Secret n'est pas renvoyé au client.
+    private async Task<IResult> SetupOAuthSaveAsync(HttpContext ctx)
+    {
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        var clientId     = (b?["clientId"]?.GetValue<string>() ?? "").Trim();
+        var clientSecret = (b?["clientSecret"]?.GetValue<string>() ?? "").Trim();
+        var authority    = (b?["authority"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            return Results.Json(new { ok = false, error = "Application ID et Secret requis." });
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
+        if (string.IsNullOrWhiteSpace(authority)) authority = (auth["Authority"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(authority)) return Results.Json(new { ok = false, error = "Instance GitLab inconnue — testez d'abord la connexion au groupe." });
+        if (!Uri.TryCreate(authority, UriKind.Absolute, out var au) || (au.Scheme != Uri.UriSchemeHttp && au.Scheme != Uri.UriSchemeHttps))
+            return Results.Json(new { ok = false, error = "URL d'instance invalide (http/https requis)." });
+        auth["Authority"] = authority;
+        auth["ClientId"] = clientId;
+        auth["ClientSecret"] = clientSecret;
+        if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SetupOAuthSave write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); }
+        catch (Exception e) { Console.Error.WriteLine("SetupOAuthSave reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        // Reconfiguration À CHAUD : vider le cache des options du schéma « gitlab » → reconstruites (via le
+        // delegate AddOAuth) avec les nouveaux identifiants au prochain challenge. Pas de redémarrage requis.
+        try { (ctx.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptionsMonitorCache<Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions>)) as Microsoft.Extensions.Options.IOptionsMonitorCache<Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions>)?.TryRemove("gitlab"); }
+        catch (Exception e) { Console.Error.WriteLine("OAuth options cache invalidation KO : " + e); }
+
+        return Results.Json(new { ok = true });
     }
 
     // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json

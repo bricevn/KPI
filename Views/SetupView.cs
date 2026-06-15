@@ -244,6 +244,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-adminok{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--good);background:var(--good-soft);padding:4px 10px;border-radius:999px;flex:none;}
 .suA-adminchange{border:0;background:none;color:var(--ink-faint);font-size:12px;cursor:pointer;padding:5px 8px;border-radius:8px;flex:none;}
 .suA-adminchange:hover{color:var(--ink);background:var(--panel-3);}
+/* étape 1 — formulaire de configuration OAuth (in-app, sans édition d'appsettings) */
+.suA-oauthsetup{display:flex;flex-direction:column;gap:12px;}
+.suA-oauthstep{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-dim);line-height:1.45;}
+.suA-oauthnum{width:22px;height:22px;border-radius:7px;flex:none;background:var(--panel-3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--ink);}
+.suA-oauthlink{color:var(--accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+.suA-oauthlink:hover{text-decoration:underline;}
+.suA-oauthredir{font-size:11.5px;color:var(--ink-faint);margin-top:5px;}
+.suA-oauthredir code{font-family:var(--mono);background:var(--panel-3);padding:1px 5px;border-radius:5px;color:var(--ink-dim);}
 /* étape 3 — portée des phases (tous / par projet) */
 .suA-scope{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
 .suA-seg{display:inline-flex;background:var(--panel-3);border-radius:10px;padding:3px;gap:2px;flex:none;}
@@ -346,7 +354,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Mêmes phases et associations pour tous les projets importés.",
       scopeHintPer:"Phases et associations distinctes pour chaque projet.",
       member:"membre", members:"membres", perProjectRecap:"par projet · phases & labels distincts",
-      oauthSetup:"Connexion GitLab (OAuth) non configurée. Renseignez Auth.ClientId / ClientSecret dans appsettings.json puis redémarrez le serveur.",
+      oauthStep1:"Créez une application OAuth sur GitLab (Redirect URI ci-dessous, scope read_user), puis collez les identifiants.",
+      oauthOpenApps:"Ouvrir les Applications GitLab", oauthSaveConnect:"Enregistrer & se connecter",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -397,7 +406,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Same phases and mappings for all imported projects.",
       scopeHintPer:"Separate phases and mappings for each project.",
       member:"member", members:"members", perProjectRecap:"per project · separate phases &amp; labels",
-      oauthSetup:"GitLab (OAuth) sign-in is not configured. Set Auth.ClientId / ClientSecret in appsettings.json, then restart the server.",
+      oauthStep1:"Create an OAuth application on GitLab (Redirect URI below, scope read_user), then paste the credentials.",
+      oauthOpenApps:"Open GitLab Applications", oauthSaveConnect:"Save & sign in",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -471,7 +481,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mismas fases y asociaciones para todos los proyectos importados.",
       "scopeHintPer": "Fases y asociaciones distintas para cada proyecto.",
       "member": "miembro", "members": "miembros", "perProjectRecap": "por proyecto · fases y etiquetas distintas",
-      "oauthSetup": "El inicio de sesión con GitLab (OAuth) no está configurado. Define Auth.ClientId / ClientSecret en appsettings.json y reinicia el servidor.",
+      "oauthStep1": "Crea una aplicación OAuth en GitLab (Redirect URI abajo, scope read_user), luego pega las credenciales.",
+      "oauthOpenApps": "Abrir Aplicaciones de GitLab", "oauthSaveConnect": "Guardar y conectarse",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -565,7 +576,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Gleiche Phasen und Zuordnungen für alle importierten Projekte.",
       "scopeHintPer": "Eigene Phasen und Zuordnungen für jedes Projekt.",
       "member": "Mitglied", "members": "Mitglieder", "perProjectRecap": "pro Projekt · eigene Phasen &amp; Labels",
-      "oauthSetup": "Die GitLab-Anmeldung (OAuth) ist nicht konfiguriert. Setzen Sie Auth.ClientId / ClientSecret in appsettings.json und starten Sie den Server neu.",
+      "oauthStep1": "Erstellen Sie eine OAuth-Anwendung in GitLab (Redirect URI unten, scope read_user) und fügen Sie dann die Zugangsdaten ein.",
+      "oauthOpenApps": "GitLab-Anwendungen öffnen", "oauthSaveConnect": "Speichern & anmelden",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -659,7 +671,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Stesse fasi e associazioni per tutti i progetti importati.",
       "scopeHintPer": "Fasi e associazioni distinte per ogni progetto.",
       "member": "membro", "members": "membri", "perProjectRecap": "per progetto · fasi &amp; etichette distinte",
-      "oauthSetup": "L'accesso con GitLab (OAuth) non è configurato. Imposta Auth.ClientId / ClientSecret in appsettings.json e riavvia il server.",
+      "oauthStep1": "Crea un'applicazione OAuth su GitLab (Redirect URI sotto, scope read_user), poi incolla le credenziali.",
+      "oauthOpenApps": "Apri Applicazioni GitLab", "oauthSaveConnect": "Salva e accedi",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -753,7 +766,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mesmas fases e associações para todos os projetos importados.",
       "scopeHintPer": "Fases e associações distintas para cada projeto.",
       "member": "membro", "members": "membros", "perProjectRecap": "por projeto · fases e rótulos distintos",
-      "oauthSetup": "O início de sessão com GitLab (OAuth) não está configurado. Defina Auth.ClientId / ClientSecret em appsettings.json e reinicie o servidor.",
+      "oauthStep1": "Crie uma aplicação OAuth no GitLab (Redirect URI abaixo, scope read_user) e cole as credenciais.",
+      "oauthOpenApps": "Abrir Aplicações GitLab", "oauthSaveConnect": "Guardar e iniciar sessão",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -847,7 +861,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Одинаковые фазы и связи для всех импортированных проектов.",
       "scopeHintPer": "Отдельные фазы и связи для каждого проекта.",
       "member": "участник", "members": "участники", "perProjectRecap": "по проекту · отдельные фазы и метки",
-      "oauthSetup": "Вход через GitLab (OAuth) не настроен. Укажите Auth.ClientId / ClientSecret в appsettings.json и перезапустите сервер.",
+      "oauthStep1": "Создайте OAuth-приложение в GitLab (Redirect URI ниже, scope read_user), затем вставьте учётные данные.",
+      "oauthOpenApps": "Открыть приложения GitLab", "oauthSaveConnect": "Сохранить и войти",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -941,7 +956,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "نفس المراحل والارتباطات لجميع المشاريع المستوردة.",
       "scopeHintPer": "مراحل وارتباطات مستقلة لكل مشروع.",
       "member": "عضو", "members": "أعضاء", "perProjectRecap": "حسب المشروع · مراحل وتسميات مستقلة",
-      "oauthSetup": "تسجيل الدخول عبر GitLab (OAuth) غير مُكوَّن. عيّن Auth.ClientId / ClientSecret في appsettings.json ثم أعد تشغيل الخادم.",
+      "oauthStep1": "أنشئ تطبيق OAuth في GitLab (Redirect URI أدناه، scope read_user)، ثم الصق بيانات الاعتماد.",
+      "oauthOpenApps": "فتح تطبيقات GitLab", "oauthSaveConnect": "حفظ وتسجيل الدخول",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -1035,7 +1051,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "所有导入的项目使用相同的阶段和关联。",
       "scopeHintPer": "每个项目使用各自不同的阶段和关联。",
       "member": "名成员", "members": "名成员", "perProjectRecap": "按项目 · 各自独立的阶段和标签",
-      "oauthSetup": "尚未配置 GitLab (OAuth) 登录。请在 appsettings.json 中设置 Auth.ClientId / ClientSecret，然后重启服务器。",
+      "oauthStep1": "在 GitLab 上创建一个 OAuth 应用（下方的 Redirect URI，scope read_user），然后粘贴凭据。",
+      "oauthOpenApps": "打开 GitLab 应用", "oauthSaveConnect": "保存并登录",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -1129,7 +1146,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "インポートしたすべてのプロジェクトに同じフェーズと関連付けを適用します。",
       "scopeHintPer": "プロジェクトごとに個別のフェーズと関連付け。",
       "member": "メンバー", "members": "メンバー", "perProjectRecap": "プロジェクトごと · フェーズ &amp; ラベルを個別に",
-      "oauthSetup": "GitLab（OAuth）ログインが未設定です。appsettings.json に Auth.ClientId / ClientSecret を設定し、サーバーを再起動してください。",
+      "oauthStep1": "GitLab で OAuth アプリを作成し（下記の Redirect URI、scope read_user）、認証情報を貼り付けてください。",
+      "oauthOpenApps": "GitLab アプリを開く", "oauthSaveConnect": "保存してサインイン",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -1172,7 +1190,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,
+    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',adminErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1259,7 +1277,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
           +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
           +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span><button class="suA-adminchange" data-act="adminchange">'+T.edit+'</button></div>';
       } else if(!OAUTHOK){
-        h+='<div class="suA-adminrow"><div class="empty" style="padding:0 6px;text-align:center;font-style:normal">'+T.oauthSetup+'</div></div>';
+        var redir=location.origin+'/signin-gitlab';
+        var appsUrl=(ST.baseUrl||'').replace(/\/+$/,'')+'/-/profile/applications';
+        h+='<div class="suA-oauthsetup">'
+          +'<div class="suA-oauthstep"><span class="suA-oauthnum">1</span><div>'+T.oauthStep1+'<div class="suA-oauthredir">Redirect URI : <code>'+esc(redir)+'</code> · scope <code>read_user</code></div><a class="suA-oauthlink" href="'+esc(appsUrl)+'" target="_blank" rel="noopener">'+T.oauthOpenApps+' '+ic('arrow',13)+'</a></div></div>'
+          +'<div class="field"><div class="flabel">Application ID <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthClientId" value="'+esc(ST.oauthClientId)+'"></div></div>'
+          +'<div class="field"><div class="flabel">Secret <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthSecret" type="password" value="'+esc(ST.oauthSecret)+'"></div></div>';
+        if(ST.adminErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.adminErr)+'</div></div>';
+        h+='<button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauthsave"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.oauthSaveConnect)+'</button>'
+          +'</div>';
       } else {
         h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
       }
@@ -1388,6 +1414,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         ST.test='ok';render();
       }).catch(function(){ST.test='err';render();});
   }
+  // Enregistre la config OAuth (in-app) puis lance le SSO. Reconfiguration serveur À CHAUD → pas de redémarrage.
+  function doOauthSave(){
+    ST.adminState='connecting';ST.adminErr='';render();
+    fetch('/api/setup/oauth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:(ST.oauthClientId||'').trim(),clientSecret:(ST.oauthSecret||'').trim(),authority:conn().baseUrl})})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j.ok){persistST();window.location.href='/auth/oauth?return=/setup';}
+        else{ST.adminState='idle';ST.adminErr=j.error||T.saveImpossible;render();}
+      }).catch(function(){ST.adminState='idle';ST.adminErr=T.serverUnreachable;render();});
+  }
   function loadLabels(cb){
     ST.labelsLoaded=false;
     fetch('/api/setup/labels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign(conn(),{projectIds:ST.importIds}))})
@@ -1475,6 +1510,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('scope:')===0){switchScope(a.slice(6));}
     else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
     else if(a==='oauth'){persistST();ST.adminState='connecting';render();window.location.href='/auth/oauth?return=/setup';}
+    else if(a==='oauthsave'){doOauthSave();}
     else if(a==='adminchange'){persistST();window.location.href='/auth/oauth?return=/setup';}
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
