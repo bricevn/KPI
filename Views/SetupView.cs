@@ -202,6 +202,70 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-selallbtn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-dim);font:inherit;font-size:12.5px;cursor:pointer;}
 .suA-selallbtn:hover{border-color:var(--accent);color:var(--accent);}
 .suA-selcount{font-size:12px;color:var(--ink-faint);}
+/* étape 1 — bulle d'aide « i » (InfoTip), remplace les sous-textes permanents */
+.su-info{position:relative;display:inline-flex;vertical-align:middle;margin-left:6px;cursor:help;}
+.su-info-i{width:15px;height:15px;border-radius:50%;background:var(--panel-3);color:var(--ink-dim);font:italic 700 10px Georgia,serif;display:flex;align-items:center;justify-content:center;line-height:1;}
+.su-info:hover .su-info-i,.su-info:focus .su-info-i{background:var(--accent);color:#fff;}
+.su-info-pop{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:230px;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:400 11.5px/1.45 system-ui,sans-serif;color:var(--ink-dim);text-transform:none;letter-spacing:0;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;visibility:hidden;transition:opacity .12s;}
+.su-info:hover .su-info-pop,.su-info:focus .su-info-pop{opacity:1;visibility:visible;}
+.su-info-pop b{color:var(--ink);font-weight:600;}
+/* étape 1 — aperçu/compteur dans l'en-tête d'accordéon */
+.suA-accprev{margin-left:auto;display:inline-flex;align-items:center;gap:4px;}
+.suA-accprev i{width:9px;height:9px;border-radius:50%;display:block;}
+.suA-acccount{font-size:11.5px;font-weight:600;color:var(--ink-faint);background:var(--panel-3);padding:2px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;}
+.suA-acccount.full{color:var(--good);background:var(--good-soft);}
+.suA-acchead .suA-accchev{margin-left:4px;}
+/* étape 1 — options avancées (Timeout + certificats) */
+.suA-testrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.suA-adv{border-top:1px solid var(--line-2);padding-top:4px;}
+.suA-adv summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-dim);padding:8px 0;list-style:none;display:flex;align-items:center;gap:6px;}
+.suA-adv summary::-webkit-details-marker{display:none;}
+.suA-adv summary::before{content:'▸';color:var(--ink-faint);transition:transform .15s;display:inline-block;}
+.suA-adv[open] summary::before{transform:rotate(90deg);}
+.suA-advgrid{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;width:100%;padding:6px 2px;}
+.suA-advitem{display:flex;align-items:center;gap:10px;min-height:38px;}
+.suA-advlabel{display:inline-flex;align-items:center;font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;}
+.suA-advunit{color:var(--ink-faint);font-weight:400;margin-left:2px;}
+.suA-advinput{width:64px;height:38px;text-align:center;background:var(--panel-2);border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font:600 13.5px var(--mono),monospace;outline:none;}
+.suA-advinput:focus{border-color:var(--accent);background:var(--panel);}
+/* étape 1 — admin OAuth GitLab */
+.suA-adminrow{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;}
+.suA-glbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;align-self:center;height:44px;padding:0 20px;border-radius:999px;border:0;cursor:pointer;background:#fc6d26;color:#fff;font:600 14px var(--sans);transition:filter .12s;}
+.suA-glbtn:hover{filter:brightness(1.06);}
+.suA-glbtn.busy{background:var(--panel-3);color:var(--ink-dim);cursor:default;}
+.suA-glmark{display:flex;background:#fff;border-radius:6px;padding:3px;}
+.suA-admincard{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);}
+.suA-adminav{width:38px;height:38px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;}
+.suA-adminmeta{flex:1;min-width:0;}
+.suA-adminname{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;}
+.suA-adminrole{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:999px;}
+.suA-adminhandle{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:2px;}
+.suA-adminok{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--good);background:var(--good-soft);padding:4px 10px;border-radius:999px;flex:none;}
+.suA-adminchange{border:0;background:none;color:var(--ink-faint);font-size:12px;cursor:pointer;padding:5px 8px;border-radius:8px;flex:none;}
+.suA-adminchange:hover{color:var(--ink);background:var(--panel-3);}
+/* étape 3 — portée des phases (tous / par projet) */
+.suA-scope{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.suA-seg{display:inline-flex;background:var(--panel-3);border-radius:10px;padding:3px;gap:2px;flex:none;}
+.suA-seg button{border:0;background:none;color:var(--ink-dim);font:600 12.5px var(--sans);padding:6px 13px;border-radius:8px;cursor:pointer;}
+.suA-seg button.on{background:var(--accent);color:#fff;}
+.suA-scopehint{font-size:11.5px;color:var(--ink-faint);}
+.suA-projtabs{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
+.suA-projtab{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-dim);font:600 12px var(--sans);padding:6px 12px;border-radius:999px;cursor:pointer;}
+.suA-projtab:hover{border-color:var(--ink-faint);color:var(--ink);}
+.suA-projtab.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel-2));color:var(--ink);}
+.suA-maprow.unset .mlabel{color:var(--ink-faint);}
+.suA-maprow.unset .dot2{opacity:.4;}
+/* étape 4 — équipes en accordéons */
+.suA-teamacc{padding:0;overflow:hidden;}
+.suA-teamacc .teamh{margin-bottom:0;padding:11px 14px;cursor:pointer;}
+.suA-teamacc .teamh:hover{background:var(--panel-3);}
+.suA-teamacc .mlist{padding:2px 14px 14px;}
+.suA-teamchev{display:flex;color:var(--ink-faint);flex:none;transition:transform .2s var(--ease);}
+.suA-teamacc.open .suA-teamchev{transform:rotate(90deg);}
+.suA-teamcount{margin-left:auto;font-size:11.5px;color:var(--ink-faint);flex:none;}
+.suA-teampreview{display:inline-flex;flex:none;}
+.suA-teampreview>*+*{margin-left:-6px;}
+.suA-teampreview>*{box-shadow:0 0 0 2px var(--panel-2);border-radius:50%;}
 /* écran de chargement post-setup (loader temps réel) */
 .ld-dots{display:inline-flex;align-items:center;}
 .ld-dots b{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:4px;animation:lddot 1.2s ease-in-out infinite;}
@@ -266,6 +330,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       loadingLabels:"Chargement des labels des projets sélectionnés…",
       selectAll:"Tout cocher", deselectAll:"Tout décocher",
       noProdLabels:"Aucun label Prod:: trouvé sur les projets sélectionnés.",
+      refreshLabels:"Rafraîchir les labels",
+      noProjForLabels:"Sélectionnez au moins un projet (étape Projets) pour charger ses labels.",
+      noLabelsFetched:"Aucun label récupéré pour ce(s) projet(s). Vérifiez que le token a le scope read_api et accès au projet.",
+      labelsNonProd:"labels récupérés, mais aucun dans le scope « Prod:: ». Les phases se basent sur des labels « Prod::Xxx ». Vos labels :",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -303,6 +371,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       loadingLabels:"Loading labels…",
       selectAll:"Select all", deselectAll:"Deselect all",
       noProdLabels:"No Prod:: labels found on the selected projects.",
+      refreshLabels:"Refresh labels",
+      noProjForLabels:"Select at least one project (Projects step) to load its labels.",
+      noLabelsFetched:"No label fetched for this project. Check that the token has the read_api scope and access to the project.",
+      labelsNonProd:"labels fetched, but none in the « Prod:: » scope. Phases rely on « Prod::Xxx » labels. Your labels:",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -363,6 +435,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "Seleccionar todo",
       "deselectAll": "Deseleccionar todo",
       "noProdLabels": "No se encontraron etiquetas Prod:: en los proyectos seleccionados.",
+      "refreshLabels": "Actualizar etiquetas",
+      "noProjForLabels": "Selecciona al menos un proyecto (paso Proyectos) para cargar sus etiquetas.",
+      "noLabelsFetched": "No se recuperó ninguna etiqueta para este proyecto. Verifica que el token tenga el alcance read_api y acceso al proyecto.",
+      "labelsNonProd": "etiquetas recuperadas, pero ninguna en el ámbito « Prod:: ». Las fases se basan en etiquetas « Prod::Xxx ». Tus etiquetas:",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -443,6 +519,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "Alle auswählen",
       "deselectAll": "Alle abwählen",
       "noProdLabels": "Keine Prod::-Label in den ausgewählten Projekten gefunden.",
+      "refreshLabels": "Labels aktualisieren",
+      "noProjForLabels": "Wählen Sie mindestens ein Projekt (Schritt Projekte), um dessen Label zu laden.",
+      "noLabelsFetched": "Kein Label für dieses Projekt abgerufen. Prüfen Sie, ob das Token den Bereich read_api und Zugriff auf das Projekt hat.",
+      "labelsNonProd": "Labels abgerufen, aber keines im « Prod:: »-Bereich. Phasen basieren auf « Prod::Xxx »-Labels. Ihre Labels:",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -523,6 +603,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "Seleziona tutto",
       "deselectAll": "Deseleziona tutto",
       "noProdLabels": "Nessuna etichetta Prod:: trovata nei progetti selezionati.",
+      "refreshLabels": "Aggiorna etichette",
+      "noProjForLabels": "Seleziona almeno un progetto (passaggio Progetti) per caricarne le etichette.",
+      "noLabelsFetched": "Nessuna etichetta recuperata per questo progetto. Verifica che il token abbia lo scope read_api e accesso al progetto.",
+      "labelsNonProd": "etichette recuperate, ma nessuna nello scope « Prod:: ». Le fasi si basano su etichette « Prod::Xxx ». Le tue etichette:",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -603,6 +687,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "Selecionar tudo",
       "deselectAll": "Desmarcar tudo",
       "noProdLabels": "Nenhum rótulo Prod:: encontrado nos projetos selecionados.",
+      "refreshLabels": "Atualizar rótulos",
+      "noProjForLabels": "Selecione pelo menos um projeto (passo Projetos) para carregar os seus rótulos.",
+      "noLabelsFetched": "Nenhum rótulo obtido para este projeto. Verifique se o token tem o scope read_api e acesso ao projeto.",
+      "labelsNonProd": "rótulos obtidos, mas nenhum no scope « Prod:: ». As fases baseiam-se em rótulos « Prod::Xxx ». Os seus rótulos:",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -683,6 +771,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "Выбрать все",
       "deselectAll": "Снять выбор",
       "noProdLabels": "Метки Prod:: не найдены в выбранных проектах.",
+      "refreshLabels": "Обновить метки",
+      "noProjForLabels": "Выберите хотя бы один проект (шаг «Проекты»), чтобы загрузить его метки.",
+      "noLabelsFetched": "Для этого проекта не получено ни одной метки. Убедитесь, что у токена есть scope read_api и доступ к проекту.",
+      "labelsNonProd": "меток получено, но ни одной в области « Prod:: ». Этапы основаны на метках « Prod::Xxx ». Ваши метки:",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -763,6 +855,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "تحديد الكل",
       "deselectAll": "إلغاء تحديد الكل",
       "noProdLabels": "لم يتم العثور على تسميات Prod:: في المشاريع المحددة.",
+      "refreshLabels": "تحديث التسميات",
+      "noProjForLabels": "اختر مشروعاً واحداً على الأقل (خطوة المشاريع) لتحميل تسمياته.",
+      "noLabelsFetched": "لم يتم جلب أي تسمية لهذا المشروع. تأكد من أن الرمز يملك نطاق read_api والوصول إلى المشروع.",
+      "labelsNonProd": "تسمية تم جلبها، لكن لا شيء في نطاق « Prod:: ». تعتمد المراحل على تسميات « Prod::Xxx ». تسمياتك:",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -843,6 +939,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "全选",
       "deselectAll": "取消全选",
       "noProdLabels": "在所选项目中未找到 Prod:: 标签。",
+      "refreshLabels": "刷新标签",
+      "noProjForLabels": "请至少选择一个项目（项目步骤）以加载其标签。",
+      "noLabelsFetched": "未获取到该项目的任何标签。请检查令牌是否具有 read_api 范围及项目访问权限。",
+      "labelsNonProd": "个标签已获取，但没有任何属于 « Prod:: » 范围。阶段基于 « Prod::Xxx » 标签。您的标签：",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -923,6 +1023,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "selectAll": "すべて選択",
       "deselectAll": "すべて選択解除",
       "noProdLabels": "選択したプロジェクトに Prod:: ラベルが見つかりません。",
+      "refreshLabels": "ラベルを更新",
+      "noProjForLabels": "ラベルを読み込むには、少なくとも1つのプロジェクトを選択してください（プロジェクト手順）。",
+      "noLabelsFetched": "このプロジェクトのラベルを取得できませんでした。トークンに read_api スコープとプロジェクトへのアクセス権があるか確認してください。",
+      "labelsNonProd": "個のラベルを取得しましたが、« Prod:: » スコープのものはありません。フェーズは « Prod::Xxx » ラベルに基づきます。あなたのラベル：",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -962,7 +1066,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var LANG_SWITCH='<div class="lang-switch"><select class="lang-sel" data-setlang>__LANG_OPTIONS__</select></div>';
 
   var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',admins:'',timeout:'60',selfSigned:false,showTok:false,
-    test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},
+    test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
@@ -1035,11 +1139,29 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
       var phOpts=[['none',T.notTracked]].concat(ST.phases.map(function(p){return [p.id,p.name];}));
       h+='<div class="suA-accbody">';
-      if(!prod.length)h+='<div class="empty">'+T.noProdLabels+'</div>';
-      else{h+='<div class="map">';
+      if(!ST.importIds.length){
+        // Aucun projet coché → rien à charger. On oriente vers l'étape Projets.
+        h+='<div class="empty">'+T.noProjForLabels+'</div><button class="btn outline sm" style="align-self:flex-start" data-act="goto:1">'+ic('chevL',15)+T.stepProjets+'</button>';
+      } else if(!prod.length){
+        if(!ST.labels.length){
+          // Aucun label récupéré → accès/projet. On signale les éventuels échecs par projet (✗ #id).
+          var failed=(ST.labelsDiag||[]).filter(function(d){return !d.ok;}).map(function(d){return '#'+d.id;});
+          h+='<div class="empty">'+T.noLabelsFetched+(failed.length?(' (✗ '+failed.join(', ')+')'):'')+'</div>';
+        } else {
+          // Des labels existent mais aucun « Prod:: » → on les affiche pour lever le doute (scope/convention).
+          h+='<div class="empty">'+ST.labels.length+' '+T.labelsNonProd+'</div>';
+          h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+          for(var li=0;li<ST.labels.length;li++)h+='<span class="grp" style="text-transform:none;letter-spacing:0;font-family:var(--mono)">'+esc(ST.labels[li])+'</span>';
+          h+='</div>';
+        }
+      } else {
+        h+='<div class="map">';
         for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
           h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
-        h+='</div>';}
+        h+='</div>';
+      }
+      // Re-fetch manuel des labels (labels seuls, via /api/setup/labels — pas d'extraction complète).
+      if(ST.importIds.length)h+='<button class="btn outline sm" style="align-self:flex-start" data-act="reloadlabels">'+ic('zap',15)+T.refreshLabels+'</button>';
       h+='</div>';
     }
     h+='</div>';
@@ -1098,9 +1220,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     fetch('/api/setup/labels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign(conn(),{projectIds:ST.importIds}))})
       .then(function(r){return r.json();}).then(function(j){
         ST.labels=(j.ok&&j.labels)?j.labels:[];
+        ST.labelsDiag=(j.ok&&j.perProject)?j.perProject:[];
         ST.labels.forEach(function(l){if(!(l in ST.labelPhase))ST.labelPhase[l]=guessPhase(l);});
         ST.labelsLoaded=true;cb&&cb();
-      }).catch(function(){ST.labels=[];ST.labelsLoaded=true;cb&&cb();});
+      }).catch(function(){ST.labels=[];ST.labelsDiag=[];ST.labelsLoaded=true;cb&&cb();});
   }
   function save(){
     ST.saving=true;ST.saveErr='';render();
@@ -1170,6 +1293,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});render();}
     else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[ST.phases.length%PALETTE.length]});render();}
     else if(a.indexOf('acc:')===0){var ak=a.slice(4);ST.acc=(ST.acc===ak?'':ak);render();}
+    else if(a==='reloadlabels'){ST.labelsLoaded=false;render();loadLabels(render);}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
