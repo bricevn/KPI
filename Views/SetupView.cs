@@ -293,10 +293,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var PALETTE=['#2188ff','#8957e5','#b8800a','#c79a06','#ec4899','#0f9e8e','#2dd4bf','#e0792e','#d6336c','#5f6b7a'];
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
-  var phaseColor=function(k){if(k==='none')return NONE_COLOR;for(var i=0;i<ST.phases.length;i++)if(ST.phases[i].id===k)return ST.phases[i].color;return NONE_COLOR;};
+  var phaseColor=function(k){if(k==='none')return NONE_COLOR;var ps=curPhases();for(var i=0;i<ps.length;i++)if(ps[i].id===k)return ps[i].color;return NONE_COLOR;};
   var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>'};
   function ic(n,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
   var MARK='<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="13" width="4.2" height="7" rx="1.4" fill="#fff" opacity="0.82"/><rect x="9.9" y="9" width="4.2" height="11" rx="1.4" fill="#fff" opacity="0.92"/><rect x="16.8" y="4.5" width="4.2" height="15.5" rx="1.4" fill="#fff"/><path d="M4 8.5 L11 6 L19 2.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><circle cx="19" cy="2.5" r="1.7" fill="#fff"/></svg>';
+  var GITLAB_MARK='<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#E24329" d="m12 21.5 3.3-10.2H8.7z"/><path fill="#FC6D26" d="M12 21.5 8.7 11.3H4.1z"/><path fill="#FCA326" d="M4.1 11.3 3.1 14.4a.7.7 0 0 0 .25.78L12 21.5z"/><path fill="#E24329" d="M4.1 11.3h4.6L6.7 5.2a.35.35 0 0 0-.66 0z"/><path fill="#FC6D26" d="M12 21.5l3.3-10.2h4.6z"/><path fill="#FCA326" d="M19.9 11.3l1 3.1a.7.7 0 0 1-.25.78L12 21.5z"/><path fill="#E24329" d="M19.9 11.3h-4.6l2-6.1a.35.35 0 0 1 .66 0z"/></svg>';
   var AVC=['#0072B2','#8957e5','#0f9e8e','#d97706','#b3231b','#2b7fff','#c2410c','#6d28d9'];
   function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function avColor(id){var s=0;for(var i=0;i<id.length;i++)s+=id.charCodeAt(i);return AVC[s%AVC.length];}
@@ -334,6 +335,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Sélectionnez au moins un projet (étape Projets) pour charger ses labels.",
       noLabelsFetched:"Aucun label récupéré pour ce(s) projet(s). Vérifiez que le token a le scope read_api et accès au projet.",
       labelsNonProd:"labels récupérés, mais aucun dans le scope « Prod:: ». Les phases se basent sur des labels « Prod::Xxx ». Vos labels :",
+      groupConn:"Connexion au groupe", groupToken:"Token de groupe", advanced:"Options avancées",
+      advancedHint:"À ajuster uniquement pour les instances GitLab auto-hébergées. Les valeurs par défaut conviennent à gitlab.com.",
+      adminSec:"Administrateur", adminNone:"Non identifié", adminOk:"Administrateur", connecting:"Connexion à GitLab…",
+      withGitlab:"Se connecter avec GitLab", connectedShort:"Connecté",
+      requiredBoth:"champs obligatoires · une connexion au groupe réussie et un administrateur identifié sont requis pour continuer.",
+      scopeAll:"Tous les projets", scopePer:"Par projet",
+      scopeHintAll:"Mêmes phases et associations pour tous les projets importés.",
+      scopeHintPer:"Phases et associations distinctes pour chaque projet.",
+      member:"membre", members:"membres", perProjectRecap:"par projet · phases & labels distincts",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -375,6 +385,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Select at least one project (Projects step) to load its labels.",
       noLabelsFetched:"No label fetched for this project. Check that the token has the read_api scope and access to the project.",
       labelsNonProd:"labels fetched, but none in the « Prod:: » scope. Phases rely on « Prod::Xxx » labels. Your labels:",
+      groupConn:"Group connection", groupToken:"Group token", advanced:"Advanced options",
+      advancedHint:"Adjust only for self-hosted GitLab instances. The defaults work for gitlab.com.",
+      adminSec:"Administrator", adminNone:"Not identified", adminOk:"Administrator", connecting:"Connecting to GitLab…",
+      withGitlab:"Sign in with GitLab", connectedShort:"Connected",
+      requiredBoth:"required fields · a successful group connection and an identified administrator are required to continue.",
+      scopeAll:"All projects", scopePer:"Per project",
+      scopeHintAll:"Same phases and mappings for all imported projects.",
+      scopeHintPer:"Separate phases and mappings for each project.",
+      member:"member", members:"members", perProjectRecap:"per project · separate phases &amp; labels",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -439,6 +458,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecciona al menos un proyecto (paso Proyectos) para cargar sus etiquetas.",
       "noLabelsFetched": "No se recuperó ninguna etiqueta para este proyecto. Verifica que el token tenga el alcance read_api y acceso al proyecto.",
       "labelsNonProd": "etiquetas recuperadas, pero ninguna en el ámbito « Prod:: ». Las fases se basan en etiquetas « Prod::Xxx ». Tus etiquetas:",
+      "groupConn": "Conexión al grupo", "groupToken": "Token de grupo", "advanced": "Opciones avanzadas",
+      "advancedHint": "Ajústalo solo en instancias de GitLab autoalojadas. Los valores predeterminados son adecuados para gitlab.com.",
+      "adminSec": "Administrador", "adminNone": "Sin identificar", "adminOk": "Administrador", "connecting": "Conectando con GitLab…",
+      "withGitlab": "Conectarse con GitLab", "connectedShort": "Conectado",
+      "requiredBoth": "campos obligatorios · para continuar se requiere una conexión al grupo correcta y un administrador identificado.",
+      "scopeAll": "Todos los proyectos", "scopePer": "Por proyecto",
+      "scopeHintAll": "Mismas fases y asociaciones para todos los proyectos importados.",
+      "scopeHintPer": "Fases y asociaciones distintas para cada proyecto.",
+      "member": "miembro", "members": "miembros", "perProjectRecap": "por proyecto · fases y etiquetas distintas",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -523,6 +551,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Wählen Sie mindestens ein Projekt (Schritt Projekte), um dessen Label zu laden.",
       "noLabelsFetched": "Kein Label für dieses Projekt abgerufen. Prüfen Sie, ob das Token den Bereich read_api und Zugriff auf das Projekt hat.",
       "labelsNonProd": "Labels abgerufen, aber keines im « Prod:: »-Bereich. Phasen basieren auf « Prod::Xxx »-Labels. Ihre Labels:",
+      "groupConn": "Verbindung zur Gruppe", "groupToken": "Gruppen-Token", "advanced": "Erweiterte Optionen",
+      "advancedHint": "Nur für selbst gehostete GitLab-Instanzen anzupassen. Die Standardwerte eignen sich für gitlab.com.",
+      "adminSec": "Administrator", "adminNone": "Nicht identifiziert", "adminOk": "Administrator", "connecting": "Verbindung zu GitLab…",
+      "withGitlab": "Mit GitLab anmelden", "connectedShort": "Verbunden",
+      "requiredBoth": "Pflichtfelder · Eine erfolgreiche Verbindung zur Gruppe und ein identifizierter Administrator sind erforderlich, um fortzufahren.",
+      "scopeAll": "Alle Projekte", "scopePer": "Pro Projekt",
+      "scopeHintAll": "Gleiche Phasen und Zuordnungen für alle importierten Projekte.",
+      "scopeHintPer": "Eigene Phasen und Zuordnungen für jedes Projekt.",
+      "member": "Mitglied", "members": "Mitglieder", "perProjectRecap": "pro Projekt · eigene Phasen &amp; Labels",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -607,6 +644,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Seleziona almeno un progetto (passaggio Progetti) per caricarne le etichette.",
       "noLabelsFetched": "Nessuna etichetta recuperata per questo progetto. Verifica che il token abbia lo scope read_api e accesso al progetto.",
       "labelsNonProd": "etichette recuperate, ma nessuna nello scope « Prod:: ». Le fasi si basano su etichette « Prod::Xxx ». Le tue etichette:",
+      "groupConn": "Connessione al gruppo", "groupToken": "Token di gruppo", "advanced": "Opzioni avanzate",
+      "advancedHint": "Da regolare solo per le istanze GitLab self-hosted. I valori predefiniti vanno bene per gitlab.com.",
+      "adminSec": "Amministratore", "adminNone": "Non identificato", "adminOk": "Amministratore", "connecting": "Connessione a GitLab…",
+      "withGitlab": "Accedi con GitLab", "connectedShort": "Connesso",
+      "requiredBoth": "campi obbligatori · per continuare sono richiesti una connessione al gruppo riuscita e un amministratore identificato.",
+      "scopeAll": "Tutti i progetti", "scopePer": "Per progetto",
+      "scopeHintAll": "Stesse fasi e associazioni per tutti i progetti importati.",
+      "scopeHintPer": "Fasi e associazioni distinte per ogni progetto.",
+      "member": "membro", "members": "membri", "perProjectRecap": "per progetto · fasi &amp; etichette distinte",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -691,6 +737,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecione pelo menos um projeto (passo Projetos) para carregar os seus rótulos.",
       "noLabelsFetched": "Nenhum rótulo obtido para este projeto. Verifique se o token tem o scope read_api e acesso ao projeto.",
       "labelsNonProd": "rótulos obtidos, mas nenhum no scope « Prod:: ». As fases baseiam-se em rótulos « Prod::Xxx ». Os seus rótulos:",
+      "groupConn": "Ligação ao grupo", "groupToken": "Token de grupo", "advanced": "Opções avançadas",
+      "advancedHint": "A ajustar apenas para instâncias GitLab auto-alojadas. Os valores predefinidos são adequados para gitlab.com.",
+      "adminSec": "Administrador", "adminNone": "Não identificado", "adminOk": "Administrador", "connecting": "A ligar ao GitLab…",
+      "withGitlab": "Iniciar sessão com o GitLab", "connectedShort": "Ligado",
+      "requiredBoth": "campos obrigatórios · para continuar, é necessária uma ligação ao grupo bem-sucedida e um administrador identificado.",
+      "scopeAll": "Todos os projetos", "scopePer": "Por projeto",
+      "scopeHintAll": "Mesmas fases e associações para todos os projetos importados.",
+      "scopeHintPer": "Fases e associações distintas para cada projeto.",
+      "member": "membro", "members": "membros", "perProjectRecap": "por projeto · fases e rótulos distintos",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -775,6 +830,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Выберите хотя бы один проект (шаг «Проекты»), чтобы загрузить его метки.",
       "noLabelsFetched": "Для этого проекта не получено ни одной метки. Убедитесь, что у токена есть scope read_api и доступ к проекту.",
       "labelsNonProd": "меток получено, но ни одной в области « Prod:: ». Этапы основаны на метках « Prod::Xxx ». Ваши метки:",
+      "groupConn": "Подключение к группе", "groupToken": "Токен группы", "advanced": "Дополнительные параметры",
+      "advancedHint": "Изменяйте только для самостоятельно размещённых экземпляров GitLab. Значения по умолчанию подходят для gitlab.com.",
+      "adminSec": "Администратор", "adminNone": "Не определён", "adminOk": "Администратор", "connecting": "Подключение к GitLab…",
+      "withGitlab": "Войти через GitLab", "connectedShort": "Подключено",
+      "requiredBoth": "обязательные поля · для продолжения необходимы успешное подключение к группе и определённый администратор.",
+      "scopeAll": "Все проекты", "scopePer": "По проекту",
+      "scopeHintAll": "Одинаковые фазы и связи для всех импортированных проектов.",
+      "scopeHintPer": "Отдельные фазы и связи для каждого проекта.",
+      "member": "участник", "members": "участники", "perProjectRecap": "по проекту · отдельные фазы и метки",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -859,6 +923,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "اختر مشروعاً واحداً على الأقل (خطوة المشاريع) لتحميل تسمياته.",
       "noLabelsFetched": "لم يتم جلب أي تسمية لهذا المشروع. تأكد من أن الرمز يملك نطاق read_api والوصول إلى المشروع.",
       "labelsNonProd": "تسمية تم جلبها، لكن لا شيء في نطاق « Prod:: ». تعتمد المراحل على تسميات « Prod::Xxx ». تسمياتك:",
+      "groupConn": "الاتصال بالمجموعة", "groupToken": "رمز المجموعة", "advanced": "خيارات متقدمة",
+      "advancedHint": "للتعديل فقط في حالة مثيلات GitLab المستضافة ذاتيًا. القيم الافتراضية مناسبة لـ gitlab.com.",
+      "adminSec": "مسؤول", "adminNone": "غير محدَّد", "adminOk": "مسؤول محدَّد", "connecting": "جارٍ الاتصال بـ GitLab…",
+      "withGitlab": "الاتصال عبر GitLab", "connectedShort": "متصل",
+      "requiredBoth": "حقول مطلوبة · يلزم اتصال ناجح بالمجموعة ومسؤول محدَّد للمتابعة.",
+      "scopeAll": "جميع المشاريع", "scopePer": "حسب المشروع",
+      "scopeHintAll": "نفس المراحل والارتباطات لجميع المشاريع المستوردة.",
+      "scopeHintPer": "مراحل وارتباطات مستقلة لكل مشروع.",
+      "member": "عضو", "members": "أعضاء", "perProjectRecap": "حسب المشروع · مراحل وتسميات مستقلة",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -943,6 +1016,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "请至少选择一个项目（项目步骤）以加载其标签。",
       "noLabelsFetched": "未获取到该项目的任何标签。请检查令牌是否具有 read_api 范围及项目访问权限。",
       "labelsNonProd": "个标签已获取，但没有任何属于 « Prod:: » 范围。阶段基于 « Prod::Xxx » 标签。您的标签：",
+      "groupConn": "连接到群组", "groupToken": "群组令牌", "advanced": "高级选项",
+      "advancedHint": "仅需为自托管的 GitLab 实例调整。默认值适用于 gitlab.com。",
+      "adminSec": "管理员", "adminNone": "未识别", "adminOk": "管理员", "connecting": "正在连接到 GitLab…",
+      "withGitlab": "使用 GitLab 登录", "connectedShort": "已连接",
+      "requiredBoth": "必填字段 · 需成功连接到群组并识别出管理员后方可继续。",
+      "scopeAll": "所有项目", "scopePer": "按项目",
+      "scopeHintAll": "所有导入的项目使用相同的阶段和关联。",
+      "scopeHintPer": "每个项目使用各自不同的阶段和关联。",
+      "member": "名成员", "members": "名成员", "perProjectRecap": "按项目 · 各自独立的阶段和标签",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -1027,6 +1109,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "ラベルを読み込むには、少なくとも1つのプロジェクトを選択してください（プロジェクト手順）。",
       "noLabelsFetched": "このプロジェクトのラベルを取得できませんでした。トークンに read_api スコープとプロジェクトへのアクセス権があるか確認してください。",
       "labelsNonProd": "個のラベルを取得しましたが、« Prod:: » スコープのものはありません。フェーズは « Prod::Xxx » ラベルに基づきます。あなたのラベル：",
+      "groupConn": "グループへの接続", "groupToken": "グループトークン", "advanced": "詳細オプション",
+      "advancedHint": "セルフホスト型のGitLabインスタンスの場合のみ調整してください。デフォルト値は gitlab.com に適しています。",
+      "adminSec": "管理者", "adminNone": "未確認", "adminOk": "管理者", "connecting": "GitLabに接続中…",
+      "withGitlab": "GitLabで接続", "connectedShort": "接続済み",
+      "requiredBoth": "必須項目 · 続行するには、グループへの接続成功と管理者の確認が必要です。",
+      "scopeAll": "すべてのプロジェクト", "scopePer": "プロジェクトごと",
+      "scopeHintAll": "インポートしたすべてのプロジェクトに同じフェーズと関連付けを適用します。",
+      "scopeHintPer": "プロジェクトごとに個別のフェーズと関連付け。",
+      "member": "メンバー", "members": "メンバー", "perProjectRecap": "プロジェクトごと · フェーズ &amp; ラベルを個別に",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -1065,16 +1156,46 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var STEP_META=[[T.stepConnexion,'link'],[T.stepProjets,'box'],[T.stepPhases,'layers'],[T.stepEquipes,'users'],[T.stepVerif,'rocket']];
   var LANG_SWITCH='<div class="lang-switch"><select class="lang-sel" data-setlang>__LANG_OPTIONS__</select></div>';
 
-  var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',admins:'',timeout:'60',selfSigned:false,showTok:false,
+  var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',timeout:'60',selfSigned:false,showTok:false,
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
+    phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
+    acc1:['group'],teamOpen:[],adminState:'idle',adminUser:null,
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
+  // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
+  var PEOPLE={};
 
-  function canNext(){return ST.step!==0||ST.test==='ok';}
+  // Persistance localStorage : l'identification admin se fait par OAuth (aller-retour PLEINE PAGE) → on
+  // restaure l'état du wizard au retour. Effacé après une mise en service réussie. (clé unique, même origine)
+  var PKEYS=['step','baseUrl','token','timeout','selfSigned','test','projects','groups','importIds','labels',
+    'labelsDiag','labelsLoaded','labelPhase','phases','acc','phaseScope','phaseProj','phasesByProject',
+    'labelPhaseByProject','teams','memberships','acc1'];
+  function persistST(){try{var o={};PKEYS.forEach(function(k){o[k]=ST[k];});localStorage.setItem('kpi-setup',JSON.stringify(o));}catch(e){}}
+  function clearST(){try{localStorage.removeItem('kpi-setup');}catch(e){}}
+  (function(){try{var v=localStorage.getItem('kpi-setup');if(!v)return;var o=JSON.parse(v);PKEYS.forEach(function(k){if(o[k]!==undefined)ST[k]=o[k];});
+    (ST.groups||[]).forEach(function(g){(g.members||[]).forEach(function(mb){PEOPLE[mb.username]=mb.name||mb.username;});});}catch(e){}})();
+
+  // ---- portée des phases : globale ('all') ou par projet ('per', projet actif) ----
+  function activeProj(){return (ST.phaseProj!=null&&ST.importIds.indexOf(ST.phaseProj)>=0)?ST.phaseProj:(ST.importIds.length?ST.importIds[0]:null);}
+  function ensurePer(){if(ST.phaseScope!=='per')return;var ap=activeProj();if(ap==null)return;
+    if(!ST.phasesByProject[ap])ST.phasesByProject[ap]=ST.phases.map(function(p){return {id:p.id,name:p.name,color:p.color};});
+    if(!ST.labelPhaseByProject[ap])ST.labelPhaseByProject[ap]=Object.assign({},ST.labelPhase);}
+  function curPhases(){if(ST.phaseScope==='all')return ST.phases;var ap=activeProj();return (ap!=null&&ST.phasesByProject[ap])||ST.phases;}
+  function curMap(){if(ST.phaseScope==='all')return ST.labelPhase;var ap=activeProj();return (ap!=null&&ST.labelPhaseByProject[ap])||ST.labelPhase;}
+  function setMapVal(label,val){ensurePer();if(ST.phaseScope==='all'){ST.labelPhase[label]=val;return;}ST.labelPhaseByProject[activeProj()][label]=val;}
+  function switchScope(sc){if(sc==='per'&&ST.phaseScope!=='per'){ST.phaseScope='per';if(ST.phaseProj==null||ST.importIds.indexOf(ST.phaseProj)<0)ST.phaseProj=(ST.importIds.length?ST.importIds[0]:null);ST.importIds.forEach(function(id){if(!ST.phasesByProject[id])ST.phasesByProject[id]=ST.phases.map(function(p){return {id:p.id,name:p.name,color:p.color};});if(!ST.labelPhaseByProject[id])ST.labelPhaseByProject[id]=Object.assign({},ST.labelPhase);});}else ST.phaseScope=sc;render();}
+
+  function canNext(){return ST.step!==0||(ST.test==='ok'&&ST.adminState==='connected');}
+
+  // Identité admin : OAuth (le compte connecté DEVIENT admin). On lit /api/me au chargement et au retour OAuth.
+  function loadMe(){fetch('/api/me').then(function(r){return r.json();}).then(function(me){
+    if(me&&me.authenticated){ST.adminState='connected';ST.adminUser={name:me.displayName||me.login||'',handle:'@'+(me.login||''),role:(me.role==='admin'?'Admin':(me.role||'GitLab'))};render();}
+  }).catch(function(){});}
 
   function render(){
     if(ST.launching){app.innerHTML=launchHtml();return;}
+    persistST();
     var h='<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright"><div class="count">'+T.stepOf.replace('{n}',ST.step+1)+'</div>'+LANG_SWITCH+'</div></div>';
     h+='<div class="step"><div class="stepper">';
     for(var i=0;i<STEP_META.length;i++){var st=i<ST.step?'done':i===ST.step?'cur':'';h+='<div class="node '+st+'" data-act="goto:'+i+'"><div class="dot">'+(i<ST.step?ic('check',16):(i+1))+'</div><div class="nl">'+STEP_META[i][0]+'</div></div>';if(i<STEP_META.length-1)h+='<div class="line'+(i<ST.step?' done':'')+'"></div>';}
@@ -1099,14 +1220,37 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     return s4();
   }
   function s0(){
+    var gOpen=ST.acc1.indexOf('group')>=0,aOpen=ST.acc1.indexOf('admin')>=0;
     var chip=ST.test==='testing'?'<span class="chip neutral"><span class="spin"></span>'+T.testing+'</span>':ST.test==='ok'?'<span class="chip ok">'+ic('check',14)+T.connected+ST.projects.length+T.accessibleProjects+'</span>':ST.test==='err'?'<span class="chip err">'+T.testFailed+'</span>':'<span class="chip neutral">'+T.notTested+'</span>';
-    return '<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
-      +'<div class="field"><div class="flabel">'+T.serviceToken+' <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div><div class="fhint">'+T.tokenHint+'</div></div>'
-      +'<div class="field"><div class="flabel">'+T.adminLabel+' <span class="req">*</span></div><div class="box">'+sic('users')+'<input data-field="admins" placeholder="brice, jdupont" value="'+esc(ST.admins)+'"></div><div class="fhint">'+T.adminHint+'</div></div>'
-      +'<div style="display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:start"><div class="field"><div class="flabel">'+T.timeout+'</div><div class="box"><input data-field="timeout" value="'+esc(ST.timeout)+'"></div><div class="fhint">'+T.timeoutHint+'</div></div>'
-      +'<div class="togrow" style="margin-top:26px"><button class="tog'+(ST.selfSigned?' on':'')+'" data-act="self"><b></b></button><div><div class="tt">'+T.selfSigned+'</div><div class="ts">'+T.selfSignedSub+'</div></div></div></div>'
-      +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+T.testConn+'</button>'+chip+'</div>'
-      +'<div class="req"><span class="r">*</span> '+T.requiredField+'</div>';
+    var gPrev=ST.test==='ok'?'<span class="suA-acccount full">'+ic('check',12)+' '+T.connectedShort+'</span>':'<span class="suA-acccount">'+(ST.test==='err'?T.testFailed:T.notTested)+'</span>';
+    var aConn=ST.adminState==='connected',au=ST.adminUser||{name:'',handle:'',role:''};
+    var aPrev=aConn?'<span class="suA-acccount full">'+ic('check',12)+' '+esc(au.name)+'</span>':'<span class="suA-acccount">'+T.adminNone+'</span>';
+    var h='<div class="suA-acc'+(gOpen?' open':'')+'"><button class="suA-acchead" data-act="acc1:group"><span class="ic">'+ic('server',16)+'</span><span class="suA-acct">'+T.groupConn+'</span><span class="suA-accprev">'+gPrev+'</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    if(gOpen){
+      h+='<div class="suA-accbody">'
+        +'<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
+        +'<div class="field"><div class="flabel">'+T.groupToken+' <span class="req">*</span>'+info(T.tokenHint)+'</div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div></div>'
+        +'<div class="suA-testrow"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+T.testConn+'</button>'+chip+'</div>'
+        +'<details class="suA-adv"><summary>'+T.advanced+info(T.advancedHint)+'</summary><div class="suA-advgrid">'
+          +'<label class="suA-advitem"><span class="suA-advlabel">'+T.timeout+' <span class="suA-advunit">(s)</span>'+info(T.timeoutHint)+'</span><input class="suA-advinput" data-field="timeout" inputmode="numeric" value="'+esc(ST.timeout)+'"></label>'
+          +'<div class="suA-advitem"><button class="tog'+(ST.selfSigned?' on':'')+'" data-act="self"><b></b></button><span class="suA-advlabel">'+T.selfSigned+info(T.selfSignedSub)+'</span></div>'
+        +'</div></details></div>';
+    }
+    h+='</div>';
+    h+='<div class="suA-acc'+(aOpen?' open':'')+'" style="margin-top:10px"><button class="suA-acchead" data-act="acc1:admin"><span class="ic">'+ic('users',16)+'</span><span class="suA-acct">'+T.adminSec+'</span><span class="suA-accprev">'+aPrev+'</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    if(aOpen){
+      h+='<div class="suA-accbody">';
+      if(aConn){
+        h+='<div class="suA-admincard"><span class="suA-adminav" style="background:'+avColor(au.handle||au.name||'a')+'">'+esc((au.name||'?').charAt(0).toUpperCase())+'</span>'
+          +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
+          +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span></div>';
+      } else {
+        h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
+      }
+      h+='</div>';
+    }
+    h+='</div><div class="req" style="margin-top:8px"><span class="r">*</span> '+T.requiredBoth+'</div>';
+    return h;
   }
   function s1(){
     var allOn=ST.projects.length>0&&ST.importIds.length===ST.projects.length;
@@ -1118,49 +1262,55 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   }
   function s2(){
     if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>'+T.loadingLabels+'</div></div>';
+    var ph=curPhases(),mp=curMap();
+    var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
+    var mapped=prod.filter(function(l){return (mp[l]||'none')!=='none';}).length;
     var h='<div class="note">'+sic('info')+'<div><span class="prereq">'+T.prereq+'</span> '+T.prereqText+'</div></div>';
-    // Accordéon 1 — Phases (éditeur : couleur / nom / ajout / suppression). Ouvert par défaut.
+    // Portée : phases/associations globales ('all') ou distinctes par projet ('per').
+    h+='<div class="suA-scope"><div class="suA-seg"><button class="'+(ST.phaseScope==='all'?'on':'')+'" data-act="scope:all">'+T.scopeAll+'</button><button class="'+(ST.phaseScope==='per'?'on':'')+'" data-act="scope:per">'+T.scopePer+'</button></div><span class="suA-scopehint">'+(ST.phaseScope==='all'?T.scopeHintAll:T.scopeHintPer)+'</span></div>';
+    if(ST.phaseScope==='per'){
+      h+='<div class="suA-projtabs">';
+      for(var pi=0;pi<ST.importIds.length;pi++){var ptid=ST.importIds[pi];var pp=ST.projects.filter(function(x){return x.id===ptid;})[0];if(pp)h+='<button class="suA-projtab'+(activeProj()===ptid?' on':'')+'" data-act="projtab:'+ptid+'">'+esc(pp.name)+'</button>';}
+      h+='</div>';
+    }
+    // Accordéon 1 — Phases (éditeur). Aperçu = pastilles de couleur.
     var pOpen=ST.acc==='phases';
-    h+='<div class="suA-acc'+(pOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:phases"><span class="ic">'+ic('layers',16)+'</span><span class="suA-acct">'+T.phases+'</span><span class="subc">'+ST.phases.length+'</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    h+='<div class="suA-acc'+(pOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:phases"><span class="ic">'+ic('layers',16)+'</span><span class="suA-acct">'+T.phases+' <span class="subc">'+ph.length+'</span></span><span class="suA-accprev">';
+    for(var pv=0;pv<Math.min(9,ph.length);pv++)h+='<i style="background:'+esc(ph[pv].color)+'" title="'+esc(ph[pv].name)+'"></i>';
+    h+='</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
     if(pOpen){
       h+='<div class="suA-accbody"><div class="phases">';
-      for(var i=0;i<ST.phases.length;i++){var p=ST.phases[i];
-        h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="'+T.changeColor+'"></button>';
+      for(var i=0;i<ph.length;i++){var p=ph[i];
+        h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="'+esc(T.changeColor)+'"></button>';
         if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
-        h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+T.deletePhase+'">×</button></div>';
+        h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+esc(T.deletePhase)+'">×</button></div>';
       }
       h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button></div>';
     }
     h+='</div>';
-    // Accordéon 2 — Association des labels : SEULS les labels du scope Prod:: (aucun repli sur les autres).
+    // Accordéon 2 — Association des labels (scope Prod::). Aperçu = compteur N/M liés.
     var lOpen=ST.acc==='labels';
-    h+='<div class="suA-acc'+(lOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:labels"><span class="ic">'+ic('link',16)+'</span><span class="suA-acct">'+T.labelMapping+'</span><span class="subc">Prod::</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    h+='<div class="suA-acc'+(lOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:labels"><span class="ic">'+ic('link',16)+'</span><span class="suA-acct">'+T.labelMapping+'</span><span class="suA-accprev"><span class="suA-acccount'+(prod.length&&mapped===prod.length?' full':'')+'">'+mapped+' / '+prod.length+'</span></span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
     if(lOpen){
-      var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
-      var phOpts=[['none',T.notTracked]].concat(ST.phases.map(function(p){return [p.id,p.name];}));
+      var phOpts=[['none',T.notTracked]].concat(ph.map(function(p){return [p.id,p.name];}));
       h+='<div class="suA-accbody">';
       if(!ST.importIds.length){
-        // Aucun projet coché → rien à charger. On oriente vers l'étape Projets.
         h+='<div class="empty">'+T.noProjForLabels+'</div><button class="btn outline sm" style="align-self:flex-start" data-act="goto:1">'+ic('chevL',15)+T.stepProjets+'</button>';
       } else if(!prod.length){
         if(!ST.labels.length){
-          // Aucun label récupéré → accès/projet. On signale les éventuels échecs par projet (✗ #id).
           var failed=(ST.labelsDiag||[]).filter(function(d){return !d.ok;}).map(function(d){return '#'+d.id;});
           h+='<div class="empty">'+T.noLabelsFetched+(failed.length?(' (✗ '+failed.join(', ')+')'):'')+'</div>';
         } else {
-          // Des labels existent mais aucun « Prod:: » → on les affiche pour lever le doute (scope/convention).
-          h+='<div class="empty">'+ST.labels.length+' '+T.labelsNonProd+'</div>';
-          h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+          h+='<div class="empty">'+ST.labels.length+' '+T.labelsNonProd+'</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
           for(var li=0;li<ST.labels.length;li++)h+='<span class="grp" style="text-transform:none;letter-spacing:0;font-family:var(--mono)">'+esc(ST.labels[li])+'</span>';
           h+='</div>';
         }
       } else {
         h+='<div class="map">';
-        for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
-          h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
+        for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=mp[ll]||'none';
+          h+='<div class="maprow'+(phv==='none'?' unset':'')+'"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
         h+='</div>';
       }
-      // Re-fetch manuel des labels (labels seuls, via /api/setup/labels — pas d'extraction complète).
       if(ST.importIds.length)h+='<button class="btn outline sm" style="align-self:flex-start" data-act="reloadlabels">'+ic('zap',15)+T.refreshLabels+'</button>';
       h+='</div>';
     }
@@ -1170,13 +1320,18 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function s3(){
     var roleOpts=[['lead',T.roleLead],['member',T.roleMember]];
     var h='<div class="note">'+sic('info')+'<div>'+T.teamsIntro+'</div></div><div class="teamcol">';
-    for(var t=0;t<ST.teams.length;t++){var tm=ST.teams[t];var mem=ST.memberships.filter(function(m){return m.teamId===tm.id;});
-      h+='<div class="team"><div class="teamh"><input class="teamname" data-team="'+t+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">'+T.glGroup+'</span>':'<span class="newbadge">'+T.newTeam+'</span>')+'<button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div><div class="mlist">';
-      if(mem.length===0)h+='<div class="empty">'+T.noMembers+'</div>';
-      for(var j=0;j<mem.length;j++){var m=mem[j];var nm=POOLname(m.pid);h+='<div class="mrow">'+av(m.pid,nm,24)+'<span class="mname">'+esc(nm)+'</span>'+miniSel('role:'+m.pid+'~'+tm.id,m.role,roleOpts)+'<button class="mx" data-act="rmmem:'+m.pid+'~'+tm.id+'">×</button></div>';}
-      var avail=allPeople().filter(function(pid){return !mem.some(function(m){return m.pid===pid;});});
-      if(avail.length){h+='<div class="addsel">'+ic('plus',14)+'<select data-add="'+tm.id+'"><option value="">'+T.addMember+'</option>';for(var a=0;a<avail.length;a++)h+='<option value="'+esc(avail[a])+'">'+esc(POOLname(avail[a]))+'</option>';h+='</select></div>';}
-      h+='</div></div>';
+    for(var t=0;t<ST.teams.length;t++){var tm=ST.teams[t];var mem=ST.memberships.filter(function(m){return m.teamId===tm.id;});var open=ST.teamOpen.indexOf(tm.id)>=0;
+      h+='<div class="team suA-teamacc'+(open?' open':'')+'"><div class="teamh" data-act="team:'+tm.id+'"><span class="suA-teamchev">'+ic('chevR',15)+'</span><input class="teamname" data-team="'+t+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">'+T.glGroup+'</span>':'<span class="newbadge">'+T.newTeam+'</span>')+'<span class="suA-teamcount">'+mem.length+' '+(mem.length>1?T.members:T.member)+'</span><span class="suA-teampreview">';
+      for(var pv=0;pv<Math.min(5,mem.length);pv++)h+=av(mem[pv].pid,POOLname(mem[pv].pid),20);
+      h+='</span><button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div>';
+      if(open){h+='<div class="mlist">';
+        if(mem.length===0)h+='<div class="empty">'+T.noMembers+'</div>';
+        for(var j=0;j<mem.length;j++){var m=mem[j];var nm=POOLname(m.pid);h+='<div class="mrow">'+av(m.pid,nm,24)+'<span class="mname">'+esc(nm)+'</span>'+miniSel('role:'+m.pid+'~'+tm.id,m.role,roleOpts)+'<button class="mx" data-act="rmmem:'+m.pid+'~'+tm.id+'">×</button></div>';}
+        var avail=allPeople().filter(function(pid){return !mem.some(function(m){return m.pid===pid;});});
+        if(avail.length){h+='<div class="addsel">'+ic('plus',14)+'<select data-add="'+tm.id+'"><option value="">'+T.addMember+'</option>';for(var a=0;a<avail.length;a++)h+='<option value="'+esc(avail[a])+'">'+esc(POOLname(avail[a]))+'</option>';h+='</select></div>';}
+        h+='</div>';
+      }
+      h+='</div>';
     }
     return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+T.newTeamName+'</button>';
   }
@@ -1184,7 +1339,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
     var mapped=0;for(var k in ST.labelPhase)if(ST.labelPhase[k]&&ST.labelPhase[k]!=='none')mapped++;
     var ppl={};ST.memberships.forEach(function(m){ppl[m.pid]=1;});
-    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,mapped+T.labelsLinked,2],['users',T.stepEquipes,ST.teams.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
+    var phVal=ST.phaseScope==='per'?T.perProjectRecap:(mapped+T.labelsLinked);
+    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,ST.teams.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
     var h='<div class="recap">';
     for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
     h+='</div>';
@@ -1192,10 +1348,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     return h;
   }
   function sic(n){return '<span class="ic">'+ic(n,16)+'</span>';}
+  // Bulle d'aide « i » (au survol/focus) — remplace les sous-textes permanents.
+  function info(t){return '<span class="su-info" tabindex="0"><span class="su-info-i">i</span><span class="su-info-pop">'+t+'</span></span>';}
   function miniSel(act,val,opts){var h='<div class="mini"><select data-sel="'+act+'">';for(var i=0;i<opts.length;i++)h+='<option value="'+esc(opts[i][0])+'"'+(opts[i][0]===val?' selected':'')+'>'+esc(opts[i][1])+'</option>';return h+'</select><span class="ic">'+ic('chevD',13)+'</span></div>';}
 
-  // people directory built from group members returned by /api/setup/test
-  var PEOPLE={};
+  // PEOPLE (username→nom) déclaré plus haut + reconstruit dans doTest / au restore localStorage.
   function POOLname(id){return PEOPLE[id]||id;}
   function allPeople(){return Object.keys(PEOPLE);}
 
@@ -1227,17 +1384,17 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   }
   function save(){
     ST.saving=true;ST.saveErr='';render();
+    function perPayload(arr){return arr.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};});}
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
-      admins:(ST.admins||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
-      projectIds:ST.importIds,labelPhases:ST.labelPhase,
-      periods:ST.phases.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};}),
+      projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
+    // Mode « Par projet » : on transmet aussi les phases + associations distinctes par projet (Stage 2 côté dashboard).
+    if(ST.phaseScope==='per'){var pbp={},lbp={};ST.importIds.forEach(function(id){pbp[id]=perPayload(ST.phasesByProject[id]||ST.phases);lbp[id]=ST.labelPhaseByProject[id]||ST.labelPhase;});payload.periodsByProject=pbp;payload.labelPhasesByProject=lbp;}
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){return r.json();}).then(function(j){
         if(j.ok){
-          // bootstrap (1re mise en service, session anonyme) → on va se connecter en admin (extraction en fond).
-          if(j.bootstrap){ window.location.href='/login'; return; }
-          ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:T.starting}; render(); setTimeout(pollProgress,500);
+          // L'admin est authentifié via OAuth → on enchaîne directement sur le loader (plus de détour /login).
+          clearST(); ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:T.starting}; render(); setTimeout(pollProgress,500);
         }
         else{ST.saving=false;ST.saveErr=j.error||T.saveImpossible;render();}})
       .catch(function(){ST.saving=false;ST.saveErr=T.serverUnreachable;render();});
@@ -1289,26 +1446,35 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('rmmem:')===0){var pr=a.slice(6).split('~');ST.memberships=ST.memberships.filter(function(m){return !(m.pid===pr[0]&&m.teamId===pr[1]);});render();}
     else if(a==='cancelLaunch'){cancelLaunch();}
     else if(a.indexOf('phcol:')===0){var pid=a.slice(6);ST.openColor=(ST.openColor===pid?null:pid);render();}
-    else if(a.indexOf('phpick:')===0){var pp=a.slice(7).split('~');ST.phases.forEach(function(p){if(p.id===pp[0])p.color=pp[1];});ST.openColor=null;render();}
-    else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});render();}
-    else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[ST.phases.length%PALETTE.length]});render();}
+    else if(a.indexOf('phpick:')===0){var pp=a.slice(7).split('~');ensurePer();curPhases().forEach(function(p){if(p.id===pp[0])p.color=pp[1];});ST.openColor=null;render();}
+    else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ensurePer();
+      if(ST.phaseScope==='all'){ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});}
+      else{var ap=activeProj();ST.phasesByProject[ap]=(ST.phasesByProject[ap]||[]).filter(function(p){return p.id!==rid;});var mm=ST.labelPhaseByProject[ap]||{};Object.keys(mm).forEach(function(k){if(mm[k]===rid)mm[k]='none';});}
+      render();}
+    else if(a==='phadd'){ensurePer();var np={id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[curPhases().length%PALETTE.length]};if(ST.phaseScope==='all')ST.phases.push(np);else ST.phasesByProject[activeProj()].push(np);render();}
     else if(a.indexOf('acc:')===0){var ak=a.slice(4);ST.acc=(ST.acc===ak?'':ak);render();}
     else if(a==='reloadlabels'){ST.labelsLoaded=false;render();loadLabels(render);}
+    else if(a.indexOf('acc1:')===0){var k1=a.slice(5);var i1=ST.acc1.indexOf(k1);if(i1>=0)ST.acc1.splice(i1,1);else ST.acc1.push(k1);render();}
+    else if(a.indexOf('scope:')===0){switchScope(a.slice(6));}
+    else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
+    else if(a==='oauth'){persistST();ST.adminState='connecting';render();window.location.href='/auth/oauth?return=/setup';}
+    else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
     var tn=e.target.closest('[data-team]');if(tn){ST.teams[+tn.dataset.team].name=tn.value;return;}
-    var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ST.phases.forEach(function(p){if(p.id===pid)p.name=pn.value;});}
+    var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ensurePer();curPhases().forEach(function(p){if(p.id===pid)p.name=pn.value;});}
   });
   app.addEventListener('change',function(e){
     var sl=e.target.closest('[data-setlang]');if(sl){location.href='/set-lang?lang='+encodeURIComponent(sl.value)+'&return=/setup';return;}
     var s=e.target.closest('[data-sel]');if(s){var a=s.dataset.sel;
-      if(a.indexOf('phase:')===0){var i=+a.slice(6);ST.labelPhase[ST.labels[i]]=s.value;render();}
+      if(a.indexOf('phase:')===0){var i=+a.slice(6);setMapVal(ST.labels[i],s.value);render();}
       else if(a.indexOf('role:')===0){var pr=a.slice(5).split('~');ST.memberships.forEach(function(m){if(m.pid===pr[0]&&m.teamId===pr[1])m.role=s.value;});render();}
       return;}
     var ad=e.target.closest('[data-add]');if(ad&&ad.value){var tid=ad.dataset.add;if(!ST.memberships.some(function(m){return m.pid===ad.value&&m.teamId===tid;}))ST.memberships.push({pid:ad.value,teamId:tid,role:'member'});render();}
   });
   render();
+  loadMe(); // identité admin (et détection du retour OAuth)
 })();
 </script>
 </body>
