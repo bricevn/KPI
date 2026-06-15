@@ -344,6 +344,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Mêmes phases et associations pour tous les projets importés.",
       scopeHintPer:"Phases et associations distinctes pour chaque projet.",
       member:"membre", members:"membres", perProjectRecap:"par projet · phases & labels distincts",
+      adminToken:"Votre token d'accès personnel", adminTokenHint:"Token PERSONNEL GitLab (différent du token de groupe). Sert à vous identifier comme administrateur ; non conservé.",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -394,6 +395,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Same phases and mappings for all imported projects.",
       scopeHintPer:"Separate phases and mappings for each project.",
       member:"member", members:"members", perProjectRecap:"per project · separate phases &amp; labels",
+      adminToken:"Your personal access token", adminTokenHint:"Your PERSONAL GitLab token (different from the group token). Used to identify you as administrator; never stored.",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -467,6 +469,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mismas fases y asociaciones para todos los proyectos importados.",
       "scopeHintPer": "Fases y asociaciones distintas para cada proyecto.",
       "member": "miembro", "members": "miembros", "perProjectRecap": "por proyecto · fases y etiquetas distintas",
+      "adminToken": "Tu token de acceso personal", "adminTokenHint": "Token PERSONAL de GitLab (distinto del token de grupo). Sirve para identificarte como administrador; no se conserva.",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -560,6 +563,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Gleiche Phasen und Zuordnungen für alle importierten Projekte.",
       "scopeHintPer": "Eigene Phasen und Zuordnungen für jedes Projekt.",
       "member": "Mitglied", "members": "Mitglieder", "perProjectRecap": "pro Projekt · eigene Phasen &amp; Labels",
+      "adminToken": "Ihr persönliches Zugriffstoken", "adminTokenHint": "Ihr PERSÖNLICHES GitLab-Token (nicht das Gruppen-Token). Dient zur Identifikation als Administrator; wird nicht gespeichert.",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -653,6 +657,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Stesse fasi e associazioni per tutti i progetti importati.",
       "scopeHintPer": "Fasi e associazioni distinte per ogni progetto.",
       "member": "membro", "members": "membri", "perProjectRecap": "per progetto · fasi &amp; etichette distinte",
+      "adminToken": "Il tuo token di accesso personale", "adminTokenHint": "Il tuo token PERSONALE GitLab (diverso dal token di gruppo). Serve a identificarti come amministratore; non viene conservato.",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -746,6 +751,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mesmas fases e associações para todos os projetos importados.",
       "scopeHintPer": "Fases e associações distintas para cada projeto.",
       "member": "membro", "members": "membros", "perProjectRecap": "por projeto · fases e rótulos distintos",
+      "adminToken": "O seu token de acesso pessoal", "adminTokenHint": "O seu token PESSOAL do GitLab (diferente do token de grupo). Serve para o identificar como administrador; não é conservado.",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -839,6 +845,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Одинаковые фазы и связи для всех импортированных проектов.",
       "scopeHintPer": "Отдельные фазы и связи для каждого проекта.",
       "member": "участник", "members": "участники", "perProjectRecap": "по проекту · отдельные фазы и метки",
+      "adminToken": "Ваш личный токен доступа", "adminTokenHint": "Ваш ЛИЧНЫЙ токен GitLab (не групповой). Используется для идентификации как администратора; не сохраняется.",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -932,6 +939,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "نفس المراحل والارتباطات لجميع المشاريع المستوردة.",
       "scopeHintPer": "مراحل وارتباطات مستقلة لكل مشروع.",
       "member": "عضو", "members": "أعضاء", "perProjectRecap": "حسب المشروع · مراحل وتسميات مستقلة",
+      "adminToken": "رمز الوصول الشخصي الخاص بك", "adminTokenHint": "رمز GitLab الشخصي (يختلف عن رمز المجموعة). يُستخدم لتعريفك كمسؤول؛ لا يُحفظ.",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -1025,6 +1033,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "所有导入的项目使用相同的阶段和关联。",
       "scopeHintPer": "每个项目使用各自不同的阶段和关联。",
       "member": "名成员", "members": "名成员", "perProjectRecap": "按项目 · 各自独立的阶段和标签",
+      "adminToken": "您的个人访问令牌", "adminTokenHint": "您的 GitLab 个人令牌（不同于群组令牌）。用于将您识别为管理员；不会被保存。",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -1118,6 +1127,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "インポートしたすべてのプロジェクトに同じフェーズと関連付けを適用します。",
       "scopeHintPer": "プロジェクトごとに個別のフェーズと関連付け。",
       "member": "メンバー", "members": "メンバー", "perProjectRecap": "プロジェクトごと · フェーズ &amp; ラベルを個別に",
+      "adminToken": "あなたの個人アクセストークン", "adminTokenHint": "あなたの個人用 GitLab トークン（グループトークンとは別）。管理者として識別するために使用。保存されません。",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -1160,7 +1170,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group'],teamOpen:[],adminState:'idle',adminUser:null,
+    acc1:['group'],teamOpen:[],adminState:'idle',adminUser:null,adminTok:'',adminLogin:'',adminErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1245,7 +1255,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
           +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
           +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span></div>';
       } else {
-        h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
+        h+='<div class="field"><div class="flabel">'+T.adminToken+' <span class="req">*</span>'+info(T.adminTokenHint)+'</div><div class="box">'+sic('key')+'<input data-field="adminTok" type="password" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.adminTok)+'"></div></div>';
+        if(ST.adminErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.adminErr)+'</div></div>';
+        h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="adminconnect"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
       }
       h+='</div>';
     }
@@ -1372,6 +1384,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         ST.test='ok';render();
       }).catch(function(){ST.test='err';render();});
   }
+  // Identifie l'admin DANS l'assistant via son token personnel (POST /api/setup/admin) → username vérifié.
+  function doAdminConnect(){
+    ST.adminState='connecting';ST.adminErr='';render();
+    fetch('/api/setup/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseUrl:conn().baseUrl,token:(ST.adminTok||'').trim(),selfSigned:ST.selfSigned})})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j.ok){ST.adminState='connected';ST.adminLogin=j.username;ST.adminUser={name:j.name||j.username,handle:'@'+j.username,role:T.adminOk};ST.adminTok='';render();}
+        else{ST.adminState='idle';ST.adminErr=j.error||T.saveImpossible;render();}
+      }).catch(function(){ST.adminState='idle';ST.adminErr=T.serverUnreachable;render();});
+  }
   function loadLabels(cb){
     ST.labelsLoaded=false;
     fetch('/api/setup/labels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign(conn(),{projectIds:ST.importIds}))})
@@ -1386,6 +1407,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     ST.saving=true;ST.saveErr='';render();
     function perPayload(arr){return arr.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};});}
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
+      admins:(ST.adminLogin?[ST.adminLogin]:[]),
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     // Mode « Par projet » : on transmet aussi les phases + associations distinctes par projet (Stage 2 côté dashboard).
@@ -1457,7 +1479,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('acc1:')===0){var k1=a.slice(5);var i1=ST.acc1.indexOf(k1);if(i1>=0)ST.acc1.splice(i1,1);else ST.acc1.push(k1);render();}
     else if(a.indexOf('scope:')===0){switchScope(a.slice(6));}
     else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
-    else if(a==='oauth'){persistST();ST.adminState='connecting';render();window.location.href='/auth/oauth?return=/setup';}
+    else if(a==='adminconnect'){doAdminConnect();}
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
   app.addEventListener('input',function(e){

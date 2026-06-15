@@ -310,6 +310,7 @@ public sealed class WebDashboard
         // Endpoints de l'assistant : ouverts au bootstrap (non configuré), sinon admin-only (RequireSetupAccess).
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup/admin",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupAdminAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx))).AllowAnonymous();
         app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx)).AllowAnonymous();
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
@@ -823,6 +824,29 @@ public sealed class WebDashboard
             perProject.Add(new JsonObject { ["id"] = pid, ["count"] = count, ["ok"] = ok });
         }
         return Results.Json(new { ok = true, labels = set, total = set.Count, perProject });
+    }
+
+    // POST /api/setup/admin { baseUrl, token (PAT PERSONNEL de l'admin), selfSigned } → { ok, username, name }
+    // Identifie l'admin DANS l'assistant (sans OAuth) : valide le token personnel contre {instance}/api/v4/user.
+    // Le username renvoyé (vérifié) est ensuite transmis au save → écrit dans Auth.AdminUsers. Token non conservé.
+    private async Task<IResult> SetupAdminAsync(HttpContext ctx)
+    {
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
+        var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
+        var selfS   = b?["selfSigned"]?.GetValue<bool>() ?? false;
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || !SetupHostAllowed(baseUri) || string.IsNullOrWhiteSpace(token))
+            return Results.Json(new { ok = false, error = "URL ou token invalide." });
+        var http = selfS ? _sharedHttpRelaxed : _sharedHttp;
+        var me = await GlGet(http, baseUri, "/api/v4/user", token, ctx.RequestAborted);
+        if (me is null) return Results.Json(new { ok = false, error = "Token invalide ou instance injoignable." });
+        var username = me["username"]?.GetValue<string>() ?? "";
+        var name = me["name"]?.GetValue<string>() ?? username;
+        var isBot = me["bot"] is JsonValue bv && bv.TryGetValue<bool>(out var bb) && bb;
+        if (string.IsNullOrWhiteSpace(username)) return Results.Json(new { ok = false, error = "Compte GitLab sans username." });
+        if (isBot || IsBotUsername(username)) return Results.Json(new { ok = false, error = "Utilisez votre token PERSONNEL (un token de service/bot ne peut pas être administrateur)." });
+        return Results.Json(new { ok = true, username, name });
     }
 
     // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json
