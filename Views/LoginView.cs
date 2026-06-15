@@ -53,6 +53,7 @@ public static class LoginView
             .Replace("__T_DESC__", T("login.desc")).Replace("__T_ENCRYPTED__", T("login.encrypted"))
             .Replace("__T_WELCOME__", T("login.welcome")).Replace("__T_WELCOMESUB__", T("login.welcomeSub"))
             .Replace("__T_INSTANCE__", T("login.instance")).Replace("__T_WITHGITLAB__", T("login.withGitlab"))
+            .Replace("__T_SSOSUB__", T("login.ssoSub")).Replace("__T_OAUTHREQUIRED__", T("login.oauthRequired"))
             .Replace("__T_USETOKEN__", T("login.useToken")).Replace("__T_TOKENPERSONAL__", T("login.tokenPersonal"))
             .Replace("__T_SIGNIN__", T("login.signin")).Replace("__T_TOKENNOTE__", T("login.tokenNote"))
             .Replace("__T_SETUP_CTA__", T("login.setupCta"))
@@ -226,32 +227,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
     <!-- LOGIN : espace déjà configuré (OAuth + token). -->
     <div id="loginView">
     <h1 class="a-title">__T_WELCOME__</h1>
-    <p class="a-sub">__T_WELCOMESUB__</p>
-    <div class="fld">
-      <label class="fld-l" for="instance">__T_INSTANCE__</label>
-      <div class="fld-box">
-        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
-        <input id="instance" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://gitlab.exemple.com" value="__DEFAULT_INSTANCE__">
-      </div>
-    </div>
+    <p class="a-sub">__T_SSOSUB__</p>
     <button class="gl-btn" id="oauthBtn" type="button">
       <span id="oauthIcon"><svg width="22" height="22" viewBox="0 0 380 380" aria-hidden="true"><path fill="#fff" opacity="0.95" d="M190 366 L259 154 H121 Z"></path><path fill="#fff" opacity="0.7" d="M190 366 L121 154 H24 Z"></path><path fill="#fff" opacity="0.5" d="M24 154 L3 219 a14 14 0 0 0 5 16 l182 131 Z"></path><path fill="#fff" opacity="0.7" d="M24 154 L53 64 a7 7 0 0 1 13 0 l55 90 Z"></path><path fill="#fff" opacity="0.95" d="M190 366 L259 154 h97 Z"></path><path fill="#fff" opacity="0.5" d="M356 154 l21 65 a14 14 0 0 1 -5 16 L190 366 Z"></path><path fill="#fff" opacity="0.7" d="M356 154 L327 64 a7 7 0 0 0 -13 0 l-55 90 Z"></path></svg></span>
       <span id="oauthLabel">__T_WITHGITLAB__</span>
     </button>
-    <button class="reveal-link" id="revealBtn" type="button">__T_USETOKEN__</button>
-    <div class="collapse" id="tokenWrap" style="max-height:0;opacity:0">
-      <div class="a-or">__T_TOKENPERSONAL__</div>
-      <div class="a-err hidden" id="errBox">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg>
-        <span id="errMsg"></span>
-      </div>
-      <div class="fld"><div class="fld-box" id="tokenBox">
-        <span class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="3.5"></circle><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"></path></svg></span>
-        <input id="token" type="password" spellcheck="false" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" autocomplete="off" aria-label="Token d'accès personnel GitLab">
-        <button class="eye" id="eyeBtn" type="button" title="Afficher / masquer" aria-label="Afficher ou masquer le token"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
-      </div></div>
-      <button class="sub-btn" id="tokenBtn" type="button">__T_SIGNIN__</button>
-      <div class="a-foot">__T_TOKENNOTE__</div>
+    <div class="a-err hidden" id="noOauth">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg>
+      <span>__T_OAUTHREQUIRED__</span>
     </div>
     </div>
   </div></div>
@@ -262,43 +245,28 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
   var CONFIGURED = __CONFIGURED__;
   var I18N = __JS_I18N__;
   var $ = function(id){return document.getElementById(id);};
-  var instance=$('instance'),token=$('token'),tokenWrap=$('tokenWrap'),oauthBtn=$('oauthBtn'),revealBtn=$('revealBtn'),tokenBtn=$('tokenBtn'),errBox=$('errBox'),errMsg=$('errMsg'),tokenBox=$('tokenBox'),footInstance=$('footInstance'),setupBtn=$('setupBtn');
-  function normInstance(){var v=(instance.value||'').trim().replace(/\/+$/,'');if(v&&!/^https?:\/\//i.test(v))v='https://'+v;return v;}
-  function syncFoot(){var v=normInstance();footInstance.textContent=v?(I18N.encryptedTo+v.replace(/^https?:\/\//,'')):I18N.encrypted;}
-  instance.addEventListener('input',syncFoot);syncFoot();
-  function openToken(){tokenWrap.style.maxHeight='360px';tokenWrap.style.opacity='1';revealBtn.classList.add('hidden');setTimeout(function(){token.focus();},120);}
-  revealBtn.addEventListener('click',openToken);
+  var oauthBtn=$('oauthBtn'),footInstance=$('footInstance'),setupBtn=$('setupBtn'),noOauth=$('noOauth');
+  var INSTHOST=('__DEFAULT_INSTANCE__'||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  function setFoot(t){if(footInstance)footInstance.textContent=t;}
+  setFoot(INSTHOST?(I18N.encryptedTo+INSTHOST):I18N.encrypted);
   var firstRunView=$('firstRunView'),loginView=$('loginView');
   if(!CONFIGURED){
-    // 1re mise en service : aucune connexion possible (pas de serveur configuré) → écran d'accueil + CTA /setup.
+    // 1re mise en service : écran d'accueil + CTA vers l'assistant.
     firstRunView.classList.remove('hidden');loginView.classList.add('hidden');
     var tagEl=document.querySelector('.split-tag');if(tagEl)tagEl.innerHTML=I18N.frTag1+'<br><em>'+I18N.frTag2+'</em>';
     var descEl=document.querySelector('.split-desc');if(descEl)descEl.textContent=I18N.frDesc;
-    footInstance.textContent=I18N.encrypted;
+    setFoot(I18N.encrypted);
     setupBtn.addEventListener('click',function(){
       setupBtn.disabled=true;$('setupLabel').textContent=I18N.setupOpening;
       var ar=$('setupLabel').nextElementSibling;if(ar)ar.outerHTML='<span class="spin"></span>';
       setTimeout(function(){window.location.href='/setup';},450);
     });
-  } else if(!OAUTH_CONFIGURED){oauthBtn.classList.add('hidden');revealBtn.classList.add('hidden');openToken();}
-  $('eyeBtn').addEventListener('click',function(){token.type=token.type==='password'?'text':'password';});
-  function showError(m){errMsg.textContent=m;errBox.classList.remove('hidden');tokenBox.classList.add('err');}
-  function clearError(){errBox.classList.add('hidden');tokenBox.classList.remove('err');}
-  token.addEventListener('input',clearError);
-  oauthBtn.addEventListener('click',function(){window.location.href='/auth/oauth';});
-  function resetTokenBtn(){tokenBtn.disabled=false;tokenBtn.textContent=I18N.signin;}
-  tokenBtn.addEventListener('click',function(){
-    clearError();
-    var inst=normInstance(),tok=(token.value||'').trim();
-    if(!inst){showError(I18N.errNoInstance);return;}
-    if(!tok){showError(I18N.errNoToken);return;}
-    tokenBtn.disabled=true;tokenBtn.innerHTML='<span class="spin"></span> '+I18N.verifying;
-    fetch('/api/auth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instance:inst,token:tok})})
-      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
-      .then(function(res){if(res.ok&&res.j&&res.j.ok){window.location.href='/';}else{resetTokenBtn();showError((res.j&&res.j.error)||I18N.cantConnect);}})
-      .catch(function(){resetTokenBtn();showError(I18N.unreachable);});
-  });
-  token.addEventListener('keydown',function(e){if(e.key==='Enter')tokenBtn.click();});
+  } else if(!OAUTH_CONFIGURED){
+    // SSO GitLab non configuré (seule méthode de connexion) → on le signale.
+    oauthBtn.classList.add('hidden');if(noOauth)noOauth.classList.remove('hidden');
+  }
+  // Connexion = SSO GitLab : redirection vers la page de login GitLab (identifiant + mot de passe + 2FA).
+  oauthBtn.addEventListener('click',function(){oauthBtn.disabled=true;window.location.href='/auth/oauth';});
 })();
 </script>
 </body>
