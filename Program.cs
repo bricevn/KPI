@@ -18,7 +18,6 @@ var appConfig = new AppConfig();
 configRoot.Bind(appConfig);
 // 1c-D : plus de bloc GitLab global → on dérive une config client du 1er serveur pour les chemins mono-serveur.
 var gl = appConfig.PrimaryGitLab();
-var viewName = "release_" + (string.IsNullOrEmpty(gl.Milestone) ? "all" : gl.Milestone) + ".html";
 
 bool viewsOnly = args.Any(a => a.Equals("--views-only", StringComparison.OrdinalIgnoreCase));
 bool serve = args.Any(a => a.Equals("--serve", StringComparison.OrdinalIgnoreCase));
@@ -45,14 +44,10 @@ try
 {
     if (serve)
     {
-        // Vérifie qu'on a au moins un HTML à servir au démarrage.
-        var htmlPath = Path.Combine(appConfig.Export.OutputDirectory, "views", viewName);
-        if (!File.Exists(htmlPath))
-        {
-            Console.WriteLine($"HTML absent ({htmlPath}). Lancement d'un export initial...");
-            await ExportPipeline.RunFullExportAsync(appConfig, null, cts.Token);
-        }
-
+        // Le serveur démarre TOUJOURS immédiatement, SANS extraction : l'utilisateur arrive sur /login
+        // (ou /setup si non configuré). L'extraction des données se fait ensuite via l'assistant /setup
+        // ou le bouton « Rafraîchir » (Options). Le dashboard servi est rendu en direct (payload inliné),
+        // il ne dépend pas d'un fichier HTML pré-généré ; sans données extraites, il s'affiche simplement vide.
         await WebDashboard.RunAsync(appConfig, port, cts.Token);
         return 0;
     }
