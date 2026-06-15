@@ -846,6 +846,13 @@ public sealed class WebDashboard
         var isBot = me["bot"] is JsonValue bv && bv.TryGetValue<bool>(out var bb) && bb;
         if (string.IsNullOrWhiteSpace(username)) return Results.Json(new { ok = false, error = "Compte GitLab sans username." });
         if (isBot || IsBotUsername(username)) return Results.Json(new { ok = false, error = "Utilisez votre token PERSONNEL (un token de service/bot ne peut pas être administrateur)." });
+
+        // Identité PROUVÉE (token valide pour ce compte) → on ouvre la session ici même : à la fin du /setup
+        // l'admin est déjà connecté (pas de 2e authentification via /login). Le token n'est pas conservé.
+        var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username) }, CookieAuthenticationDefaults.AuthenticationScheme);
+        var srv = ServerForInstance(baseUrl);
+        if (srv != null) identity.AddClaim(new Claim(ServerClaim, srv.Id));
+        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         return Results.Json(new { ok = true, username, name });
     }
 

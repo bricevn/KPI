@@ -1253,7 +1253,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       if(aConn){
         h+='<div class="suA-admincard"><span class="suA-adminav" style="background:'+avColor(au.handle||au.name||'a')+'">'+esc((au.name||'?').charAt(0).toUpperCase())+'</span>'
           +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
-          +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span></div>';
+          +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span><button class="suA-adminchange" data-act="adminchange">'+T.edit+'</button></div>';
       } else {
         h+='<div class="field"><div class="flabel">'+T.adminToken+' <span class="req">*</span>'+info(T.adminTokenHint)+'</div><div class="box">'+sic('key')+'<input data-field="adminTok" type="password" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.adminTok)+'"></div></div>';
         if(ST.adminErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.adminErr)+'</div></div>';
@@ -1480,6 +1480,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('scope:')===0){switchScope(a.slice(6));}
     else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
     else if(a==='adminconnect'){doAdminConnect();}
+    else if(a==='adminchange'){ST.adminState='idle';ST.adminLogin='';ST.adminUser=null;render();}
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
   app.addEventListener('input',function(e){
