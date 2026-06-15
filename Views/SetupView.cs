@@ -185,7 +185,28 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .phname:focus{border-color:var(--accent);}
 .phx{flex:none;border:0;background:none;color:var(--ink-faint);font-size:20px;line-height:1;cursor:pointer;padding:0 6px;border-radius:6px;}
 .phx:hover{color:var(--bad);}
+/* étape Phases : accordéons (Phases / Association des labels), un seul ouvert à la fois */
+.suA-acc{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel-2);}
+.suA-acc+.suA-acc{margin-top:10px;}
+.suA-acchead{display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:0;cursor:pointer;color:var(--ink);font:inherit;text-align:left;}
+.suA-acchead:hover{background:var(--panel-3);}
+.suA-acchead .ic{color:var(--accent);display:flex;flex:none;}
+.suA-acct{font-weight:700;font-size:14px;}
+.suA-accchev{margin-left:auto;display:flex;color:var(--ink-faint);transition:transform .2s var(--ease);}
+.suA-acc.open .suA-accchev{transform:rotate(90deg);}
+.suA-accbody{padding:4px 15px 16px;display:flex;flex-direction:column;gap:12px;}
+.suA-accbody .map{border:0;border-radius:0;background:none;}
+.suA-accbody .maprow:first-child{padding-top:0;}
+/* étape Projets : tout cocher / décocher + compteur */
+.suA-selall{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.suA-selallbtn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-dim);font:inherit;font-size:12.5px;cursor:pointer;}
+.suA-selallbtn:hover{border-color:var(--accent);color:var(--accent);}
+.suA-selcount{font-size:12px;color:var(--ink-faint);}
 /* écran de chargement post-setup (loader temps réel) */
+.ld-dots{display:inline-flex;align-items:center;}
+.ld-dots b{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:4px;animation:lddot 1.2s ease-in-out infinite;}
+.ld-dots b:nth-child(2){animation-delay:.18s;}.ld-dots b:nth-child(3){animation-delay:.36s;}
+@keyframes lddot{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
 .ld-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px;}
 .ld-bars{display:flex;align-items:flex-end;gap:9px;height:120px;}
 .ld-bars i{display:block;width:16px;height:100%;background:var(--panel-2);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden;}
@@ -209,7 +230,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
   var phaseColor=function(k){if(k==='none')return NONE_COLOR;for(var i=0;i<ST.phases.length;i++)if(ST.phases[i].id===k)return ST.phases[i].color;return NONE_COLOR;};
-  var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'};
+  var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>'};
   function ic(n,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
   var MARK='<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="13" width="4.2" height="7" rx="1.4" fill="#fff" opacity="0.82"/><rect x="9.9" y="9" width="4.2" height="11" rx="1.4" fill="#fff" opacity="0.92"/><rect x="16.8" y="4.5" width="4.2" height="15.5" rx="1.4" fill="#fff"/><path d="M4 8.5 L11 6 L19 2.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><circle cx="19" cy="2.5" r="1.7" fill="#fff"/></svg>';
   var AVC=['#0072B2','#8957e5','#0f9e8e','#d97706','#b3231b','#2b7fff','#c2410c','#6d28d9'];
@@ -243,6 +264,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       requiredField:"champ obligatoire · une connexion réussie est requise pour continuer.",
       projSelectedOf:" projet(s) sélectionné(s) sur ", accessible:" accessibles.",
       loadingLabels:"Chargement des labels des projets sélectionnés…",
+      selectAll:"Tout cocher", deselectAll:"Tout décocher",
+      noProdLabels:"Aucun label Prod:: trouvé sur les projets sélectionnés.",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -278,6 +301,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       requiredField:"required field · a successful connection is required to continue.",
       projSelectedOf:" project(s) selected of ", accessible:" accessible.",
       loadingLabels:"Loading labels…",
+      selectAll:"Select all", deselectAll:"Deselect all",
+      noProdLabels:"No Prod:: labels found on the selected projects.",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -335,6 +360,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " proyecto(s) seleccionado(s) de ",
       "accessible": " accesibles.",
       "loadingLabels": "Cargando etiquetas…",
+      "selectAll": "Seleccionar todo",
+      "deselectAll": "Deseleccionar todo",
+      "noProdLabels": "No se encontraron etiquetas Prod:: en los proyectos seleccionados.",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -412,6 +440,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " Projekt(e) ausgewählt von ",
       "accessible": " verfügbar.",
       "loadingLabels": "Label werden geladen…",
+      "selectAll": "Alle auswählen",
+      "deselectAll": "Alle abwählen",
+      "noProdLabels": "Keine Prod::-Label in den ausgewählten Projekten gefunden.",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -489,6 +520,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " progetto(i) selezionato(i) su ",
       "accessible": " accessibili.",
       "loadingLabels": "Caricamento etichette…",
+      "selectAll": "Seleziona tutto",
+      "deselectAll": "Deseleziona tutto",
+      "noProdLabels": "Nessuna etichetta Prod:: trovata nei progetti selezionati.",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -530,7 +564,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "launch": "Iniciar dashboard",
       "saving": "A guardar…",
       "stepConnexion": "Ligação",
-      "stepProjetos": "Projetos",
+      "stepProjets": "Projetos",
       "stepPhases": "Fases",
       "stepEquipes": "Equipes",
       "stepVerif": "Análise",
@@ -566,6 +600,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " projeto(s) selecionado(s) de ",
       "accessible": " acessíveis.",
       "loadingLabels": "A carregar rótulos…",
+      "selectAll": "Selecionar tudo",
+      "deselectAll": "Desmarcar tudo",
+      "noProdLabels": "Nenhum rótulo Prod:: encontrado nos projetos selecionados.",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -643,6 +680,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " проект(ов) выбрано из ",
       "accessible": " доступные.",
       "loadingLabels": "Загрузка меток…",
+      "selectAll": "Выбрать все",
+      "deselectAll": "Снять выбор",
+      "noProdLabels": "Метки Prod:: не найдены в выбранных проектах.",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -720,6 +760,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " مشروع (مشاريع) مختار (مختارة) من",
       "accessible": " متاح (متاحة).",
       "loadingLabels": "جاري تحميل التسميات…",
+      "selectAll": "تحديد الكل",
+      "deselectAll": "إلغاء تحديد الكل",
+      "noProdLabels": "لم يتم العثور على تسميات Prod:: في المشاريع المحددة.",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -797,6 +840,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": " 个项目已选择（共 ",
       "accessible": " 个可访问的）。",
       "loadingLabels": "正在加载标签…",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "noProdLabels": "在所选项目中未找到 Prod:: 标签。",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -874,6 +920,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "projSelectedOf": "プロジェクト選択 / ",
       "accessible": "アクセス可能。",
       "loadingLabels": "ラベルを読み込み中…",
+      "selectAll": "すべて選択",
+      "deselectAll": "すべて選択解除",
+      "noProdLabels": "選択したプロジェクトに Prod:: ラベルが見つかりません。",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -914,7 +963,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',admins:'',timeout:'60',selfSigned:false,showTok:false,
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},
-    phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,
+    phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
 
@@ -956,29 +1005,45 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       +'<div class="req"><span class="r">*</span> '+T.requiredField+'</div>';
   }
   function s1(){
-    var h='<div class="note">'+sic('info')+'<div><b>'+ST.importIds.length+'</b>'+T.projSelectedOf+ST.projects.length+T.accessible+'</div></div><div class="checklist">';
+    var allOn=ST.projects.length>0&&ST.importIds.length===ST.projects.length;
+    var h='<div class="note">'+sic('info')+'<div><b>'+ST.importIds.length+'</b>'+T.projSelectedOf+ST.projects.length+T.accessible+'</div></div>';
+    if(ST.projects.length)h+='<div class="suA-selall"><button class="suA-selallbtn" data-act="toggleall">'+ic(allOn?'x':'check',14)+(allOn?T.deselectAll:T.selectAll)+'</button><span class="suA-selcount">'+ST.importIds.length+' / '+ST.projects.length+'</span></div>';
+    h+='<div class="checklist">';
     for(var i=0;i<ST.projects.length;i++){var p=ST.projects[i];var on=ST.importIds.indexOf(p.id)>=0;h+='<button class="chk'+(on?' on':'')+'" data-act="proj:'+p.id+'"><span class="chkbox">'+(on?ic('check',13):'')+'</span><span class="chkl">'+esc(p.name)+'<b>#'+p.id+'</b></span><span class="grp">'+esc(p.group||'')+'</span></button>';}
     return h+'</div>';
   }
   function s2(){
     if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>'+T.loadingLabels+'</div></div>';
     var h='<div class="note">'+sic('info')+'<div><span class="prereq">'+T.prereq+'</span> '+T.prereqText+'</div></div>';
-    // Éditeur de phases : couleur (palette), nom éditable, suppression.
-    h+='<div class="subh">'+T.phases+' <span class="subc">'+ST.phases.length+'</span></div><div class="phases">';
-    for(var i=0;i<ST.phases.length;i++){var p=ST.phases[i];
-      h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="'+T.changeColor+'"></button>';
-      if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
-      h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+T.deletePhase+'">×</button></div>';
+    // Accordéon 1 — Phases (éditeur : couleur / nom / ajout / suppression). Ouvert par défaut.
+    var pOpen=ST.acc==='phases';
+    h+='<div class="suA-acc'+(pOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:phases"><span class="ic">'+ic('layers',16)+'</span><span class="suA-acct">'+T.phases+'</span><span class="subc">'+ST.phases.length+'</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    if(pOpen){
+      h+='<div class="suA-accbody"><div class="phases">';
+      for(var i=0;i<ST.phases.length;i++){var p=ST.phases[i];
+        h+='<div class="phrow"><div class="swatchwrap"><button class="swatch" style="background:'+esc(p.color)+'" data-act="phcol:'+esc(p.id)+'" title="'+T.changeColor+'"></button>';
+        if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
+        h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+T.deletePhase+'">×</button></div>';
+      }
+      h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button></div>';
     }
-    h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button>';
-    // Association : labels Prod:: → phase (repli sur tous les labels si aucun Prod::).
-    var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
-    if(!prod.length)prod=ST.labels;
-    var phOpts=[['none',T.notTracked]].concat(ST.phases.map(function(p){return [p.id,p.name];}));
-    h+='<div class="subh" style="margin-top:6px">'+T.labelMapping+' <span class="subc">Prod::</span></div><div class="map">';
-    for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
-      h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
-    return h+'</div>';
+    h+='</div>';
+    // Accordéon 2 — Association des labels : SEULS les labels du scope Prod:: (aucun repli sur les autres).
+    var lOpen=ST.acc==='labels';
+    h+='<div class="suA-acc'+(lOpen?' open':'')+'"><button class="suA-acchead" data-act="acc:labels"><span class="ic">'+ic('link',16)+'</span><span class="suA-acct">'+T.labelMapping+'</span><span class="subc">Prod::</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
+    if(lOpen){
+      var prod=ST.labels.filter(function(l){return l.toLowerCase().indexOf('prod::')===0;});
+      var phOpts=[['none',T.notTracked]].concat(ST.phases.map(function(p){return [p.id,p.name];}));
+      h+='<div class="suA-accbody">';
+      if(!prod.length)h+='<div class="empty">'+T.noProdLabels+'</div>';
+      else{h+='<div class="map">';
+        for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=ST.labelPhase[ll]||'none';
+          h+='<div class="maprow"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
+        h+='</div>';}
+      h+='</div>';
+    }
+    h+='</div>';
+    return h;
   }
   function s3(){
     var roleOpts=[['lead',T.roleLead],['member',T.roleMember]];
@@ -1020,7 +1085,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       .then(function(r){return r.json();}).then(function(j){
         if(!j.ok){ST.test='err';render();return;}
         ST.projects=j.projects||[];ST.groups=j.groups||[];
-        if(!ST.importIds.length)ST.importIds=ST.projects.map(function(p){return p.id;});
+        // Par défaut : AUCUN projet coché. L'admin sélectionne explicitement (ou « Tout cocher »).
         // build teams + memberships + people from groups
         PEOPLE={};ST.teams=[];ST.memberships=[];
         (ST.groups||[]).forEach(function(g,gi){var id='g'+gi;ST.teams.push({id:id,name:g.name,gitlab:true});
@@ -1069,12 +1134,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function launchHtml(){
     var pr=ST.progress||{status:'running',percent:0,message:T.starting};
     var done=pr.status==='done',err=pr.status==='error',pct=Math.max(0,Math.min(100,pr.percent||0));
-    var heights=[40,62,52,86,66,96],bars='';
-    for(var i=0;i<heights.length;i++)bars+='<i><b style="height:'+Math.round(pct*heights[i]/100)+'%"></b></i>';
+    var heights=[40,62,52,86,66,96],cols=['#2b7fff','#1f9d6b','#fc6d26','#4d97ff','#1f9d6b','#2b7fff'],bars='';
+    for(var i=0;i<heights.length;i++)bars+='<i><b style="height:'+Math.round(pct*heights[i]/100)+'%;background:'+cols[i]+'"></b></i>';
     var eta=(pr.etaSeconds!=null&&!done&&!err)?' · ~ '+fmtClock(pr.etaSeconds)+T.left:'';
     var status=done?('<span class="okic">'+ic('check',17)+'</span> '+T.done)
       :err?(T.failed+esc(pr.error||pr.message||''))
-      :('<span class="spin"></span> '+esc(pr.message||T.extractingShort));
+      :('<span class="spin"></span> '+esc(pr.message||T.extractingShort)+'<span class="ld-dots"><b></b><b></b><b></b></span>');
     return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright">'+LANG_SWITCH+'</div></div>'
       +'<div class="ld-wrap"><div class="ld-bars">'+bars+'</div>'
       +'<div class="ld-pct">'+pct+'<span>%</span></div>'
@@ -1095,6 +1160,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a==='launch'){save();}
     else if(a.indexOf('goto:')===0){var n=+a.slice(5);if(n<ST.step||n===ST.step)go(n);}
     else if(a.indexOf('proj:')===0){var id=+a.slice(5);var k=ST.importIds.indexOf(id);if(k>=0)ST.importIds.splice(k,1);else ST.importIds.push(id);ST.labelsLoaded=false;render();}
+    else if(a==='toggleall'){ST.importIds=(ST.importIds.length===ST.projects.length)?[]:ST.projects.map(function(p){return p.id;});ST.labelsLoaded=false;render();}
     else if(a.indexOf('rmteam:')===0){var tid=a.slice(7);ST.memberships=ST.memberships.filter(function(m){return m.teamId!==tid;});ST.teams=ST.teams.filter(function(t){return t.id!==tid;});render();}
     else if(a==='addteam'){ST.teams.push({id:'t'+Date.now(),name:T.newTeamName,gitlab:false});render();}
     else if(a.indexOf('rmmem:')===0){var pr=a.slice(6).split('~');ST.memberships=ST.memberships.filter(function(m){return !(m.pid===pr[0]&&m.teamId===pr[1]);});render();}
@@ -1103,6 +1169,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('phpick:')===0){var pp=a.slice(7).split('~');ST.phases.forEach(function(p){if(p.id===pp[0])p.color=pp[1];});ST.openColor=null;render();}
     else if(a.indexOf('phrm:')===0){var rid=a.slice(5);ST.phases=ST.phases.filter(function(p){return p.id!==rid;});Object.keys(ST.labelPhase).forEach(function(k){if(ST.labelPhase[k]===rid)ST.labelPhase[k]='none';});render();}
     else if(a==='phadd'){ST.phases.push({id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[ST.phases.length%PALETTE.length]});render();}
+    else if(a.indexOf('acc:')===0){var ak=a.slice(4);ST.acc=(ST.acc===ak?'':ak);render();}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
