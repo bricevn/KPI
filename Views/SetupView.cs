@@ -1172,7 +1172,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group'],teamOpen:[],adminState:'idle',adminUser:null,
+    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1180,9 +1180,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   // Persistance localStorage : l'identification admin se fait par OAuth (aller-retour PLEINE PAGE) → on
   // restaure l'état du wizard au retour. Effacé après une mise en service réussie. (clé unique, même origine)
+  // NB : 'acc1'/'acc'/'teamOpen' (états d'accordéon, UI) NON persistés → l'ouverture par défaut s'applique
+  // toujours (sinon un ancien localStorage rouvrirait l'ancien état et masquerait le bouton admin).
   var PKEYS=['step','baseUrl','token','timeout','selfSigned','test','projects','groups','importIds','labels',
-    'labelsDiag','labelsLoaded','labelPhase','phases','acc','phaseScope','phaseProj','phasesByProject',
-    'labelPhaseByProject','teams','memberships','acc1'];
+    'labelsDiag','labelsLoaded','labelPhase','phases','phaseScope','phaseProj','phasesByProject',
+    'labelPhaseByProject','teams','memberships'];
   function persistST(){try{var o={};PKEYS.forEach(function(k){o[k]=ST[k];});localStorage.setItem('kpi-setup',JSON.stringify(o));}catch(e){}}
   function clearST(){try{localStorage.removeItem('kpi-setup');}catch(e){}}
   (function(){try{var v=localStorage.getItem('kpi-setup');if(!v)return;var o=JSON.parse(v);PKEYS.forEach(function(k){if(o[k]!==undefined)ST[k]=o[k];});
