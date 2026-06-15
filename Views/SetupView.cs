@@ -234,6 +234,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       hs5:"Vérifiez la configuration. Vous pourrez tout modifier ensuite dans Options.",
       baseUrl:"Base URL", serviceToken:"Token de service",
       tokenHint:"Scope read_api. Stocké côté serveur pour l'extraction, jamais affiché aux utilisateurs.",
+      adminLabel:"Compte(s) administrateur", adminHint:"Username(s) GitLab admin — 1re mise en service. Plusieurs : séparés par des virgules.",
       timeout:"Timeout (s)", timeoutHint:"Délai max d'une requête à l'API.",
       selfSigned:"Certificats auto-signés", selfSignedSub:"Pour les instances internes",
       testConn:"Tester la connexion", testing:"Test en cours…",
@@ -268,6 +269,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       hs5:"Review the configuration. You can change everything later in Options.",
       baseUrl:"Base URL", serviceToken:"Service token",
       tokenHint:"Scope read_api. Stored server-side for extraction, never shown to users.",
+      adminLabel:"Admin account(s)", adminHint:"GitLab admin username(s) — first setup only. Comma-separated for several.",
       timeout:"Timeout (s)", timeoutHint:"Max delay for an API request.",
       selfSigned:"Self-signed certificates", selfSignedSub:"For internal instances",
       testConn:"Test connection", testing:"Testing…",
@@ -910,7 +912,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var STEP_META=[[T.stepConnexion,'link'],[T.stepProjets,'box'],[T.stepPhases,'layers'],[T.stepEquipes,'users'],[T.stepVerif,'rocket']];
   var LANG_SWITCH='<div class="lang-switch"><select class="lang-sel" data-setlang>__LANG_OPTIONS__</select></div>';
 
-  var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',timeout:'60',selfSigned:false,showTok:false,
+  var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',admins:'',timeout:'60',selfSigned:false,showTok:false,
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
@@ -947,6 +949,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var chip=ST.test==='testing'?'<span class="chip neutral"><span class="spin"></span>'+T.testing+'</span>':ST.test==='ok'?'<span class="chip ok">'+ic('check',14)+T.connected+ST.projects.length+T.accessibleProjects+'</span>':ST.test==='err'?'<span class="chip err">'+T.testFailed+'</span>':'<span class="chip neutral">'+T.notTested+'</span>';
     return '<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
       +'<div class="field"><div class="flabel">'+T.serviceToken+' <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div><div class="fhint">'+T.tokenHint+'</div></div>'
+      +'<div class="field"><div class="flabel">'+T.adminLabel+' <span class="req">*</span></div><div class="box">'+sic('users')+'<input data-field="admins" placeholder="brice, jdupont" value="'+esc(ST.admins)+'"></div><div class="fhint">'+T.adminHint+'</div></div>'
       +'<div style="display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:start"><div class="field"><div class="flabel">'+T.timeout+'</div><div class="box"><input data-field="timeout" value="'+esc(ST.timeout)+'"></div><div class="fhint">'+T.timeoutHint+'</div></div>'
       +'<div class="togrow" style="margin-top:26px"><button class="tog'+(ST.selfSigned?' on':'')+'" data-act="self"><b></b></button><div><div class="tt">'+T.selfSigned+'</div><div class="ts">'+T.selfSignedSub+'</div></div></div></div>'
       +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+T.testConn+'</button>'+chip+'</div>'
@@ -1037,12 +1040,17 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function save(){
     ST.saving=true;ST.saveErr='';render();
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
+      admins:(ST.admins||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
       projectIds:ST.importIds,labelPhases:ST.labelPhase,
       periods:ST.phases.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};}),
       teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){return r.json();}).then(function(j){
-        if(j.ok){ ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:T.starting}; render(); setTimeout(pollProgress,500); }
+        if(j.ok){
+          // bootstrap (1re mise en service, session anonyme) → on va se connecter en admin (extraction en fond).
+          if(j.bootstrap){ window.location.href='/login'; return; }
+          ST.saving=false; ST.launching=true; ST.progress={status:'running',percent:0,message:T.starting}; render(); setTimeout(pollProgress,500);
+        }
         else{ST.saving=false;ST.saveErr=j.error||T.saveImpossible;render();}})
       .catch(function(){ST.saving=false;ST.saveErr=T.serverUnreachable;render();});
   }

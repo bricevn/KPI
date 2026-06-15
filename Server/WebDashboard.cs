@@ -291,26 +291,27 @@ public sealed class WebDashboard
         // Données du dashboard FILTRÉES selon le compte (cœur de la restriction côté serveur).
         app.MapGet("/api/data", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeDataAsync(ctx)));
 
-        // Assistant de mise en service — ADMIN-ONLY, accessible À TOUT MOMENT : première configuration
-        // ET reconfiguration / nouvelle extraction (l'instance peut déjà être configurée).
+        // Assistant de mise en service. OUVERT (AllowAnonymous) tant que l'instance n'est PAS configurée
+        // (1re mise en service après un clone : l'assistant capture l'admin + la config). Une fois
+        // configuré → ADMIN-ONLY (la section Auth est alors verrouillée, plus d'escalade via l'app).
         app.MapGet("/setup", (HttpContext ctx) =>
         {
-            if (self.IsAdminLogin(ctx.User.Identity?.Name))
+            if (!self.IsConfigured() || self.IsAdminLogin(ctx.User.Identity?.Name))
                 return Results.Content(SetupView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
-            // Authentifié mais non-admin → dashboard ; non authentifié → login.
             return (ctx.User.Identity?.IsAuthenticated ?? false) ? Results.Redirect("/") : Results.Redirect("/login");
-        });
-        app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx)));
-        app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx)));
-        app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx)));
-        // Progression du scrap post-setup (loader temps réel) + annulation (réutilise CancelAsync).
-        app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx));
+        }).AllowAnonymous();
+        // Endpoints de l'assistant : ouverts au bootstrap (non configuré), sinon admin-only (RequireSetupAccess).
+        app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx))).AllowAnonymous();
+        app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx)).AllowAnonymous();
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
 
         // --- Endpoints d'authentification ---
         // Page de connexion designée (OAuth + token). Déjà connecté → dashboard.
         app.MapGet("/login", (HttpContext ctx) =>
         {
+            if (!self.IsConfigured()) return Results.Redirect("/setup"); // 1re mise en service : on guide vers l'assistant
             if (ctx.User.Identity?.IsAuthenticated ?? false) return Results.Redirect("/");
             return Results.Content(LoginView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
         }).AllowAnonymous().RequireRateLimiting("login");
@@ -720,17 +721,23 @@ public sealed class WebDashboard
     // GET GitLab avec le token fourni par l'assistant (HttpClient PARTAGÉ — pas de socket exhaustion).
     private async Task<JsonNode?> GlGet(HttpClient http, Uri baseUri, string path, string token, CancellationToken ct)
     {
-        using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
-        req.Headers.Add("PRIVATE-TOKEN", token);
-        using var resp = await http.SendAsync(req, ct);
-        if (!resp.IsSuccessStatusCode) return null;
-        return JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct));
+        // Robuste : toute erreur réseau/parse (instance injoignable, DNS, TLS, JSON) → null (pas de 500).
+        // L'appelant traduit null en message clair ("Connexion refusée…") dans l'assistant.
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
+            req.Headers.Add("PRIVATE-TOKEN", token);
+            using var resp = await http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct));
+        }
+        catch { return null; }
     }
 
     // POST /api/setup/test → { ok, projects:[{id,name,group}], groups:[{name,members:[{username,name,role}]}] }
     private async Task<IResult> SetupTestAsync(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
         var b = await ReadJsonBody(ctx);
         var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
         var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
@@ -772,7 +779,7 @@ public sealed class WebDashboard
     // POST /api/setup/labels { baseUrl, token, selfSigned, projectIds:[] } → { ok, labels:[...] }
     private async Task<IResult> SetupLabelsAsync(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
         var b = await ReadJsonBody(ctx);
         var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
         var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
@@ -794,7 +801,8 @@ public sealed class WebDashboard
     // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json
     private async Task<IResult> SetupSaveAsync(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
+        var bootstrap = !IsConfigured(); // 1re mise en service : on pourra écrire Auth (admin) ; sinon Auth verrouillé
         var b = await ReadJsonBody(ctx);
         var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
         var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
@@ -890,6 +898,20 @@ public sealed class WebDashboard
         // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
         if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
 
+        // BOOTSTRAP (1re mise en service) : établir le 1er admin + l'autorité (login/OAuth). C'est la SEULE
+        // écriture de Auth via l'app ; une fois configuré, Auth est verrouillé (cf. SaveConfigAsync préserve Auth).
+        if (bootstrap)
+        {
+            var admins = new JsonArray();
+            foreach (var a in b?["admins"]?.AsArray() ?? new JsonArray())
+            { var u = (Str(a) ?? "").Trim(); if (u.Length > 0) admins.Add(u); }
+            if (admins.Count == 0) return Results.Json(new { ok = false, error = "Indiquez au moins un compte administrateur (votre username GitLab)." });
+            var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
+            auth["Authority"] = baseUrl;     // verrouille l'instance de login sur ce host
+            auth["AdminUsers"] = admins;
+            if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
+        }
+
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try
         {
@@ -907,7 +929,9 @@ public sealed class WebDashboard
         // et écrit les données CHIFFRÉES sous output/<serverId>/. Le dashboard suit l'avancement via /api/status.
         StartSetupFetch(ctx);
 
-        return Results.Json(new { ok = true, jobId = "setup" });
+        // bootstrap : la session est anonyme et l'instance vient de devenir « configurée » → le frontend
+        // redirige vers /login (l'admin se connecte ; l'extraction tourne en fond). Sinon (admin) → loader.
+        return Results.Json(new { ok = true, jobId = "setup", bootstrap });
     }
 
     /// <summary>Identifiant de serveur stable dérivé de l'hôte de l'instance (segment de dossier, [a-z0-9-]).</summary>
@@ -936,7 +960,7 @@ public sealed class WebDashboard
     /// <summary>Progression du scrap post-setup, mappée sur l'état du job (loader temps réel côté /setup).</summary>
     private IResult SetupProgress(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
         var s = _state.Snapshot();
         var status = s.running ? "running" : (!string.IsNullOrEmpty(s.lastError) ? "error" : "done");
         var percent = s.total > 0 ? Math.Min(99, (int)Math.Round(s.current * 100.0 / s.total)) : (s.running ? 3 : 100);
@@ -974,6 +998,13 @@ public sealed class WebDashboard
 
     private IResult? RequireAdmin(HttpContext ctx)
         => IsAdminLogin(ctx.User.Identity?.Name)
+            ? null
+            : Results.Text("Réservé aux administrateurs.", "text/plain; charset=utf-8", Encoding.UTF8, StatusCodes.Status403Forbidden);
+
+    /// <summary>Accès aux endpoints de l'assistant : OUVERT tant que l'instance n'est pas configurée
+    /// (1re mise en service après un clone), sinon réservé aux admins. Verrouille le bootstrap dès qu'il est fait.</summary>
+    private IResult? RequireSetupAccess(HttpContext ctx)
+        => (!IsConfigured() || IsAdminLogin(ctx.User.Identity?.Name))
             ? null
             : Results.Text("Réservé aux administrateurs.", "text/plain; charset=utf-8", Encoding.UTF8, StatusCodes.Status403Forbidden);
 
@@ -1306,7 +1337,7 @@ public sealed class WebDashboard
     {
         var b = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
             .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
             .AddEnvironmentVariables(prefix: "KPI_");
         var cfg = new AppConfig();

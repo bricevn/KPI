@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 
 var builder = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false) // optional : un clone neuf n'a pas encore le fichier → 1re mise en service via /setup
     .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
     .AddEnvironmentVariables(prefix: "KPI_");
 
