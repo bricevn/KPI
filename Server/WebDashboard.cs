@@ -128,6 +128,17 @@ public sealed class WebDashboard
             o.UserInformationEndpoint = gl + "/api/v4/user";
             o.Scope.Add("read_user");
             o.SaveTokens = false;
+            // Self-hosted à certificat auto-signé / CA interne : relâcher la validation TLS du BACKCHANNEL OAuth
+            // (sinon l'échange code→token ET l'appel /api/v4/user échouent). Lu EN DIRECT : flag Auth posé par
+            // /api/setup/oauth (bootstrap, avant que le serveur ne soit enregistré), ou repli sur le serveur
+            // correspondant à l'autorité une fois configuré. Reconstruit à chaud à l'invalidation du cache d'options.
+            var relaxTls = a.AllowSelfSignedCertificates
+                || (configured && (self.ServerForInstance(a.Authority)?.AllowSelfSignedCertificates ?? false));
+            if (relaxTls)
+                o.BackchannelHttpHandler = new SocketsHttpHandler
+                {
+                    SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true }
+                };
             o.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
             o.ClaimActions.MapJsonKey(ClaimTypes.Name, "username");
             o.ClaimActions.MapJsonKey("display_name", "name");
@@ -850,6 +861,10 @@ public sealed class WebDashboard
         auth["ClientId"] = clientId;
         auth["ClientSecret"] = clientSecret;
         if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
+        // Cert auto-signé / CA interne : porté par l'étape 1 (avant l'enregistrement du serveur), persisté sur Auth
+        // pour que le backchannel OAuth tolère le TLS dès le bootstrap. Conserve une valeur déjà posée si omise.
+        var selfSigned = b?["selfSigned"]?.GetValue<bool>() ?? (auth["AllowSelfSignedCertificates"]?.GetValue<bool>() ?? false);
+        auth["AllowSelfSignedCertificates"] = selfSigned;
 
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try

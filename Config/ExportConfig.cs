@@ -71,6 +71,9 @@ public sealed class AuthConfig
     public List<string> AdminUsers { get; set; } = new();
     /// <summary>Id de la vue attribuée aux salariés connectés non listés (auto-provision « individuel »). Vide = tous les onglets.</summary>
     public string DefaultViewId { get; set; } = "";
+    /// <summary>Instance GitLab à certificat TLS auto-signé / CA interne : relâche la validation TLS du
+    /// BACKCHANNEL OAuth (échange code→token + /api/v4/user). Indispensable pour le SSO sur self-hosted self-signed.</summary>
+    public bool AllowSelfSignedCertificates { get; set; }
 
     /// <summary>True si l'OAuth GitLab est exploitable (autorité + client id + secret renseignés).</summary>
     public bool OAuthConfigured =>

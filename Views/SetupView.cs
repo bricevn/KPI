@@ -1417,7 +1417,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // Enregistre la config OAuth (in-app) puis lance le SSO. Reconfiguration serveur À CHAUD → pas de redémarrage.
   function doOauthSave(){
     ST.adminState='connecting';ST.adminErr='';render();
-    fetch('/api/setup/oauth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:(ST.oauthClientId||'').trim(),clientSecret:(ST.oauthSecret||'').trim(),authority:conn().baseUrl})})
+    fetch('/api/setup/oauth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:(ST.oauthClientId||'').trim(),clientSecret:(ST.oauthSecret||'').trim(),authority:conn().baseUrl,selfSigned:ST.selfSigned})})
       .then(function(r){return r.json();}).then(function(j){
         if(j.ok){persistST();window.location.href='/auth/oauth?return=/setup';}
         else{ST.adminState='idle';ST.adminErr=j.error||T.saveImpossible;render();}
