@@ -5,26 +5,26 @@
 - l'historique daté des changements de labels (sur une liste de labels configurable) ;
 - les transitions configurées (paires `From → To`) avec leurs **dates** et **durées** ;
 - les Merge Requests liées (tous statuts) avec leurs approbateurs ;
-- un **dashboard HTML interactif** (un seul fichier autonome) avec plusieurs onglets : Dashboard (KPIs), Graphiques (camemberts + barres, exportables), Anomalies, Issues (timeline d'événements), Calendrier (Gantt des phases), Vélocité (Gantt par personne).
+- un **dashboard HTML interactif** (un seul fichier autonome) avec plusieurs onglets : Dashboard (KPIs), Graphiques (camemberts + barres, exportables), Anomalies, Issues (timeline d'événements), Calendrier (Gantt des phases), Vélocité (Gantt par personne) ;
+- une **interface multilingue** : 10 langues (FR, EN, ES, DE, IT, PT, RU, AR, ZH, JA), dont l'arabe en **RTL** — la langue est choisie côté serveur (cookie) et rendue côté client, avec un sélecteur dans l'app ;
+- un **accès sécurisé** : connexion GitLab (OAuth ou Personal Access Token), accès réservé aux membres du projet, et un **assistant de mise en service** guidé (`/setup`).
 
 Le dashboard est servi par un mini-serveur HTTP local (mode `--serve`) ou ouvrable directement comme fichier statique.
 
 ## Démarrage rapide (nouvelle installation)
 
-1. **Cloner** ce dépôt et installer le **.NET SDK 10**.
-2. **Configurer le minimum** : copier `appsettings.example.json` → `appsettings.json`, puis renseigner uniquement la section `Auth` (laisser `GitLab.*` vide — l'assistant le remplira) :
-   ```jsonc
-   "Auth": {
-     "Authority":  "https://gitlab.votre-instance.com",  // votre instance GitLab
-     "AdminUsers": ["votre_username_gitlab"],             // qui peut administrer / configurer
-     "ClientId": "", "ClientSecret": "", "CallbackPath": "/signin-gitlab", "DefaultViewId": ""
-   }
-   ```
-3. **Lancer** : `dotnet run -- --serve` → ouvrir http://localhost:5050/.
-4. **Se connecter** (`/login`) : collez un **Personal Access Token** GitLab (scope `read_api`) de votre compte — qui doit être **membre du projet** à analyser. *(OAuth GitLab possible si vous renseignez `Auth.ClientId/ClientSecret` + le Redirect URI `…/signin-gitlab`.)*
-5. **Assistant de mise en service** (`/setup`, admin) : testez la connexion, choisissez les projets, **associez librement vos labels aux phases de temps**, vérifiez les équipes, puis « Lancer le dashboard ».
+1. **Cloner** ce dépôt et installer le **.NET SDK 10**. *(Optionnel : copier `appsettings.example.json` → `appsettings.json` ; l'assistant écrira la configuration de toute façon. Pour activer l'OAuth GitLab, renseignez `Auth.ClientId/ClientSecret` + le Redirect URI `…/signin-gitlab`.)*
+2. **Lancer** : `dotnet run -- --serve` → ouvrir http://localhost:5050/.
+3. **Première connexion** : tant que l'instance n'est pas configurée, la page d'accueil affiche un écran **« Première connexion »** → bouton **« Lancer la configuration »** qui ouvre l'assistant `/setup`.
+4. **Assistant de mise en service** (`/setup`) — 5 étapes :
+   1. **Connexion** : Base URL + un **token de service** (Group ou Personal Access Token, scope `read_api`) + le(s) **compte(s) administrateur** (username GitLab) — capturés ici au tout premier lancement ;
+   2. **Projets** : cochez les projets à suivre (bouton *Tout cocher / décocher* + compteur ; rien n'est coché par défaut) ;
+   3. **Phases** : éditez vos phases de production (nom / couleur / ajout / suppression) puis associez-y vos labels `Prod::` (deux accordéons « Phases » et « Association des labels ») ;
+   4. **Équipes** : importées des **groupes GitLab** (rôles Lead = Maintainer, Membre = Developer) ;
+   5. **Vérification** → « Lancer le dashboard » (un écran de chargement suit l'extraction en temps réel, puis ouvre le dashboard).
+5. **Se connecter** : une fois configuré, `/login` propose **OAuth GitLab** (si `Auth.ClientId/Secret` renseignés) ou un **Personal Access Token** de votre compte — qui doit être **membre du projet** analysé.
 
-> **Modèle d'accès** : seuls les **membres GitLab du projet** peuvent se connecter ; l'**admin** = la liste `Auth.AdminUsers` du fichier serveur (non modifiable via l'app, à éditer sur le serveur). Aucun token utilisateur n'est stocké ; le token de service saisi au `/setup` sert à l'extraction et reste côté serveur. Les comptes bot GitLab sont refusés à la connexion.
+> **Modèle d'accès** : seuls les **membres GitLab du projet** peuvent se connecter ; l'**admin** = la liste `Auth.AdminUsers` (capturée au 1ᵉʳ `/setup`, ensuite non modifiable via l'app — à éditer sur le serveur). Aucun token utilisateur n'est stocké ; le token de service saisi au `/setup` sert à l'extraction et reste côté serveur. Les comptes bot GitLab sont refusés à la connexion.
 
 ## Prérequis
 
@@ -34,22 +34,40 @@ Le dashboard est servi par un mini-serveur HTTP local (mode `--serve`) ou ouvrab
 
 ## Configuration
 
-Toute la configuration est dans [appsettings.json](appsettings.json) (gitignoré). Un template versionnable est dans [appsettings.example.json](appsettings.example.json).
+Toute la configuration est dans [appsettings.json](appsettings.json) (gitignoré) ; un template versionnable est dans [appsettings.example.json](appsettings.example.json). La plupart des réglages sont écrits par l'assistant `/setup` — vous pouvez aussi éditer le fichier à la main. La configuration est **100 % multi-serveur** : une entrée `Servers[]` par instance GitLab (cloisonnée), il n'y a plus de bloc `GitLab` legacy.
+
+### `Servers[]` — une entrée par instance/serveur GitLab
 
 | Clé | Description |
 |---|---|
-| `GitLab.BaseUrl` | URL **racine** de l'instance (ex: `https://gitlab.obvious.tech`), **sans** `/api/v4`. |
-| `GitLab.PrivateToken` | Personal Access Token (scope `read_api`). |
-| `GitLab.ProjectId` | ID numérique (ex: `4`) ou chemin URL-encoded (`groupe/projet`). |
-| `GitLab.Milestone` | Titre **exact** de la milestone — sensible à la casse (ex: `2026-R2`, pas `2026-r2`). |
-| `GitLab.AllowSelfSignedCertificates` | `true` si l'instance utilise un certificat self-signed. |
-| `GitLab.RequestTimeoutSeconds` | Timeout HTTP (défaut 60). |
-| `Export.OutputDirectory` | Dossier de sortie relatif (défaut `output`). |
-| `Export.TrackedLabels` | Liste des labels `Prod::*` suivis dans l'historique (events `add`/`remove`). Inclut Code In Progress, Code (pre-)review, QA, To Fix, PO Validation, et les `Prod::UI/UX *`. |
-| `Export.TrackedTransitions` | Liste de paires `{ "From": "...", "To": "..." }`. Pour chacune on enregistre dates et durée. |
-| `Export.Teams` | Dictionnaire `{ "Équipe": ["user1", "user2"] }` pour le filtre « Équipe » du dashboard. |
+| `Id` | Identifiant court du serveur (dérivé de l'hôte au `/setup`). |
+| `BaseUrl` | URL **racine** de l'instance (ex: `https://gitlab.exemple.com`), **sans** `/api/v4`. |
+| `GroupToken` | Token de service (Group ou Personal Access Token, scope `read_api`) — sert à l'extraction, jamais affiché aux utilisateurs. |
+| `ProjectIds` | Liste d'IDs numériques (`4`) ou de chemins `namespace/projet`. |
+| `AllowSelfSignedCertificates` | `true` si l'instance utilise un certificat self-signed. |
+| `RequestTimeoutSeconds` | Timeout HTTP (défaut 60). |
 
-> 💡 **Édition via l'UI** : en mode `--serve`, l'onglet **Options → Configuration** permet d'éditer la plupart de ces réglages sans toucher au fichier : section **Gitlab** (Base URL, Private Token masqué, Project ID, Allow Self Signed Certificates, Request Timeout Seconds), plus **Tracked Labels** (liste déroulante à cocher), **Tracked Transitions** (paires From→To) et **Teams** (équipes + membres). « Sauvegarder » écrit `appsettings.json` et **recharge la config à chaud**. `GitLab.Milestone` et `Export.OutputDirectory` ne sont pas exposés dans l'UI (modifiés à la main si besoin). Voir [endpoints serveur](#endpoints-du-serveur).
+### `Export`
+
+| Clé | Description |
+|---|---|
+| `OutputDirectory` | Dossier de sortie relatif (défaut `output`). |
+| `TrackedLabels` | Labels `Prod::*` suivis dans l'historique (events `add`/`remove`). L'assistant y ajoute automatiquement les labels mappés à une phase. |
+| `TrackedTransitions` | Paires `{ "From": "...", "To": "..." }` — pour chacune, dates et durée enregistrées. |
+| `Teams` | `{ "Équipe": ["user1", "user2"] }` pour le filtre « Équipe » du dashboard. |
+| `LabelPhases` | Mapping **label → phase** (`{ "Prod::Code review": "review", … }`), configuré à l'étape « Phases » du `/setup`. |
+| `Periods` | Catalogue des phases `{ Key, Name, Color, Timed }` (éditable au `/setup` : nom, couleur, ajout/suppression ; `Timed:false` = segment Gantt non chronométré, ex. UI/UX). |
+
+### `Auth` — sécurité (fichier serveur uniquement, **non modifiable via l'app**)
+
+| Clé | Description |
+|---|---|
+| `Authority` | Instance GitLab de login (verrouille l'hôte autorisé). Renseignée au 1ᵉʳ `/setup`. |
+| `AdminUsers` | Usernames GitLab administrateurs (capturés au 1ᵉʳ `/setup`). |
+| `ClientId` / `ClientSecret` / `CallbackPath` | OAuth GitLab (optionnel ; Redirect URI `…/signin-gitlab`, scope `read_user`). |
+| `DefaultViewId` | Vue par défaut (système comptes & vues). |
+
+> 💡 **Édition via l'UI** : en mode `--serve`, l'onglet **Options → Configuration** reflète le `/setup` et permet d'éditer la plupart de ces réglages sans toucher au fichier : **Connexion** (Base URL, Token de service masqué, Self-signed, Timeout), **Projets importés**, **Phases de production** (éditeur de phases + mapping des labels `Prod::`) et **Équipes** (rôles Lead/Membre). « Sauvegarder » écrit `appsettings.json` et **recharge la config à chaud**. La section `Auth` n'est **pas** éditable via l'app. Voir [endpoints serveur](#endpoints-du-serveur).
 
 ## Commandes
 
@@ -247,7 +265,7 @@ Parmi les MR retournées par l'endpoint `issues/:iid/closed_by`, on choisit :
 L'app est un service Kestrel qui écoute sur `localhost:5050`, **conçu pour tourner derrière un reverse proxy qui assure le HTTPS**. Pour l'héberger sur un domaine :
 
 1. **Publier** : `dotnet publish -c Release -o /chemin/app`. Copier le dossier publié **+** `appsettings.json` **+** `output/` ; créer un dossier `dp-keys/` inscriptible.
-2. **Lancer en service** (systemd / service Windows / conteneur) avec `--serve`. Fournir le token de service par **variable d'environnement** plutôt qu'en clair : `KPI_GitLab__PrivateToken=...`.
+2. **Lancer en service** (systemd / service Windows / conteneur) avec `--serve`. Fournir le token de service par **variable d'environnement** plutôt qu'en clair : `KPI_Servers__0__GroupToken=...` (préfixe `KPI_`, indice `0` = première entrée `Servers`).
 3. **Reverse proxy + TLS** (Caddy = HTTPS automatique, ou nginx/IIS) vers `127.0.0.1:5050`, en transmettant `X-Forwarded-Proto/Host/For`. Le proxy doit être sur le **même hôte** (les en-têtes ne sont acceptés que depuis loopback) ; sinon ajuster `KnownProxies`.
 4. **OAuth (optionnel)** : enregistrer le Redirect URI `https://<domaine>/signin-gitlab` (scope `read_user`) et renseigner `Auth.ClientId/ClientSecret`.
 
