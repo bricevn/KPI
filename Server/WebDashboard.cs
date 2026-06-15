@@ -136,13 +136,20 @@ public sealed class WebDashboard
                     resp.EnsureSuccessStatusCode();
                     using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
                     ctx.RunClaimActions(doc.RootElement);
-                    // Rôles GitLab : refuser le ticket si l'utilisateur n'est ni membre du projet ni admin.
                     var uname = ctx.Identity?.Name ?? "";
-                    var oauthServer = self.ServerForInstance(authCfg.Authority);
-                    if (!self.IsAdminLogin(uname) && (oauthServer == null || await self.GetServerAccessLevelAsync(oauthServer, uname, ctx.HttpContext.RequestAborted) == null))
-                        ctx.Fail("Compte GitLab non membre des projets du serveur.");
-                    else if (oauthServer != null)
-                        ctx.Identity?.AddClaim(new Claim(ServerClaim, oauthServer.Id));
+                    // 1re mise en service (non configuré) : aucun serveur/admin défini → on autorise tout compte
+                    // GitLab VALIDE (il deviendra l'admin via /setup). La permissivité est strictement gardée par
+                    // !IsConfigured() : dès que /setup écrit Auth.AdminUsers, IsConfigured() passe true et la
+                    // vérification d'appartenance ci-dessous redevient obligatoire (la faille se referme).
+                    if (self.IsConfigured())
+                    {
+                        // Rôles GitLab : refuser le ticket si l'utilisateur n'est ni membre du projet ni admin.
+                        var oauthServer = self.ServerForInstance(authCfg.Authority);
+                        if (!self.IsAdminLogin(uname) && (oauthServer == null || await self.GetServerAccessLevelAsync(oauthServer, uname, ctx.HttpContext.RequestAborted) == null))
+                            ctx.Fail("Compte GitLab non membre des projets du serveur.");
+                        else if (oauthServer != null)
+                            ctx.Identity?.AddClaim(new Claim(ServerClaim, oauthServer.Id));
+                    }
                 };
                 // Échec du flux OAuth (dont refus ci-dessus) → retour propre à la page de connexion.
                 o.Events.OnRemoteFailure = ctx =>
@@ -318,10 +325,12 @@ public sealed class WebDashboard
         }).AllowAnonymous().RequireRateLimiting("login");
 
         // Bouton « Se connecter avec GitLab » → challenge OAuth de l'instance configurée (Auth.Authority).
-        app.MapGet("/auth/oauth", (HttpContext ctx) =>
+        app.MapGet("/auth/oauth", (HttpContext ctx, string? @return) =>
         {
             if (!authCfg.OAuthConfigured) return Results.Redirect("/login");
-            return Results.Challenge(new AuthenticationProperties { RedirectUri = "/" }, new[] { "gitlab" });
+            // @return validé chemin local (anti open-redirect) : permet à /setup de revenir au wizard après OAuth.
+            var back = (!string.IsNullOrEmpty(@return) && @return.StartsWith("/") && !@return.StartsWith("//")) ? @return : "/";
+            return Results.Challenge(new AuthenticationProperties { RedirectUri = back }, new[] { "gitlab" });
         }).AllowAnonymous().RequireRateLimiting("login");
 
         // Connexion par Personal Access Token : validée CÔTÉ SERVEUR contre {instance}/api/v4/user.
@@ -777,7 +786,9 @@ public sealed class WebDashboard
         return Results.Json(new { ok = true, projects, groups });
     }
 
-    // POST /api/setup/labels { baseUrl, token, selfSigned, projectIds:[] } → { ok, labels:[...] }
+    // POST /api/setup/labels { baseUrl, token, selfSigned, projectIds:[] }
+    //   → { ok, labels:[...], total, perProject:[{id,count,ok}] }
+    // perProject permet de distinguer « projet sans label » (ok:true,count:0) d'un « échec d'accès » (ok:false).
     private async Task<IResult> SetupLabelsAsync(HttpContext ctx)
     {
         var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
@@ -786,17 +797,32 @@ public sealed class WebDashboard
         var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
         var selfS   = b?["selfSigned"]?.GetValue<bool>() ?? false;
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || !SetupHostAllowed(baseUri))
-            return Results.Json(new { ok = false });
+            return Results.Json(new { ok = false, error = "Instance non autorisée." });
 
         var http = selfS ? _sharedHttpRelaxed : _sharedHttp;
         var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pid in b?["projectIds"]?.AsArray() ?? new JsonArray())
+        var perProject = new JsonArray();
+        foreach (var pidNode in b?["projectIds"]?.AsArray() ?? new JsonArray())
         {
-            var lj = await GlGet(http, baseUri, $"/api/v4/projects/{pid!.GetValue<int>()}/labels?per_page=100", token, ctx.RequestAborted);
-            foreach (var l in lj?.AsArray() ?? new JsonArray())
-                set.Add(l!["name"]!.GetValue<string>());
+            // ProjectIds tolérant : nombre (id) OU chaîne (id ou chemin "namespace/projet").
+            var pid = pidNode is JsonValue v && v.TryGetValue<int>(out var iv) ? iv.ToString() : (pidNode?.GetValue<string>() ?? "");
+            if (string.IsNullOrWhiteSpace(pid)) continue;
+            var enc = Uri.EscapeDataString(pid);
+            int count = 0; bool ok = false;
+            // include_ancestor_groups=true : les labels Prod:: sont souvent définis au niveau GROUPE.
+            // Pagination (jusqu'à 5×100) pour les projets riches en labels.
+            for (int page = 1; page <= 5; page++)
+            {
+                var lj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/labels?per_page=100&page={page}&include_ancestor_groups=true&with_counts=false", token, ctx.RequestAborted);
+                if (lj is not JsonArray arr) break; // null = échec requête (accès/réseau) ou réponse inattendue
+                ok = true;
+                if (arr.Count == 0) break;
+                foreach (var l in arr) { var n = l?["name"]?.GetValue<string>(); if (!string.IsNullOrWhiteSpace(n)) { set.Add(n); count++; } }
+                if (arr.Count < 100) break;
+            }
+            perProject.Add(new JsonObject { ["id"] = pid, ["count"] = count, ["ok"] = ok });
         }
-        return Results.Json(new { ok = true, labels = set });
+        return Results.Json(new { ok = true, labels = set, total = set.Count, perProject });
     }
 
     // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json
@@ -899,14 +925,56 @@ public sealed class WebDashboard
         // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
         if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
 
+        // v3 — PHASES PAR PROJET (mode « Par projet » du wizard). Persistées en plus du global ; un projet
+        // absent retombe sur le global. ⚠ Stage 1 : écrites mais PAS encore consommées par le dashboard (Stage 2).
+        if (b?["periodsByProject"] is JsonObject pbp)
+        {
+            var outPbp = new JsonObject();
+            foreach (var kv in pbp)
+            {
+                if (kv.Value is not JsonArray parr) continue;
+                var arr = new JsonArray();
+                var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in parr)
+                {
+                    if (p is not JsonObject po) continue;
+                    var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
+                    if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
+                    var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
+                    var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
+                    var timed = po["timed"] is JsonValue ptv && ptv.TryGetValue<bool>(out var ptb) ? ptb : true;
+                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+                }
+                outPbp[kv.Key] = arr;
+            }
+            ex["PeriodsByProject"] = outPbp;
+        }
+        if (b?["labelPhasesByProject"] is JsonObject lbp)
+        {
+            var outLbp = new JsonObject();
+            foreach (var kv in lbp)
+            {
+                if (kv.Value is not JsonObject m) continue;
+                var mm = new JsonObject();
+                foreach (var e in m) { mm[e.Key] = (Str(e.Value) ?? "none"); }
+                outLbp[kv.Key] = mm;
+            }
+            ex["LabelPhasesByProject"] = outLbp;
+        }
+
         // BOOTSTRAP (1re mise en service) : établir le 1er admin + l'autorité (login/OAuth). C'est la SEULE
         // écriture de Auth via l'app ; une fois configuré, Auth est verrouillé (cf. SaveConfigAsync préserve Auth).
         if (bootstrap)
         {
+            // Admin de la 1re mise en service. Source PRIORITAIRE : le compte GitLab qui a ouvert la SESSION
+            // OAuth pour atteindre /setup (ctx.User) → pas d'injection possible. Repli rétro-compatible : le(s)
+            // username(s) du body `admins` (ancien flux où l'admin n'était pas encore authentifié). Au moins un requis.
             var admins = new JsonArray();
-            foreach (var a in b?["admins"]?.AsArray() ?? new JsonArray())
-            { var u = (Str(a) ?? "").Trim(); if (u.Length > 0) admins.Add(u); }
-            if (admins.Count == 0) return Results.Json(new { ok = false, error = "Indiquez au moins un compte administrateur (votre username GitLab)." });
+            var oauthLogin = ctx.User.Identity?.Name ?? "";
+            if (!string.IsNullOrWhiteSpace(oauthLogin)) admins.Add(JsonValue.Create(oauthLogin));
+            else foreach (var a in b?["admins"]?.AsArray() ?? new JsonArray())
+            { var u = (Str(a) ?? "").Trim(); if (u.Length > 0) admins.Add(JsonValue.Create(u)); }
+            if (admins.Count == 0) return Results.Json(new { ok = false, error = "Connectez-vous via GitLab (ou indiquez au moins un compte administrateur)." });
             var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
             auth["Authority"] = baseUrl;     // verrouille l'instance de login sur ce host
             auth["AdminUsers"] = admins;

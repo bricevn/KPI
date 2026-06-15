@@ -121,6 +121,21 @@ public sealed class ExportConfig
     /// L'ordre de la liste = ordre des colonnes/légende côté UI.
     /// </summary>
     public List<PeriodDefinition> Periods { get; set; } = new();
+
+    /// <summary>
+    /// Mapping label → phase PAR PROJET (clé = id de projet GitLab). Écrit par /setup en mode « Par projet ».
+    /// Vide pour un projet ⇒ repli sur le mapping global <see cref="LabelPhases"/>.
+    /// ⚠ Stage 1 : persisté par /setup mais PAS encore consommé par la logique de phases du dashboard
+    /// (câblage du dashboard prévu en Stage 2). Voir export_setup/README.md.
+    /// </summary>
+    public Dictionary<int, Dictionary<string, string>> LabelPhasesByProject { get; set; } = new();
+
+    /// <summary>
+    /// Catalogue des périodes PAR PROJET (clé = id de projet GitLab). Écrit par /setup en mode « Par projet ».
+    /// Vide pour un projet ⇒ repli sur <see cref="Periods"/> global. Même réserve Stage 1/Stage 2 que
+    /// <see cref="LabelPhasesByProject"/>.
+    /// </summary>
+    public Dictionary<int, List<PeriodDefinition>> PeriodsByProject { get; set; } = new();
 }
 
 /// <summary>
