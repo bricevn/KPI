@@ -291,12 +291,14 @@ public sealed class WebDashboard
         // Données du dashboard FILTRÉES selon le compte (cœur de la restriction côté serveur).
         app.MapGet("/api/data", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeDataAsync(ctx)));
 
-        // Assistant de première mise en service (admin-only, tant que la connexion GitLab est vide).
+        // Assistant de mise en service — ADMIN-ONLY, accessible À TOUT MOMENT : première configuration
+        // ET reconfiguration / nouvelle extraction (l'instance peut déjà être configurée).
         app.MapGet("/setup", (HttpContext ctx) =>
         {
-            if (self.IsConfigured()) return Results.Redirect("/");
-            if (!self.IsAdminLogin(ctx.User.Identity?.Name)) return Results.Redirect("/login");
-            return Results.Content(SetupView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+            if (self.IsAdminLogin(ctx.User.Identity?.Name))
+                return Results.Content(SetupView.Page(authCfg, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+            // Authentifié mais non-admin → dashboard ; non authentifié → login.
+            return (ctx.User.Identity?.IsAuthenticated ?? false) ? Results.Redirect("/") : Results.Redirect("/login");
         });
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx)));
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx)));
