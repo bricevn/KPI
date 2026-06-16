@@ -27,7 +27,6 @@ public static class SetupView
             $"<option value=\"{l[0]}\"{(l[0] == lc ? " selected" : "")}>{HtmlAttr(l[1])}</option>"));
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
-            .Replace("__OAUTH_CLIENTID__", HtmlAttr(auth.ClientId ?? ""))
             .Replace("__OAUTH_AUTHORITY__", HtmlAttr((auth.Authority ?? "").TrimEnd('/')))
             .Replace("__DEFAULT_INSTANCE__", "")
             .Replace("__SLANG__", lc)
@@ -250,6 +249,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-adminok{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--good);background:var(--good-soft);padding:4px 10px;border-radius:999px;flex:none;}
 .suA-adminchange{border:0;background:none;color:var(--ink-faint);font-size:12px;cursor:pointer;padding:5px 8px;border-radius:8px;flex:none;}
 .suA-adminchange:hover{color:var(--ink);background:var(--panel-3);}
+.suA-oauthcur{margin-top:12px;font-size:12px;color:var(--ink-dim);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.suA-oauthcur code{font-family:var(--mono);color:var(--ink);background:var(--panel-3);padding:2px 8px;border-radius:6px;}
+.suA-reconf{margin-top:10px;}
 /* étape 1 — formulaire de configuration OAuth (in-app, sans édition d'appsettings) */
 .suA-oauthsetup{display:flex;flex-direction:column;gap:12px;}
 .suA-oauthstep{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-dim);line-height:1.45;}
@@ -1197,7 +1199,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'__OAUTH_CLIENTID__',oauthSecret:'',oauthEdit:false,adminErr:'',
+    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',oauthEdit:false,adminErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1307,10 +1309,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         if(reconf)h+='<button class="btn ghost sm" data-act="oauthcancel" style="margin-top:6px">'+T.cancel+'</button>';
         h+='</div>';
       } else {
-        var curInst=(OAUTHAUTH||'').replace(/^https?:\/\//,'').replace(/\/+$/,''); // instance configurée (serveur), pas le champ
+        // Indicateur = instance SAISIE (ST.baseUrl) si présente, sinon instance configurée (OAUTHAUTH). #curInst
+        // est mis à jour en direct quand on tape dans le champ base url (cf. handler 'input').
         h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
-        // Instance courante visible + reconfiguration accessible (corriger une Authority erronée sans redémarrer).
-        h+='<div class="suA-oauthredir" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+T.oauthCurrent+' <code>'+esc(curInst||'—')+'</code><button class="suA-adminchange" data-act="oauthedit">'+T.oauthReconfigure+'</button></div>';
+        h+='<div class="suA-oauthcur">'+T.oauthCurrent+' <code id="curInst">'+esc(oauthInst()||'—')+'</code></div>';
+        h+='<button class="btn outline sm suA-reconf" data-act="oauthedit">'+ic('key',15)+' '+T.oauthReconfigure+'</button>';
       }
       h+='</div>';
     }
@@ -1449,6 +1452,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   // ---- actions ----
   function conn(){return {baseUrl:ST.baseUrl.trim().replace(/\/+$/,''),token:ST.token.trim(),selfSigned:ST.selfSigned,timeout:parseInt(ST.timeout,10)||60};}
+  // Hôte affiché dans « Instance : … » : ce qui est SAISI dans le champ base url (live), sinon l'instance configurée.
+  function oauthInst(){var b=(ST.baseUrl||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');return b||(OAUTHAUTH||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');}
   function doTest(){
     ST.test='testing';render();
     fetch('/api/setup/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(conn())})
@@ -1584,7 +1589,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
   app.addEventListener('input',function(e){
-    var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
+    var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';
+      if(f.dataset.field==='baseUrl'){var ci=document.getElementById('curInst');if(ci)ci.textContent=oauthInst()||'—';} // « Instance : … » suit la base url en direct
+      return;}
     var tn=e.target.closest('[data-team]');if(tn){var _t=ST.teams.filter(function(x){return x.id===tn.dataset.team;})[0];if(_t)_t.name=tn.value;return;}
     var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ensurePer();curPhases().forEach(function(p){if(p.id===pid)p.name=pn.value;});}
   });
