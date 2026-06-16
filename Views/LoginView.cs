@@ -26,7 +26,8 @@ public static class LoginView
     /// sans serveur configuré) et on affiche un CTA « Commencer la configuration » vers /setup.</summary>
     public static string Page(AuthConfig auth, string culture = "en", bool configured = true)
     {
-        var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "";
+        // NB : on n'injecte PLUS l'instance configurée dans la page de login (aucune trace du dépôt) — le footer
+        // reste neutre (« Chiffré »). Le SSO part de toute façon vers l'Authority configurée CÔTÉ SERVEUR.
         var lc = Kpi.Localization.Loc.Normalize(culture);
         string T(string k) => Kpi.Localization.Loc.T(lc, k);
         var langOptions = string.Join("", Kpi.Localization.Loc.List().Select(l =>
@@ -44,7 +45,6 @@ public static class LoginView
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
             .Replace("__CONFIGURED__", configured ? "true" : "false")
-            .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
             .Replace("__LANG__", lc)
             .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
             .Replace("__JS_I18N__", jsI18n)
@@ -246,9 +246,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
   var I18N = __JS_I18N__;
   var $ = function(id){return document.getElementById(id);};
   var oauthBtn=$('oauthBtn'),footInstance=$('footInstance'),setupBtn=$('setupBtn'),noOauth=$('noOauth');
-  var INSTHOST=('__DEFAULT_INSTANCE__'||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  // Footer neutre : on N'AFFICHE PAS l'instance configurée (aucune trace du dépôt). Toujours « Chiffré ».
   function setFoot(t){if(footInstance)footInstance.textContent=t;}
-  setFoot(INSTHOST?(I18N.encryptedTo+INSTHOST):I18N.encrypted);
+  setFoot(I18N.encrypted);
   var firstRunView=$('firstRunView'),loginView=$('loginView');
   if(!CONFIGURED){
     // 1re mise en service : écran d'accueil + CTA vers l'assistant.
