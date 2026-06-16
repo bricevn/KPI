@@ -54,10 +54,12 @@ public sealed class DashboardView
         IReadOnlyList<PeriodDefinition> periods,
         IReadOnlyList<Kpi.GitLab.Models.GitLabLabel> labels,
         IReadOnlyList<Kpi.GitLab.Models.GitLabMilestone> milestones,
-        string? lastExtractedAt)
+        string? lastExtractedAt,
+        object? setup = null)
     {
         var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
+        payload.setup = setup;
         foreach (var lab in labels)
             if (!string.IsNullOrEmpty(lab.Name))
                 payload.labelColors[lab.Name] = new LabelColorPayload { color = lab.Color ?? "", textColor = lab.TextColor ?? "" };
@@ -276,6 +278,9 @@ public sealed class DashboardView
         public Dictionary<string, LabelColorPayload> labelColors { get; set; } = new();
         public Dictionary<string, MilestoneDatesPayload> milestoneDates { get; set; } = new();
         public List<IssuePayload> issues { get; set; } = new();
+        // Reflet de la config /setup pour l'onglet Options (projets, phases/associations par projet, équipes).
+        // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
+        public object? setup { get; set; }
     }
 
     private sealed class TransitionConfigPayload

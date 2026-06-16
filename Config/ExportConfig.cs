@@ -139,6 +139,29 @@ public sealed class ExportConfig
     /// <see cref="LabelPhasesByProject"/>.
     /// </summary>
     public Dictionary<int, List<PeriodDefinition>> PeriodsByProject { get; set; } = new();
+
+    /// <summary>
+    /// Projets importés à l'assistant, avec leur NOM et leur namespace (full_path), persistés par /setup.
+    /// Permet à l'onglet Options du dashboard d'afficher la vraie liste de projets (les IDs seuls ne suffisent
+    /// pas — GitLab ne renvoie pas le nom dans les issues). Vide pour une config ancienne ⇒ repli sur les IDs.
+    /// </summary>
+    public List<ProjectRef> Projects { get; set; } = new();
+
+    /// <summary>
+    /// Groupe GitLab (full_path) de chaque équipe (clé = nom d'équipe). Écrit par /setup. Permet d'associer
+    /// une équipe à un projet (l'équipe couvre le projet si son groupe est le namespace du projet ou un ancêtre).
+    /// <see cref="Teams"/> (membres) reste la source pour le filtrage ; ceci n'ajoute que le rattachement projet.
+    /// </summary>
+    public Dictionary<string, string> TeamGroups { get; set; } = new();
+}
+
+/// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>
+public sealed class ProjectRef
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    /// <summary>full_path du namespace (ex. « groupe » ou « parent/sous-groupe »), pour l'association aux équipes.</summary>
+    public string Group { get; set; } = "";
 }
 
 /// <summary>

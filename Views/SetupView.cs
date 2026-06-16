@@ -1508,7 +1508,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       admins:[],
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
-      teams:visibleTeams().map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
+      // Projets importés AVEC nom + namespace (pour l'onglet Options du dashboard, qui ne peut pas dériver les noms).
+      projects:ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return {id:p.id,name:p.name,group:p.groupFull||''};}),
+      teams:visibleTeams().map(function(t){return {name:t.name,groupPath:t.groupPath||'',members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     // Mode « Par projet » : on transmet aussi les phases + associations distinctes par projet (Stage 2 côté dashboard).
     if(ST.phaseScope==='per'){var pbp={},lbp={};ST.importIds.forEach(function(id){pbp[id]=perPayload(ST.phasesByProject[id]||ST.phases);lbp[id]=ST.labelPhaseByProject[id]||ST.labelPhase;});payload.periodsByProject=pbp;payload.labelPhasesByProject=lbp;}
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})

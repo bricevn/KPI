@@ -1,16 +1,12 @@
-// Options tab — apparence, régénération des données, configuration (formulaire).
+// Options tab — apparence, régénération des données, configuration (REFLET lecture seule de /setup).
+// Les données de config (projets, phases, associations label→phase, équipes) viennent du payload réel
+// window.__DATA__.setup (construit côté serveur depuis appsettings). L'édition se fait dans /setup.
 (function () {
   const { useState } = React;
-  const A = window.APP;
-  const PROD_LABELS = ['Code In Progress', 'Code review', 'Code pre-review', 'QA Backlog', 'QA InProgress', 'To Fix', 'PO Validation', 'UI/UX To Do', 'UI/UX in progress', 'UI/UX Done'];
-  const PHASES_DEFAULT = [['dev', '#2188ff'], ['review', '#8957e5'], ['qawait', '#b8800a'], ['qa', '#c79a06'], ['tofix', '#ec4899'], ['po', '#0f9e8e'], ['uiux', '#2dd4bf']];
-  const PHASE_PALETTE = ['#2188ff', '#8957e5', '#b8800a', '#c79a06', '#ec4899', '#0f9e8e', '#2dd4bf', '#e0792e', '#d6336c', '#5f6b7a'];
-  const LABEL_PHASE_DEFAULT = { 'Code In Progress': 'dev', 'Code review': 'review', 'Code pre-review': 'review', 'QA Backlog': 'qawait', 'QA InProgress': 'qa', 'To Fix': 'tofix', 'PO Validation': 'po', 'UI/UX To Do': 'uiux', 'UI/UX in progress': 'uiux', 'UI/UX Done': 'none' };
-  const PROJECTS = [['Hypervisor Core', 4], ['Agenz Suite', 11], ['Telemetry', 7], ['Map Service', 19], ['Operator Desk', 23]];
+  const A = window.APP || {};
   const ACCENTS = [['#2b7fff', 'Bleu'], ['#7A5AE0', 'Violet'], ['#0f9e8e', 'Teal'], ['#e0792e', 'Ambre'], ['#d6336c', 'Magenta']];
   const NUMFONTS = [['grotesk', 'Grotesk'], ['mono', 'Mono'], ['system', 'Système']];
   const DRILL_LAYOUTS = [['modal', 'Centré'], ['panel', 'Panneau'], ['full', 'Plein écran']];
-  const PHASE_T = { none: 'opt.phNone', dev: 'opt.phDev', review: 'opt.phReview', qawait: 'opt.phQawait', qa: 'opt.phQa', tofix: 'opt.phTofix', po: 'opt.phPo', uiux: 'opt.phUiux' };
   const DRILL_T = { modal: 'opt.drillModal', panel: 'opt.drillPanel', full: 'opt.drillFull' };
 
   function Toggle({ on, onClick }) {
@@ -21,21 +17,56 @@
 
   window.TabOptions = function TabOptions({ theme, setTheme, appearance }) {
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
-    const [labelPhase, setLabelPhase] = useState(() => ({ ...LABEL_PHASE_DEFAULT }));
-    const [phases, setPhases] = useState(() => PHASES_DEFAULT.map(([id, color]) => ({ id, name: window.t(PHASE_T[id]), color })));
-    const [openColor, setOpenColor] = useState(null);
-    const [imported, setImported] = useState(() => new Set([4, 11]));
-    const [showToken, setShowToken] = useState(false);
-    const [selfSigned, setSelfSigned] = useState(false);
-    const setPhase = (l, v) => setLabelPhase((m) => ({ ...m, [l]: v }));
-    const toggleProject = (id) => setImported((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-    const phaseColor = (id) => id === 'none' ? '#5f6b7a' : ((phases.find((p) => p.id === id) || {}).color || '#5f6b7a');
-    const renamePhase = (id, name) => setPhases((ps) => ps.map((p) => p.id === id ? { ...p, name } : p));
-    const setPhaseColor = (id, color) => { setPhases((ps) => ps.map((p) => p.id === id ? { ...p, color } : p)); setOpenColor(null); };
-    const addPhase = () => { const id = 'ph-' + Date.now(); setPhases((ps) => [...ps, { id, name: window.t('opt.newPhase'), color: PHASE_PALETTE[ps.length % PHASE_PALETTE.length] }]); };
-    const removePhase = (id) => { setLabelPhase((m) => { const n = { ...m }; Object.keys(n).forEach((k) => { if (n[k] === id) n[k] = 'none'; }); return n; }); setPhases((ps) => ps.filter((p) => p.id !== id)); };
-    const teamsRoles = { 'Core': [['antoine', 'lead'], ['brice', 'member'], ['carlo', 'member']], 'QA': [['denis', 'lead'], ['ash', 'member']], 'Front': [['kabbas', 'lead'], ['antoine', 'member']] };
+
+    // ---- config réelle (reflet de /setup), via le payload window.__DATA__.setup ----
+    const S = (window.__DATA__ || {}).setup || {};
+    const projects = S.projects || [];
+    const periodsGlobal = S.periods || [];
+    const lpGlobal = S.labelPhases || {};
+    const pbp = S.periodsByProject || {};
+    const lbp = S.labelPhasesByProject || {};
+    const trackedLabels = S.trackedLabels || [];
+    const allTeams = S.teams || [];
+    const isAdmin = !!S.isAdmin;   // régénération + reconfiguration réservées aux admins (cf. /api/refresh, /setup)
+    const milestones = (A.filterOptions || {}).milestones || [];
+    const peopleById = A.peopleById || {};
+
+    const [selProj, setSelProj] = useState(() => (projects[0] ? String(projects[0].id) : ''));
+    const [regenMs, setRegenMs] = useState('');               // '' = tout le projet (toutes milestones)
+    const [refreshState, setRefreshState] = useState('idle'); // idle | busy | done | err
+
+    const sid = (pid) => String(pid);
+    const periodsFor = (pid) => (pbp[sid(pid)] && pbp[sid(pid)].length ? pbp[sid(pid)] : periodsGlobal);
+    const lpFor = (pid) => (lbp[sid(pid)] && Object.keys(lbp[sid(pid)]).length ? lbp[sid(pid)] : lpGlobal);
+    const isPer = (pid) => !!(pbp[sid(pid)] && pbp[sid(pid)].length) || !!(lbp[sid(pid)] && Object.keys(lbp[sid(pid)]).length);
+    const phaseColor = (periods, key) => key === 'none' ? '#5f6b7a' : ((periods.find((p) => p.key === key) || {}).color || '#5f6b7a');
+    const phaseName = (periods, key) => key === 'none' ? window.t('opt.phNone') : ((periods.find((p) => p.key === key) || {}).name || key);
+    // Équipes couvrant un projet : groupe d'équipe = namespace du projet OU ancêtre. Repli global si pas de groupes.
+    const teamsFor = (proj) => {
+      if (!proj) return allTeams;
+      const pg = proj.group || '';
+      const haveGroups = allTeams.some((t) => t.group);
+      if (!haveGroups || !pg) return allTeams;
+      return allTeams.filter((t) => t.group && (pg === t.group || pg.indexOf(t.group + '/') === 0));
+    };
+    const personName = (id) => (peopleById[id] || {}).name || id;
+
+    const doRefresh = () => {
+      setRefreshState('busy');
+      fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(regenMs ? { milestones: [regenMs] } : {}) })
+        .then((r) => setRefreshState(r.ok ? 'done' : 'err'))
+        .catch(() => setRefreshState('err'));
+    };
+
+    const proj = projects.find((p) => String(p.id) === selProj) || projects[0] || null;
+    const periods = proj ? periodsFor(proj.id) : periodsGlobal;
+    const lp = proj ? lpFor(proj.id) : lpGlobal;
+    const labelsToShow = trackedLabels.length ? trackedLabels : Object.keys(lp);
+    const teams = teamsFor(proj);
+    const perTag = proj && isPer(proj.id) ? proj.name : window.t('opt.globalTag');
+
     const selStyle = { border: '1px solid var(--line)', borderRadius: 9, background: 'var(--panel-2)', color: 'var(--ink)', padding: '9px 12px', font: '14px system-ui' };
+    const subGrey = { fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-faint)' };
 
     return (
       <div style={{ maxWidth: 860 }}>
@@ -81,101 +112,90 @@
           </div>
         </div>
 
+        {isAdmin && (
         <div className="opt-sec">
           <h3>{window.t('opt.regen')}</h3>
-          <p className="lead">{window.t('opt.regenLead', { date: A.meta.extracted })}</p>
+          <p className="lead">{window.t('opt.regenLead', { date: (A.meta || {}).extracted || '—' })}</p>
           <div className="opt-row">
             <div className="lbl">{window.t('opt.scope')}<span>{window.t('opt.scopeSub')}</span></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <select style={selStyle}>
-                {PROJECTS.map(([name, id]) => <option key={id}>{name}</option>)}
+              <select style={selStyle} value={selProj} onChange={(e) => setSelProj(e.target.value)}>
+                {projects.length ? projects.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>) : <option value="">{window.t('opt.noProjects')}</option>}
               </select>
-              <select style={selStyle} defaultValue="Tout le projet">
-                <option>{window.t('whole_project')}</option>
-                <option>2026-R2</option>
-                <option>2026-R1</option>
-                <option>2026-R3</option>
+              <select style={selStyle} value={regenMs} onChange={(e) => setRegenMs(e.target.value)}>
+                <option value="">{window.t('whole_project')}</option>
+                {milestones.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
-            <button className="btn btn-primary">{window.ICONS.refresh} {window.t('opt.refresh')}</button>
+            <button className="btn btn-primary" disabled={refreshState === 'busy'} onClick={doRefresh}>{window.ICONS.refresh} {window.t('opt.refresh')}</button>
           </div>
+          {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--good,#2f9e44)' }}>{window.t('opt.refreshStarted')}</p>}
+          {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
         </div>
+        )}
 
         <div className="opt-sec">
           <h3>{window.t('opt.config')}</h3>
           <p className="lead">{window.t('opt.configLead', { setup: '/setup', file: 'appsettings.json' })}</p>
 
-          <div className="opt-sub">{window.t('opt.connection')}</div>
-          <div className="field-grid">
-            <div className="field"><label>Base URL</label><input defaultValue="https://gitlab.obvious.tech" /></div>
-            <div className="field"><label>{window.t('opt.timeout')}</label><input defaultValue="60" /></div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}><label>{window.t('opt.serviceToken')}</label>
-              <div style={{ position: 'relative' }}>
-                <input type={showToken ? 'text' : 'password'} defaultValue="glpat-xxxxxxxxxxxx" style={{ width: '100%', paddingRight: 38 }} />
-                <button onClick={() => setShowToken((s) => !s)} style={{ position: 'absolute', right: 6, top: 6, border: 0, background: 'transparent', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 12 }}>{showToken ? window.t('opt.hide') : window.t('opt.show')}</button>
-              </div>
-            </div>
-          </div>
-          <div className="opt-row" style={{ borderTop: '1px solid var(--line-2)' }}>
-            <div className="lbl">{window.t('opt.selfSigned')}<span>{window.t('opt.selfSignedSub')}</span></div>
-            <Toggle on={selfSigned} onClick={() => setSelfSigned((s) => !s)} />
-          </div>
-
           <div className="opt-sub">{window.t('opt.importedProjects')}</div>
           <div className="checklist">
-            {PROJECTS.map(([name, id]) => <label key={id} className={imported.has(id) ? 'on' : ''} onClick={() => toggleProject(id)}><input type="checkbox" readOnly checked={imported.has(id)} style={{ pointerEvents: 'none' }} />{name} <span style={{ opacity: .6, fontFamily: 'var(--font-mono,monospace)', fontSize: 11 }}>#{id}</span></label>)}
+            {projects.length ? projects.map((p) =>
+            <label key={p.id} className="on" style={{ cursor: 'default' }}><input type="checkbox" readOnly checked style={{ pointerEvents: 'none' }} />{p.name} <span style={{ opacity: .6, fontFamily: 'var(--font-mono,monospace)', fontSize: 11 }}>#{p.id}</span></label>
+            ) : <p className="opt-note">{window.t('opt.noProjects')}</p>}
           </div>
 
-          <div className="opt-sub">{window.t('opt.prodPhases')} <span className="opt-prereq">{window.t('opt.prereq')}</span></div>
-          <p className="opt-note">{window.t('opt.phasesEditNote')}</p>
+          {projects.length > 1 &&
+          <div className="opt-row">
+            <div className="lbl">{window.t('opt.projectScope')}<span>{window.t('opt.projectScopeSub')}</span></div>
+            <select style={selStyle} value={selProj} onChange={(e) => setSelProj(e.target.value)}>
+              {projects.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
+          </div>}
+
+          <div className="opt-sub">{window.t('opt.prodPhases')} <span className="opt-prereq">{perTag}</span></div>
+          <p className="opt-note">{window.t('opt.phasesReadNote')}</p>
           <div className="opt-phases">
-            {phases.map((p) => (
-              <div className="opt-phrow" key={p.id}>
-                <div className="opt-swatchwrap">
-                  <button className="opt-swatch" style={{ background: p.color }} onClick={() => setOpenColor(openColor === p.id ? null : p.id)} title={window.t('opt.accent')}></button>
-                  {openColor === p.id &&
-                  <div className="opt-pop">
-                      {PHASE_PALETTE.map((c) => <button key={c} className={'opt-pc' + (c === p.color ? ' on' : '')} style={{ background: c }} onClick={() => setPhaseColor(p.id, c)}></button>)}
-                    </div>}
-                </div>
-                <input className="opt-phname" value={p.name} onChange={(e) => renamePhase(p.id, e.target.value)} />
-                <button className="opt-phx" onClick={() => removePhase(p.id)} title="×">×</button>
+            {periods.length ? periods.map((p) => (
+              <div className="opt-phrow" key={p.key}>
+                <div className="opt-swatchwrap"><span className="opt-swatch" style={{ background: p.color, cursor: 'default', display: 'inline-block' }}></span></div>
+                <span className="opt-phname" style={{ padding: '6px 4px' }}>{p.name}</span>
               </div>
-            ))}
-          </div>
-          <button className="btn btn-sm" style={{ marginBottom: 14 }} onClick={addPhase}>+ {window.t('opt.addPhase')}</button>
-          <div className="opt-sub">{window.t('opt.assocLabels')} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-faint)' }}>Prod::</span></div>
-          <div className="opt-map">
-            {PROD_LABELS.map((l) => (
-              <div className="opt-maprow" key={l}>
-                <span className="opt-dot" style={{ background: phaseColor(labelPhase[l] || 'none') }}></span>
-                <span className="opt-mlabel">Prod::{l}</span>
-                <select className="opt-mini" value={labelPhase[l] || 'none'} onChange={(e) => setPhase(l, e.target.value)}>
-                  {[['none', window.t('opt.phNone')], ...phases.map((p) => [p.id, p.name])].map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
-                </select>
-              </div>
-            ))}
+            )) : <p className="opt-note">{window.t('opt.noPhases')}</p>}
           </div>
 
-          <div className="opt-sub">{window.t('opt.teams')} <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-faint)' }}>· {window.t('opt.teamsSub')}</span></div>
+          <div className="opt-sub">{window.t('opt.assocLabels')} <span style={subGrey}>Prod::</span></div>
+          <div className="opt-map">
+            {labelsToShow.length ? labelsToShow.map((l) => {
+              const key = lp[l] || 'none';
+              return (
+                <div className="opt-maprow" key={l}>
+                  <span className="opt-dot" style={{ background: phaseColor(periods, key) }}></span>
+                  <span className="opt-mlabel">{l}</span>
+                  <span style={{ fontSize: 12, color: 'var(--ink-faint)', marginLeft: 'auto' }}>{phaseName(periods, key)}</span>
+                </div>
+              );
+            }) : <p className="opt-note">{window.t('opt.noLabels')}</p>}
+          </div>
+
+          <div className="opt-sub">{window.t('opt.teams')} <span style={subGrey}>· {window.t('opt.teamsSub')}</span></div>
+          {teams.length ?
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-            {Object.entries(teamsRoles).map(([name, members]) =>
-            <div key={name} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{name}</div>
+            {teams.map((tm) =>
+            <div key={tm.name} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{tm.name}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {members.map(([id, role]) => <span key={id} className="tag"><window.Avatar pid={id} size={18} />{(A.peopleById[id] || {}).name || id}<span className="opt-role">{role === 'lead' ? window.t('opt.lead') : window.t('opt.memberRole')}</span></span>)}
+                  {(tm.members || []).map((id) => <span key={id} className="tag"><window.Avatar pid={id} size={18} />{personName(id)}</span>)}
                 </div>
               </div>
             )}
           </div>
+          : <p className="opt-note">{window.t('opt.noTeams')}</p>}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-            <button className="btn btn-primary btn-sm">{window.t('opt.addTeam')}</button>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-              <button className="btn btn-danger btn-sm">{window.t('opt.cancel')}</button>
-              <button className="btn btn-ok btn-sm">{window.t('opt.save')}</button>
-            </div>
-          </div>
+          {isAdmin &&
+          <div style={{ marginTop: 20 }}>
+            <a className="btn btn-primary btn-sm" href="/setup">{window.t('opt.reconfigure')}</a>
+          </div>}
         </div>
       </div>);
 

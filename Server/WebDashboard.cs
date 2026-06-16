@@ -396,6 +396,16 @@ public sealed class WebDashboard
         return value;
     }
 
+    /// <summary>Slug de projet (dernier segment du chemin) dérivé d'un webUrl d'issue GitLab
+    /// (https://host/groupe/projet/-/issues/123 → « projet »). Repli pour nommer un projet sans nom persisté.</summary>
+    private static string ProjectSlugFromWebUrl(string url)
+    {
+        var m = Regex.Match(url ?? "", @"^https?://[^/]+/(.+?)/-/issues/");
+        if (!m.Success) return "";
+        var segs = m.Groups[1].Value.Split('/');
+        return segs.Length > 0 ? segs[^1] : "";
+    }
+
     // --- Endpoints ------------------------------------------------------
 
     private async Task<IResult> ServeHtmlAsync(HttpContext ctx)
@@ -979,6 +989,7 @@ public sealed class WebDashboard
         }
 
         var teams = new JsonObject();
+        var teamGroups = new JsonObject();           // nom d'équipe → groupPath (full_path du groupe GitLab)
         foreach (var t in b?["teams"]?.AsArray() ?? new JsonArray())
         {
             var name = t!["name"]!.GetValue<string>();
@@ -986,6 +997,23 @@ public sealed class WebDashboard
             foreach (var m in t["members"]?.AsArray() ?? new JsonArray())
                 arr.Add(m!["username"]!.GetValue<string>());
             teams[name] = arr;
+            var gp = (Str(t["groupPath"]) ?? "").Trim();
+            if (gp.Length > 0) teamGroups[name] = gp;
+        }
+
+        // Projets importés AVEC nom + namespace (l'onglet Options du dashboard ne peut pas dériver les noms des IDs).
+        var projectsArr = new JsonArray();
+        foreach (var p in b?["projects"]?.AsArray() ?? new JsonArray())
+        {
+            if (p is not JsonObject po) continue;
+            var pid = po["id"] is JsonValue piv && piv.TryGetValue<int>(out var pii) ? pii : 0;
+            if (pid == 0) continue;
+            projectsArr.Add(new JsonObject
+            {
+                ["Id"]    = pid,
+                ["Name"]  = (Str(po["name"]) ?? "").Trim(),
+                ["Group"] = (Str(po["group"]) ?? "").Trim(),
+            });
         }
 
         // Merge non destructif : la section Auth (admins, OAuth) est PRÉSERVÉE telle quelle (non modifiable via l'app).
@@ -1020,7 +1048,10 @@ public sealed class WebDashboard
         ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
         ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
         ex["Teams"] = teams;
+        ex["TeamGroups"] = teamGroups;
         ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
+        // Projets importés (nom + namespace) — n'écrit que si le client les transmet (sinon préserve l'existant).
+        if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
         // Catalogue des périodes : on n'écrit QUE si le wizard a transmis le champ (même vide = volonté
         // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
         if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
@@ -1448,10 +1479,41 @@ public sealed class WebDashboard
             scopedTeams = new Dictionary<string, List<string>> { [r.ScopeValue] = tm };
         else scopedTeams = new Dictionary<string, List<string>>();
 
+        // --- Bloc « setup » (lecture seule) pour l'onglet Options : reflet de la config /setup ---
+        // Noms de projets : priorité à Export.Projects (persisté) ; repli = slug dérivé du webUrl des issues.
+        var nameById = new Dictionary<int, string>();
+        foreach (var e in all)
+        {
+            var pid = (int)e.ProjectId;
+            if (pid > 0 && !nameById.ContainsKey(pid) && !string.IsNullOrEmpty(e.WebUrl))
+            {
+                var nm = ProjectSlugFromWebUrl(e.WebUrl!);
+                if (nm.Length > 0) nameById[pid] = nm;
+            }
+        }
+        string ProjName(int id, string? saved) =>
+            !string.IsNullOrWhiteSpace(saved) ? saved! : (nameById.TryGetValue(id, out var n) ? n : "#" + id);
+        static bool RealPeriod(PeriodDefinition p) => !string.IsNullOrEmpty(p.Key) && !string.Equals(p.Key, "none", StringComparison.OrdinalIgnoreCase);
+        static object PeriodObj(PeriodDefinition p) => new { key = p.Key, name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name, color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, timed = p.Timed };
+        List<object> setupProjects = (cfg.Export.Projects is { Count: > 0 })
+            ? cfg.Export.Projects.Select(p => (object)new { id = p.Id, name = ProjName(p.Id, p.Name), group = p.Group ?? "", imported = true }).ToList()
+            : (cfg.Export.ProjectIds ?? new()).Select(id => (object)new { id, name = ProjName(id, null), group = "", imported = true }).ToList();
+        var setup = new
+        {
+            isAdmin = string.Equals(r.Role, "admin", StringComparison.OrdinalIgnoreCase), // gate des actions admin (régénération, reconfigurer)
+            projects = setupProjects,
+            periods = (cfg.Export.Periods ?? new()).Where(RealPeriod).Select(PeriodObj).ToList(),
+            periodsByProject = (cfg.Export.PeriodsByProject ?? new()).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.Where(RealPeriod).Select(PeriodObj).ToList()),
+            labelPhases = cfg.Export.LabelPhases ?? new(),
+            labelPhasesByProject = (cfg.Export.LabelPhasesByProject ?? new()).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+            teams = scopedTeams.Select(kv => new { name = kv.Key, group = (cfg.Export.TeamGroups != null && cfg.Export.TeamGroups.TryGetValue(kv.Key, out var g)) ? g : "", members = kv.Value }).ToList(),
+            trackedLabels = cfg.Export.TrackedLabels ?? new(),
+        };
+
         var json = DashboardView.BuildPayloadJson(
             "", filtered.ToList(), // v2 : pas de milestone global (filtre UI) ; le payload couvre toutes les issues du périmètre
             cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, cfg.Export.Periods,
-            labels, milestones, lastExtracted);
+            labels, milestones, lastExtracted, setup);
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }
