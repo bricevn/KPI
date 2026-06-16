@@ -165,7 +165,9 @@ public sealed class WebDashboard
             };
             o.Events.OnRemoteFailure = ctx =>
             {
-                ctx.Response.Redirect("/login");
+                // Échec/annulation : revenir à la cible de retour si connue (en popup → /auth/popup-done, qui
+                // referme la fenêtre et laisse l'ouvrant relire /api/me). Sinon /login. Validé anti open-redirect.
+                ctx.Response.Redirect(SafeLocalReturn(ctx.Properties?.RedirectUri, "/login"));
                 ctx.HandleResponse();
                 return Task.CompletedTask;
             };
@@ -357,6 +359,18 @@ public sealed class WebDashboard
             var back = SafeLocalReturn(@return);
             return Results.Redirect(back);
         });
+
+        // Cible de retour du SSO en POPUP (cf. setup). Après le callback OAuth, le navigateur (dans la popup)
+        // atterrit ici : on prévient la fenêtre parente (postMessage same-origin) puis on ferme la popup. Si la
+        // page n'est PAS une popup (ouverture plein écran / repli), on revient au /setup au bout d'un court délai.
+        app.MapGet("/auth/popup-done", () => Results.Content(
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>GitLab</title></head>" +
+            "<body style=\"margin:0;background:#0a0e13;color:#9aa6b6;font:14px system-ui,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh\">" +
+            "<div>Connexion GitLab terminée — vous pouvez fermer cette fenêtre.</div>" +
+            "<script>(function(){try{if(window.opener&&!window.opener.closed){window.opener.postMessage({kpiOauth:'done'},window.location.origin);}}catch(e){}" +
+            "try{window.close();}catch(e){}" +
+            "setTimeout(function(){try{window.close();}catch(e){}try{if(!window.opener){window.location.replace('/setup');}}catch(e){window.location.replace('/setup');}},600);})();</script>" +
+            "</body></html>", "text/html; charset=utf-8")).AllowAnonymous();
 
         Console.WriteLine("=== Dashboard server (ASP.NET Core) prêt ===");
         Console.WriteLine($"Ouvrir : http://localhost:{port}/");
