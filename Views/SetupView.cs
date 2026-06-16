@@ -303,7 +303,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 (function(){
   // Périodes par défaut PROPOSÉES (éditables à l'étape 3 : renommer / couleur / ajouter / supprimer).
   var DEFAULT_PHASES=[{id:'dev',name:'Development',color:'#2188ff'},{id:'review',name:'Code review',color:'#8957e5'},{id:'qawait',name:'QA wait',color:'#b8800a'},{id:'qa',name:'QA',color:'#c79a06'},{id:'tofix',name:'To fix',color:'#ec4899'},{id:'po',name:'PO validation',color:'#0f9e8e'},{id:'uiux',name:'UI/UX',color:'#2dd4bf'}];
-  var PALETTE=['#2188ff','#8957e5','#b8800a','#c79a06','#ec4899','#0f9e8e','#2dd4bf','#e0792e','#d6336c','#5f6b7a'];
+  var PALETTE=['#2188ff','#0ea5e9','#06b6d4','#2dd4bf','#0f9e8e','#22c55e','#84cc16','#eab308','#c79a06','#e0792e','#f97316','#ef4444','#d6336c','#ec4899','#d946ef','#a855f7','#8957e5','#6366f1','#64748b','#94a3b8'];
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
   var phaseColor=function(k){if(k==='none')return NONE_COLOR;var ps=curPhases();for(var i=0;i<ps.length;i++)if(ps[i].id===k)return ps[i].color;return NONE_COLOR;};
@@ -333,7 +333,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       hs4:"Vérifiez les équipes importées (groupes GitLab) et ajustez si besoin.",
       hs5:"Vérifiez la configuration. Vous pourrez tout modifier ensuite dans Options.",
       baseUrl:"Base URL", serviceToken:"Token de service",
-      tokenHint:"Scope read_api. Stocké côté serveur pour l'extraction, jamais affiché aux utilisateurs.",
+      tokenHint:"Token de groupe, de projet ou personnel (scope read_api). Stocké côté serveur, jamais affiché aux utilisateurs.",
       adminLabel:"Compte(s) administrateur", adminHint:"Username(s) GitLab admin — 1re mise en service. Plusieurs : séparés par des virgules.",
       timeout:"Timeout (s)", timeoutHint:"Délai max d'une requête à l'API.",
       selfSigned:"Certificats auto-signés", selfSignedSub:"Pour les instances internes",
@@ -349,7 +349,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Sélectionnez au moins un projet (étape Projets) pour charger ses labels.",
       noLabelsFetched:"Aucun label récupéré pour ce(s) projet(s). Vérifiez que le token a le scope read_api et accès au projet.",
       labelsNonProd:"labels récupérés, mais aucun dans le scope « Prod:: ». Les phases se basent sur des labels « Prod::Xxx ». Vos labels :",
-      groupConn:"Connexion au groupe", groupToken:"Token de groupe", advanced:"Options avancées",
+      groupConn:"Connexion au groupe", groupToken:"Token", advanced:"Options avancées",
       advancedHint:"À ajuster uniquement pour les instances GitLab auto-hébergées. Les valeurs par défaut conviennent à gitlab.com.",
       adminSec:"Administrateur", adminNone:"Non identifié", adminOk:"Administrateur", connecting:"Connexion à GitLab…",
       withGitlab:"Se connecter avec GitLab", connectedShort:"Connecté",
@@ -363,7 +363,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
-      teamsIntro:"Équipes importées depuis les <b>groupes GitLab</b>. <b>Lead</b> = Maintainer · <b>Membre</b> = Developer. Un membre peut appartenir à <b>plusieurs équipes</b>.",
+      teamsIntro:"Équipes importées depuis les <b>groupes GitLab</b>. <b>Lead</b> = Maintainer · <b>Membre</b> = Developer. Un membre peut appartenir à <b>plusieurs équipes</b>.", noTeamsForProj:"Aucune équipe GitLab pour les projets sélectionnés. Ajoutez-en une manuellement ci-dessous.",
       glGroup:"groupe GitLab", newTeam:"nouvelle", noMembers:"Aucun membre — ajoutez-en ci-dessous",
       addMember:"Ajouter un membre…", newTeamName:"Nouvelle équipe", roleLead:"Lead", roleMember:"Membre",
       none:"Aucun", labelsLinked:" labels liés à une phase", teamsCount:" équipes · ", peopleCount:" personnes", edit:"Modifier",
@@ -385,7 +385,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       hs4:"Review the imported teams (GitLab groups) and adjust if needed.",
       hs5:"Review the configuration. You can change everything later in Options.",
       baseUrl:"Base URL", serviceToken:"Service token",
-      tokenHint:"Scope read_api. Stored server-side for extraction, never shown to users.",
+      tokenHint:"Group, project, or personal token (read_api scope). Stored server-side, never shown to users.",
       adminLabel:"Admin account(s)", adminHint:"GitLab admin username(s) — first setup only. Comma-separated for several.",
       timeout:"Timeout (s)", timeoutHint:"Max delay for an API request.",
       selfSigned:"Self-signed certificates", selfSignedSub:"For internal instances",
@@ -401,7 +401,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Select at least one project (Projects step) to load its labels.",
       noLabelsFetched:"No label fetched for this project. Check that the token has the read_api scope and access to the project.",
       labelsNonProd:"labels fetched, but none in the « Prod:: » scope. Phases rely on « Prod::Xxx » labels. Your labels:",
-      groupConn:"Group connection", groupToken:"Group token", advanced:"Advanced options",
+      groupConn:"Group connection", groupToken:"Token", advanced:"Advanced options",
       advancedHint:"Adjust only for self-hosted GitLab instances. The defaults work for gitlab.com.",
       adminSec:"Administrator", adminNone:"Not identified", adminOk:"Administrator", connecting:"Connecting to GitLab…",
       withGitlab:"Sign in with GitLab", connectedShort:"Connected",
@@ -415,7 +415,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
-      teamsIntro:"Teams imported from <b>GitLab groups</b>. <b>Lead</b> = Maintainer · <b>Member</b> = Developer. A member can belong to <b>several teams</b>.",
+      teamsIntro:"Teams imported from <b>GitLab groups</b>. <b>Lead</b> = Maintainer · <b>Member</b> = Developer. A member can belong to <b>several teams</b>.", noTeamsForProj:"No GitLab team for the selected projects. Add one manually below.",
       glGroup:"GitLab group", newTeam:"new", noMembers:"No members — add some below",
       addMember:"Add a member…", newTeamName:"New team", roleLead:"Lead", roleMember:"Member",
       none:"None", labelsLinked:" labels linked to a phase", teamsCount:" teams · ", peopleCount:" people", edit:"Edit",
@@ -454,7 +454,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "Revisa la configuración. Puedes cambiar todo más tarde en Opciones.",
       "baseUrl": "URL base",
       "serviceToken": "Token de servicio",
-      "tokenHint": "Alcance read_api. Almacenado en el servidor para la extracción, nunca se muestra a los usuarios.",
+      "tokenHint": "Token de grupo, de proyecto o personal (alcance read_api). Almacenado en el servidor, nunca se muestra a los usuarios.",
       "timeout": "Tiempo de espera (s)",
       "timeoutHint": "Retraso máximo para una solicitud de API.",
       "selfSigned": "Certificados autofirmados",
@@ -476,7 +476,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecciona al menos un proyecto (paso Proyectos) para cargar sus etiquetas.",
       "noLabelsFetched": "No se recuperó ninguna etiqueta para este proyecto. Verifica que el token tenga el alcance read_api y acceso al proyecto.",
       "labelsNonProd": "etiquetas recuperadas, pero ninguna en el ámbito « Prod:: ». Las fases se basan en etiquetas « Prod::Xxx ». Tus etiquetas:",
-      "groupConn": "Conexión al grupo", "groupToken": "Token de grupo", "advanced": "Opciones avanzadas",
+      "groupConn": "Conexión al grupo", "groupToken": "Token", "advanced": "Opciones avanzadas",
       "advancedHint": "Ajústalo solo en instancias de GitLab autoalojadas. Los valores predeterminados son adecuados para gitlab.com.",
       "adminSec": "Administrador", "adminNone": "Sin identificar", "adminOk": "Administrador", "connecting": "Conectando con GitLab…",
       "withGitlab": "Conectarse con GitLab", "connectedShort": "Conectado",
@@ -495,7 +495,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "Añadir una fase",
       "labelMapping": "Mapeo de etiquetas",
       "notTracked": "No rastreada",
-      "teamsIntro": "Equipos importados desde <b>grupos de GitLab</b>. <b>Lead</b> = Maintainer · <b>Miembro</b> = Developer. Un miembro puede pertenecer a <b>varios equipos</b>.",
+      "teamsIntro": "Equipos importados desde <b>grupos de GitLab</b>. <b>Lead</b> = Maintainer · <b>Miembro</b> = Developer. Un miembro puede pertenecer a <b>varios equipos</b>.", "noTeamsForProj": "Ningún equipo GitLab para los proyectos seleccionados. Añade uno manualmente abajo.",
       "glGroup": "grupo de GitLab",
       "newTeam": "nuevo",
       "noMembers": "Sin miembros — añade algunos a continuación",
@@ -549,7 +549,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "Überprüfen Sie die Konfiguration. Sie können später alles unter \"Optionen\" ändern.",
       "baseUrl": "Basis-URL",
       "serviceToken": "Service-Token",
-      "tokenHint": "Bereich read_api. Serverseitig für die Extraktion gespeichert, wird Benutzern niemals angezeigt.",
+      "tokenHint": "Gruppen-, Projekt- oder persönlicher Token (Bereich read_api). Serverseitig gespeichert, wird Benutzern niemals angezeigt.",
       "timeout": "Timeout (s)",
       "timeoutHint": "Maximale Verzögerung für eine API-Anfrage.",
       "selfSigned": "Selbstsignierte Zertifikate",
@@ -571,7 +571,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Wählen Sie mindestens ein Projekt (Schritt Projekte), um dessen Label zu laden.",
       "noLabelsFetched": "Kein Label für dieses Projekt abgerufen. Prüfen Sie, ob das Token den Bereich read_api und Zugriff auf das Projekt hat.",
       "labelsNonProd": "Labels abgerufen, aber keines im « Prod:: »-Bereich. Phasen basieren auf « Prod::Xxx »-Labels. Ihre Labels:",
-      "groupConn": "Verbindung zur Gruppe", "groupToken": "Gruppen-Token", "advanced": "Erweiterte Optionen",
+      "groupConn": "Verbindung zur Gruppe", "groupToken": "Token", "advanced": "Erweiterte Optionen",
       "advancedHint": "Nur für selbst gehostete GitLab-Instanzen anzupassen. Die Standardwerte eignen sich für gitlab.com.",
       "adminSec": "Administrator", "adminNone": "Nicht identifiziert", "adminOk": "Administrator", "connecting": "Verbindung zu GitLab…",
       "withGitlab": "Mit GitLab anmelden", "connectedShort": "Verbunden",
@@ -590,7 +590,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "Phase hinzufügen",
       "labelMapping": "Label-Zuordnung",
       "notTracked": "Nicht verfolgt",
-      "teamsIntro": "Teams importiert aus <b>GitLab-Gruppen</b>. <b>Lead</b> = Maintainer · <b>Mitglied</b> = Developer. Ein Mitglied kann zu <b>mehreren Teams</b> gehören.",
+      "teamsIntro": "Teams importiert aus <b>GitLab-Gruppen</b>. <b>Lead</b> = Maintainer · <b>Mitglied</b> = Developer. Ein Mitglied kann zu <b>mehreren Teams</b> gehören.", "noTeamsForProj": "Kein GitLab-Team für die ausgewählten Projekte. Fügen Sie unten manuell eines hinzu.",
       "glGroup": "GitLab-Gruppe",
       "newTeam": "neu",
       "noMembers": "Keine Mitglieder — fügen Sie einige hinzu",
@@ -644,7 +644,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "Rivedi la configurazione. Potrai modificare tutto in seguito in Opzioni.",
       "baseUrl": "URL base",
       "serviceToken": "Token di servizio",
-      "tokenHint": "Scope read_api. Archiviato lato server per l'estrazione, mai mostrato agli utenti.",
+      "tokenHint": "Token di gruppo, di progetto o personale (scope read_api). Archiviato lato server, mai mostrato agli utenti.",
       "timeout": "Timeout (s)",
       "timeoutHint": "Ritardo massimo per una richiesta API.",
       "selfSigned": "Certificati autofirmati",
@@ -666,7 +666,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Seleziona almeno un progetto (passaggio Progetti) per caricarne le etichette.",
       "noLabelsFetched": "Nessuna etichetta recuperata per questo progetto. Verifica che il token abbia lo scope read_api e accesso al progetto.",
       "labelsNonProd": "etichette recuperate, ma nessuna nello scope « Prod:: ». Le fasi si basano su etichette « Prod::Xxx ». Le tue etichette:",
-      "groupConn": "Connessione al gruppo", "groupToken": "Token di gruppo", "advanced": "Opzioni avanzate",
+      "groupConn": "Connessione al gruppo", "groupToken": "Token", "advanced": "Opzioni avanzate",
       "advancedHint": "Da regolare solo per le istanze GitLab self-hosted. I valori predefiniti vanno bene per gitlab.com.",
       "adminSec": "Amministratore", "adminNone": "Non identificato", "adminOk": "Amministratore", "connecting": "Connessione a GitLab…",
       "withGitlab": "Accedi con GitLab", "connectedShort": "Connesso",
@@ -685,7 +685,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "Aggiungi una fase",
       "labelMapping": "Mapping etichette",
       "notTracked": "Non tracciato",
-      "teamsIntro": "Team importati da <b>gruppi GitLab</b>. <b>Lead</b> = Maintainer · <b>Membro</b> = Developer. Un membro può appartenere a <b>più team</b>.",
+      "teamsIntro": "Team importati da <b>gruppi GitLab</b>. <b>Lead</b> = Maintainer · <b>Membro</b> = Developer. Un membro può appartenere a <b>più team</b>.", "noTeamsForProj": "Nessun team GitLab per i progetti selezionati. Aggiungine uno manualmente qui sotto.",
       "glGroup": "gruppo GitLab",
       "newTeam": "nuovo",
       "noMembers": "Nessun membro — aggiungine di seguito",
@@ -739,7 +739,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "Analise a configuração. Pode alterar tudo depois em Opções.",
       "baseUrl": "URL Base",
       "serviceToken": "Token de serviço",
-      "tokenHint": "Scope read_api. Armazenado do lado do servidor para extração, nunca mostrado aos utilizadores.",
+      "tokenHint": "Token de grupo, de projeto ou pessoal (scope read_api). Armazenado no servidor, nunca mostrado aos utilizadores.",
       "timeout": "Timeout (s)",
       "timeoutHint": "Atraso máximo para um pedido de API.",
       "selfSigned": "Certificados auto-assinados",
@@ -761,7 +761,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecione pelo menos um projeto (passo Projetos) para carregar os seus rótulos.",
       "noLabelsFetched": "Nenhum rótulo obtido para este projeto. Verifique se o token tem o scope read_api e acesso ao projeto.",
       "labelsNonProd": "rótulos obtidos, mas nenhum no scope « Prod:: ». As fases baseiam-se em rótulos « Prod::Xxx ». Os seus rótulos:",
-      "groupConn": "Ligação ao grupo", "groupToken": "Token de grupo", "advanced": "Opções avançadas",
+      "groupConn": "Ligação ao grupo", "groupToken": "Token", "advanced": "Opções avançadas",
       "advancedHint": "A ajustar apenas para instâncias GitLab auto-alojadas. Os valores predefinidos são adequados para gitlab.com.",
       "adminSec": "Administrador", "adminNone": "Não identificado", "adminOk": "Administrador", "connecting": "A ligar ao GitLab…",
       "withGitlab": "Iniciar sessão com o GitLab", "connectedShort": "Ligado",
@@ -780,7 +780,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "Adicionar uma fase",
       "labelMapping": "Mapeamento de rótulos",
       "notTracked": "Não rastreado",
-      "teamsIntro": "Equipes importadas a partir de <b>grupos GitLab</b>. <b>Lead</b> = Maintainer · <b>Membro</b> = Developer. Um membro pode pertencer a <b>várias equipes</b>.",
+      "teamsIntro": "Equipes importadas a partir de <b>grupos GitLab</b>. <b>Lead</b> = Maintainer · <b>Membro</b> = Developer. Um membro pode pertencer a <b>várias equipes</b>.", "noTeamsForProj": "Nenhuma equipa GitLab para os projetos selecionados. Adicione uma manualmente abaixo.",
       "glGroup": "grupo GitLab",
       "newTeam": "novo",
       "noMembers": "Sem membros — adicione alguns abaixo",
@@ -834,7 +834,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "Проверьте конфигурацию. Вы можете все изменить позже в параметрах.",
       "baseUrl": "Base URL",
       "serviceToken": "Токен обслуживания",
-      "tokenHint": "Scope read_api. Сохраняется на сервере для извлечения, никогда не показывается пользователям.",
+      "tokenHint": "Токен группы, проекта или персональный (scope read_api). Хранится на сервере, не показывается пользователям.",
       "timeout": "Таймаут (сек)",
       "timeoutHint": "Максимальная задержка для запроса API.",
       "selfSigned": "Самоподписанные сертификаты",
@@ -856,7 +856,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Выберите хотя бы один проект (шаг «Проекты»), чтобы загрузить его метки.",
       "noLabelsFetched": "Для этого проекта не получено ни одной метки. Убедитесь, что у токена есть scope read_api и доступ к проекту.",
       "labelsNonProd": "меток получено, но ни одной в области « Prod:: ». Этапы основаны на метках « Prod::Xxx ». Ваши метки:",
-      "groupConn": "Подключение к группе", "groupToken": "Токен группы", "advanced": "Дополнительные параметры",
+      "groupConn": "Подключение к группе", "groupToken": "Токен", "advanced": "Дополнительные параметры",
       "advancedHint": "Изменяйте только для самостоятельно размещённых экземпляров GitLab. Значения по умолчанию подходят для gitlab.com.",
       "adminSec": "Администратор", "adminNone": "Не определён", "adminOk": "Администратор", "connecting": "Подключение к GitLab…",
       "withGitlab": "Войти через GitLab", "connectedShort": "Подключено",
@@ -875,7 +875,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "Добавить фазу",
       "labelMapping": "Сопоставление меток",
       "notTracked": "Не отслеживается",
-      "teamsIntro": "Команды, импортированные из <b>групп GitLab</b>. <b>Lead</b> = Maintainer · <b>Member</b> = Developer. Участник может принадлежать <b>нескольким командам</b>.",
+      "teamsIntro": "Команды, импортированные из <b>групп GitLab</b>. <b>Lead</b> = Maintainer · <b>Member</b> = Developer. Участник может принадлежать <b>нескольким командам</b>.", "noTeamsForProj": "Нет команды GitLab для выбранных проектов. Добавьте её вручную ниже.",
       "glGroup": "группа GitLab",
       "newTeam": "новая",
       "noMembers": "Нет участников — добавьте некоторых ниже",
@@ -929,7 +929,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "راجع الإعدادات. يمكنك تغيير كل شيء لاحقاً في الخيارات.",
       "baseUrl": "عنوان URL الأساسي",
       "serviceToken": "رمز الخدمة",
-      "tokenHint": "نطاق read_api. مخزن على جانب الخادم للاستخراج، لا يُعرض أبداً للمستخدمين.",
+      "tokenHint": "رمز المجموعة أو المشروع أو شخصي (نطاق read_api). مخزن على الخادم، لا يُعرض أبداً للمستخدمين.",
       "timeout": "انتظار (ثانية)",
       "timeoutHint": "أقصى تأخير لطلب API.",
       "selfSigned": "شهادات موقعة ذاتياً",
@@ -951,7 +951,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "اختر مشروعاً واحداً على الأقل (خطوة المشاريع) لتحميل تسمياته.",
       "noLabelsFetched": "لم يتم جلب أي تسمية لهذا المشروع. تأكد من أن الرمز يملك نطاق read_api والوصول إلى المشروع.",
       "labelsNonProd": "تسمية تم جلبها، لكن لا شيء في نطاق « Prod:: ». تعتمد المراحل على تسميات « Prod::Xxx ». تسمياتك:",
-      "groupConn": "الاتصال بالمجموعة", "groupToken": "رمز المجموعة", "advanced": "خيارات متقدمة",
+      "groupConn": "الاتصال بالمجموعة", "groupToken": "الرمز", "advanced": "خيارات متقدمة",
       "advancedHint": "للتعديل فقط في حالة مثيلات GitLab المستضافة ذاتيًا. القيم الافتراضية مناسبة لـ gitlab.com.",
       "adminSec": "مسؤول", "adminNone": "غير محدَّد", "adminOk": "مسؤول محدَّد", "connecting": "جارٍ الاتصال بـ GitLab…",
       "withGitlab": "الاتصال عبر GitLab", "connectedShort": "متصل",
@@ -970,7 +970,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "إضافة مرحلة",
       "labelMapping": "تعيين التسميات",
       "notTracked": "غير مُتابعة",
-      "teamsIntro": "فرق مستوردة من <b>مجموعات GitLab</b>. <b>Lead</b> = المسؤول · <b>العضو</b> = المطور. يمكن لعضو الانتماء إلى <b>عدة فرق</b>.",
+      "teamsIntro": "فرق مستوردة من <b>مجموعات GitLab</b>. <b>Lead</b> = المسؤول · <b>العضو</b> = المطور. يمكن لعضو الانتماء إلى <b>عدة فرق</b>.", "noTeamsForProj": "لا يوجد فريق GitLab للمشاريع المحددة. أضف واحداً يدوياً أدناه.",
       "glGroup": "مجموعة GitLab",
       "newTeam": "جديدة",
       "noMembers": "بلا أعضاء — أضف البعض أدناه",
@@ -1024,7 +1024,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "审查配置。之后可以在选项中更改所有内容。",
       "baseUrl": "基础URL",
       "serviceToken": "服务令牌",
-      "tokenHint": "范围read_api。存储在服务器端用于提取，永远不会向用户显示。",
+      "tokenHint": "群组、项目或个人令牌（read_api 范围）。存储在服务器端，绝不向用户显示。",
       "timeout": "超时（秒）",
       "timeoutHint": "API请求的最大延迟。",
       "selfSigned": "自签名证书",
@@ -1046,7 +1046,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "请至少选择一个项目（项目步骤）以加载其标签。",
       "noLabelsFetched": "未获取到该项目的任何标签。请检查令牌是否具有 read_api 范围及项目访问权限。",
       "labelsNonProd": "个标签已获取，但没有任何属于 « Prod:: » 范围。阶段基于 « Prod::Xxx » 标签。您的标签：",
-      "groupConn": "连接到群组", "groupToken": "群组令牌", "advanced": "高级选项",
+      "groupConn": "连接到群组", "groupToken": "令牌", "advanced": "高级选项",
       "advancedHint": "仅需为自托管的 GitLab 实例调整。默认值适用于 gitlab.com。",
       "adminSec": "管理员", "adminNone": "未识别", "adminOk": "管理员", "connecting": "正在连接到 GitLab…",
       "withGitlab": "使用 GitLab 登录", "connectedShort": "已连接",
@@ -1065,7 +1065,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "添加阶段",
       "labelMapping": "标签映射",
       "notTracked": "未跟踪",
-      "teamsIntro": "从 <b>GitLab组</b>导入的团队。<b>Lead</b> = 维护者 · <b>成员</b> = 开发者。一个成员可以属于 <b>多个团队</b>。",
+      "teamsIntro": "从 <b>GitLab组</b>导入的团队。<b>Lead</b> = 维护者 · <b>成员</b> = 开发者。一个成员可以属于 <b>多个团队</b>。", "noTeamsForProj": "所选项目没有 GitLab 团队。请在下方手动添加。",
       "glGroup": "GitLab组",
       "newTeam": "新建",
       "noMembers": "无成员 — 在下方添加",
@@ -1119,7 +1119,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "hs5": "設定を確認。後でオプションで すべて変更可能。",
       "baseUrl": "ベースURL",
       "serviceToken": "サービストークン",
-      "tokenHint": "スコープ read_api。サーバーサイドで抽出に保存され、ユーザーには表示されません。",
+      "tokenHint": "グループ、プロジェクト、または個人トークン（read_api スコープ）。サーバー側に保存され、ユーザーには表示されません。",
       "timeout": "タイムアウト（秒）",
       "timeoutHint": "APIリクエストの最大遅延。",
       "selfSigned": "自己署名証明書",
@@ -1141,7 +1141,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "ラベルを読み込むには、少なくとも1つのプロジェクトを選択してください（プロジェクト手順）。",
       "noLabelsFetched": "このプロジェクトのラベルを取得できませんでした。トークンに read_api スコープとプロジェクトへのアクセス権があるか確認してください。",
       "labelsNonProd": "個のラベルを取得しましたが、« Prod:: » スコープのものはありません。フェーズは « Prod::Xxx » ラベルに基づきます。あなたのラベル：",
-      "groupConn": "グループへの接続", "groupToken": "グループトークン", "advanced": "詳細オプション",
+      "groupConn": "グループへの接続", "groupToken": "トークン", "advanced": "詳細オプション",
       "advancedHint": "セルフホスト型のGitLabインスタンスの場合のみ調整してください。デフォルト値は gitlab.com に適しています。",
       "adminSec": "管理者", "adminNone": "未確認", "adminOk": "管理者", "connecting": "GitLabに接続中…",
       "withGitlab": "GitLabで接続", "connectedShort": "接続済み",
@@ -1160,7 +1160,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "addPhase": "フェーズを追加",
       "labelMapping": "ラベルマッピング",
       "notTracked": "未追跡",
-      "teamsIntro": "<b>GitLabグループ</b>からインポート済みチーム。<b>リード</b> = メンテナー · <b>メンバー</b> = 開発者。メンバーは<b>複数チーム</b>に属せます。",
+      "teamsIntro": "<b>GitLabグループ</b>からインポート済みチーム。<b>リード</b> = メンテナー · <b>メンバー</b> = 開発者。メンバーは<b>複数チーム</b>に属せます。", "noTeamsForProj": "選択したプロジェクトに対応する GitLab チームがありません。下から手動で追加してください。",
       "glGroup": "GitLabグループ",
       "newTeam": "新規",
       "noMembers": "メンバーなし — 以下から追加",
@@ -1232,6 +1232,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function render(){
     if(ST.launching){app.innerHTML=launchHtml();return;}
     persistST();
+    var _scEl=document.getElementById('body');var _scPos=_scEl?_scEl.scrollTop:0; // préserve le scroll : un clic ne doit pas remonter la vue
     var h='<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright"><div class="count">'+T.stepOf.replace('{n}',ST.step+1)+'</div>'+LANG_SWITCH+'</div></div>';
     h+='<div class="step"><div class="stepper">';
     for(var i=0;i<STEP_META.length;i++){var st=i<ST.step?'done':i===ST.step?'cur':'';h+='<div class="node '+st+'" data-act="goto:'+i+'"><div class="dot">'+(i<ST.step?ic('check',16):(i+1))+'</div><div class="nl">'+STEP_META[i][0]+'</div></div>';if(i<STEP_META.length-1)h+='<div class="line'+(i<ST.step?' done':'')+'"></div>';}
@@ -1241,6 +1242,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else h+='<button class="btn primary'+(canNext()?'':' disabled')+'" data-act="next">'+T.continue+' '+ic('chevR',16)+'</button>';
     h+='</div></div>';
     app.innerHTML=h;
+    var _scNew=document.getElementById('body');if(_scNew)_scNew.scrollTop=_scPos; // restaure la position (go() remet à 0 lors d'un changement d'étape)
   }
   function head(){
     var meta=[[T.eb1,T.ht1,'link'],[T.eb2,T.ht2,'box'],[T.eb3,T.ht3,'layers'],[T.eb4,T.ht4,'users'],[T.eb5,T.ht5,'rocket']][ST.step];
@@ -1374,8 +1376,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function s3(){
     var roleOpts=[['lead',T.roleLead],['member',T.roleMember]];
     var h='<div class="note">'+sic('info')+'<div>'+T.teamsIntro+'</div></div><div class="teamcol">';
-    for(var t=0;t<ST.teams.length;t++){var tm=ST.teams[t];var mem=ST.memberships.filter(function(m){return m.teamId===tm.id;});var open=ST.teamOpen.indexOf(tm.id)>=0;
-      h+='<div class="team suA-teamacc'+(open?' open':'')+'"><div class="teamh" data-act="team:'+tm.id+'"><span class="suA-teamchev">'+ic('chevR',15)+'</span><input class="teamname" data-team="'+t+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">'+T.glGroup+'</span>':'<span class="newbadge">'+T.newTeam+'</span>')+'<span class="suA-teamcount">'+mem.length+' '+(mem.length>1?T.members:T.member)+'</span><span class="suA-teampreview">';
+    var vt=visibleTeams();
+    if(!vt.length)h+='<div class="empty" style="padding:14px 0">'+T.noTeamsForProj+'</div>';
+    for(var t=0;t<vt.length;t++){var tm=vt[t];var mem=ST.memberships.filter(function(m){return m.teamId===tm.id;});var open=ST.teamOpen.indexOf(tm.id)>=0;
+      h+='<div class="team suA-teamacc'+(open?' open':'')+'"><div class="teamh" data-act="team:'+tm.id+'"><span class="suA-teamchev">'+ic('chevR',15)+'</span><input class="teamname" data-team="'+tm.id+'" value="'+esc(tm.name)+'">'+(tm.gitlab?'<span class="glbadge">'+T.glGroup+'</span>':'<span class="newbadge">'+T.newTeam+'</span>')+'<span class="suA-teamcount">'+mem.length+' '+(mem.length>1?T.members:T.member)+'</span><span class="suA-teampreview">';
       for(var pv=0;pv<Math.min(5,mem.length);pv++)h+=av(mem[pv].pid,POOLname(mem[pv].pid),20);
       h+='</span><button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div>';
       if(open){h+='<div class="mlist">';
@@ -1392,9 +1396,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function s4(){
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
     var mapped=0;for(var k in ST.labelPhase)if(ST.labelPhase[k]&&ST.labelPhase[k]!=='none')mapped++;
-    var ppl={};ST.memberships.forEach(function(m){ppl[m.pid]=1;});
+    var _vt=visibleTeams();var _vid={};_vt.forEach(function(t){_vid[t.id]=1;});
+    var ppl={};ST.memberships.forEach(function(m){if(_vid[m.teamId])ppl[m.pid]=1;});
     var phVal=ST.phaseScope==='per'?T.perProjectRecap:(mapped+T.labelsLinked);
-    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,ST.teams.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
+    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,_vt.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
     var h='<div class="recap">';
     for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
     h+='</div>';
@@ -1410,6 +1415,16 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function POOLname(id){return PEOPLE[id]||id;}
   function allPeople(){return Object.keys(PEOPLE);}
 
+  // Équipes visibles = équipes manuelles (toujours) + groupes GitLab rattachés à un projet SÉLECTIONNÉ
+  // (le groupe possède le namespace du projet, ou en est un ancêtre). Évite d'afficher tous les groupes.
+  function selNamespaces(){var s={};ST.projects.forEach(function(p){if(ST.importIds.indexOf(p.id)>=0&&p.groupFull)s[p.groupFull]=1;});return Object.keys(s);}
+  // Garde-fou migration : un localStorage écrit par un build ANTÉRIEUR a des projets SANS groupFull. Dans ce cas
+  // on ne peut pas filtrer de façon fiable → on n'exclut PAS les équipes GitLab (sinon elles disparaîtraient de
+  // l'affichage ET du payload de save). Le filtrage normal reprend dès un nouveau « Tester la connexion ».
+  function nsDataMissing(){var sel=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;});return sel.length>0&&!sel.some(function(p){return p.groupFull;});}
+  function teamVisible(tm){if(!tm.gitlab)return true;if(nsDataMissing())return true;var gp=tm.groupPath||tm.name;return selNamespaces().some(function(n){return n===gp||n.indexOf(gp+'/')===0;});}
+  function visibleTeams(){return ST.teams.filter(teamVisible);}
+
   // ---- actions ----
   function conn(){return {baseUrl:ST.baseUrl.trim().replace(/\/+$/,''),token:ST.token.trim(),selfSigned:ST.selfSigned,timeout:parseInt(ST.timeout,10)||60};}
   function doTest(){
@@ -1421,7 +1436,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         // Par défaut : AUCUN projet coché. L'admin sélectionne explicitement (ou « Tout cocher »).
         // build teams + memberships + people from groups
         PEOPLE={};ST.teams=[];ST.memberships=[];
-        (ST.groups||[]).forEach(function(g,gi){var id='g'+gi;ST.teams.push({id:id,name:g.name,gitlab:true});
+        (ST.groups||[]).forEach(function(g,gi){var id='g'+gi;ST.teams.push({id:id,name:g.name,gitlab:true,groupPath:g.name});
           (g.members||[]).forEach(function(mb){PEOPLE[mb.username]=mb.name||mb.username;ST.memberships.push({pid:mb.username,teamId:id,role:mb.role==='lead'?'lead':'member'});});});
         ST.test='ok';render();
       }).catch(function(){ST.test='err';render();});
@@ -1451,7 +1466,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       admins:[],
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
-      teams:ST.teams.map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
+      teams:visibleTeams().map(function(t){return {name:t.name,members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
     // Mode « Par projet » : on transmet aussi les phases + associations distinctes par projet (Stage 2 côté dashboard).
     if(ST.phaseScope==='per'){var pbp={},lbp={};ST.importIds.forEach(function(id){pbp[id]=perPayload(ST.phasesByProject[id]||ST.phases);lbp[id]=ST.labelPhaseByProject[id]||ST.labelPhase;});payload.periodsByProject=pbp;payload.labelPhasesByProject=lbp;}
     fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
@@ -1492,7 +1507,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       +(done?'':'<button class="btn '+(err?'outline':'ghost')+' sm" data-act="cancelLaunch">'+(err?T.backToConfig:ic('chevL',15)+T.cancel)+'</button>')
       +'</div></div>';
   }
-  function go(n){ if(n>ST.step && !canNext())return; if(n===2 && !ST.labelsLoaded){ST.step=2;render();loadLabels(render);return;} ST.step=n; render(); document.getElementById('body').scrollTop=0; }
+  function toTop(){var b=document.getElementById('body');if(b)b.scrollTop=0;}
+  function go(n){ if(n>ST.step && !canNext())return; if(n===2 && !ST.labelsLoaded){ST.step=2;render();toTop();loadLabels(function(){render();toTop();});return;} ST.step=n; render(); toTop(); }
 
   app.addEventListener('click',function(e){
     var b=e.target.closest('[data-act]');if(!b)return;var a=b.dataset.act;
@@ -1525,12 +1541,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a==='oauthsave'){doOauthSave();}
     else if(a==='oauthedit'){ST.oauthEdit=true;ST.adminErr='';render();}
     else if(a==='oauthcancel'){ST.oauthEdit=false;ST.adminErr='';render();}
-    else if(a==='adminchange'){persistST();window.location.href='/auth/oauth?return=/setup';}
+    else if(a==='adminchange'){persistST();window.location.href='/logout?return=/setup';} // déconnecte la session app → réaffiche « Se connecter avec GitLab » (sinon GitLab ré-approuve le même compte)
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';return;}
-    var tn=e.target.closest('[data-team]');if(tn){ST.teams[+tn.dataset.team].name=tn.value;return;}
+    var tn=e.target.closest('[data-team]');if(tn){var _t=ST.teams.filter(function(x){return x.id===tn.dataset.team;})[0];if(_t)_t.name=tn.value;return;}
     var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ensurePer();curPhases().forEach(function(p){if(p.id===pid)p.name=pn.value;});}
   });
   app.addEventListener('change',function(e){

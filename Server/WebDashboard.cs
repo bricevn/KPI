@@ -285,7 +285,7 @@ public sealed class WebDashboard
                 CookieRequestCultureProvider.DefaultCookieName,
                 CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(c)),
                 new CookieOptions { HttpOnly = false, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(365), IsEssential = true });
-            var back = (!string.IsNullOrEmpty(@return) && @return.StartsWith("/") && !@return.StartsWith("//")) ? @return : "/";
+            var back = SafeLocalReturn(@return);
             return Results.Redirect(back);
         }).AllowAnonymous();
 
@@ -340,7 +340,7 @@ public sealed class WebDashboard
         {
             if (!self._config.Auth.OAuthConfigured) return Results.Redirect("/login");
             // @return validé chemin local (anti open-redirect) : permet à /setup de revenir au wizard après OAuth.
-            var back = (!string.IsNullOrEmpty(@return) && @return.StartsWith("/") && !@return.StartsWith("//")) ? @return : "/";
+            var back = SafeLocalReturn(@return);
             return Results.Challenge(new AuthenticationProperties { RedirectUri = back }, new[] { "gitlab" });
         }).AllowAnonymous().RequireRateLimiting("login");
 
@@ -349,10 +349,13 @@ public sealed class WebDashboard
         app.MapPost("/api/auth/token", (Func<HttpContext, Task<IResult>>)(ctx => self.LoginWithTokenAsync(ctx)))
            .AllowAnonymous().RequireRateLimiting("login");
 
-        app.MapGet("/logout", async (HttpContext ctx) =>
+        app.MapGet("/logout", async (HttpContext ctx, string? @return) =>
         {
             await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return Results.Redirect("/");
+            // @return validé chemin local (anti open-redirect) : permet au setup de revenir au wizard
+            // après déconnexion (bouton « Modifier » l'admin → réaffiche l'écran de connexion).
+            var back = SafeLocalReturn(@return);
+            return Results.Redirect(back);
         });
 
         Console.WriteLine("=== Dashboard server (ASP.NET Core) prêt ===");
@@ -365,6 +368,18 @@ public sealed class WebDashboard
         // Arrêt propre quand le token de Program.cs (Ctrl+C) est annulé.
         ct.Register(() => { try { app.Lifetime.StopApplication(); } catch { } });
         await app.RunAsync();
+    }
+
+    /// <summary>
+    /// Chemin de retour LOCAL sûr (anti open-redirect). Accepte uniquement un chemin commençant par '/'
+    /// qui n'est PAS protocol-relative : refuse « //host » ET « /\host » (les navigateurs normalisent '\'
+    /// en '/', donc « /\host » devient « //host » → redirection externe). Sinon repli sur <paramref name="fallback"/>.
+    /// </summary>
+    private static string SafeLocalReturn(string? value, string fallback = "/")
+    {
+        if (string.IsNullOrEmpty(value) || value[0] != '/') return fallback;
+        if (value.Length >= 2 && (value[1] == '/' || value[1] == '\\')) return fallback;
+        return value;
     }
 
     // --- Endpoints ------------------------------------------------------
@@ -776,7 +791,9 @@ public sealed class WebDashboard
         var pj = await GlGet(http, baseUri, "/api/v4/projects?membership=true&simple=true&per_page=100&order_by=name&sort=asc", token, ctx.RequestAborted);
         foreach (var p in pj?.AsArray() ?? new JsonArray())
             projects.Add(new { id = p!["id"]!.GetValue<int>(), name = p["name"]!.GetValue<string>(),
-                group = p["namespace"]?["path"]?.GetValue<string>() ?? "" });
+                group = p["namespace"]?["path"]?.GetValue<string>() ?? "",
+                // full_path du namespace : clé STABLE pour rattacher un projet à son groupe (= group.name = full_path).
+                groupFull = p["namespace"]?["full_path"]?.GetValue<string>() ?? "" });
 
         var groups = new List<object>();
         var gj = await GlGet(http, baseUri, "/api/v4/groups?per_page=100&order_by=name", token, ctx.RequestAborted);
