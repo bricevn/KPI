@@ -19,15 +19,14 @@ public static class SetupView
 {
     public static string Page(AuthConfig auth, string culture = "en")
     {
-        // Champ instance TOUJOURS vide par défaut (placeholder gitlab.com) — AUCUN pré-remplissage, même quand une
-        // instance est déjà configurée (demande explicite). L'instance configurée n'est exposée que pour AFFICHAGE
-        // (indicateur « Instance : … » à côté de « Reconfigurer »), via __OAUTH_AUTHORITY__ — jamais dans le champ.
+        // Champ instance TOUJOURS vide par défaut (placeholder gitlab.com) — AUCUN pré-remplissage ET AUCUNE trace
+        // de l'instance configurée dans la page (ni champ, ni indicateur). L'« Instance : … » ne reflète que ce que
+        // l'utilisateur saisit dans le champ base url (mis à jour en direct) ; vide → « — ».
         var lc = Kpi.Localization.Loc.Normalize(culture);
         var langOptions = string.Join("", Kpi.Localization.Loc.List().Select(l =>
             $"<option value=\"{l[0]}\"{(l[0] == lc ? " selected" : "")}>{HtmlAttr(l[1])}</option>"));
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
-            .Replace("__OAUTH_AUTHORITY__", HtmlAttr((auth.Authority ?? "").TrimEnd('/')))
             .Replace("__DEFAULT_INSTANCE__", "")
             .Replace("__SLANG__", lc)
             .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
@@ -324,7 +323,6 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // ---- i18n (FR/EN) ----
   var SLANG='__SLANG__';
   var OAUTHOK=__OAUTH__; // OAuth GitLab configuré côté serveur (Auth.ClientId/ClientSecret)
-  var OAUTHAUTH='__OAUTH_AUTHORITY__'; // instance configurée — AFFICHAGE seul (« Instance : … »), jamais dans le champ
   var I18N={
     fr:{
       bs:"Mise en service", stepOf:"Étape {n} sur 5",
@@ -1211,8 +1209,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // toujours (sinon un ancien localStorage rouvrirait l'ancien état et masquerait le bouton admin).
   // NB : 'baseUrl' VOLONTAIREMENT non persisté → le champ instance est TOUJOURS vide par défaut (placeholder
   // gitlab.com), même si une instance est déjà configurée. Le SSO passant en popup, le wizard ne se recharge
-  // plus → pas besoin de le restaurer. L'instance configurée n'apparaît que dans l'indicateur « Instance : … »
-  // (OAUTHAUTH, affichage seul), jamais pré-remplie dans le champ.
+  // plus → pas besoin de le restaurer. L'instance configurée n'est exposée NULLE PART dans la page par défaut.
   var PKEYS=['step','token','timeout','selfSigned','test','projects','groups','importIds','labels',
     'labelsDiag','labelsLoaded','labelPhase','phases','phaseScope','phaseProj','phasesByProject',
     'labelPhaseByProject','teams','memberships'];
@@ -1309,8 +1306,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         if(reconf)h+='<button class="btn ghost sm" data-act="oauthcancel" style="margin-top:6px">'+T.cancel+'</button>';
         h+='</div>';
       } else {
-        // Indicateur = instance SAISIE (ST.baseUrl) si présente, sinon instance configurée (OAUTHAUTH). #curInst
-        // est mis à jour en direct quand on tape dans le champ base url (cf. handler 'input').
+        // Indicateur = UNIQUEMENT l'instance saisie (ST.baseUrl), vide → « — ». #curInst est mis à jour en direct
+        // quand on tape dans le champ base url (cf. handler 'input'). Aucune instance configurée affichée par défaut.
         h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
         h+='<div class="suA-oauthcur">'+T.oauthCurrent+' <code id="curInst">'+esc(oauthInst()||'—')+'</code></div>';
         h+='<button class="btn outline sm suA-reconf" data-act="oauthedit">'+ic('key',15)+' '+T.oauthReconfigure+'</button>';
@@ -1452,8 +1449,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   // ---- actions ----
   function conn(){return {baseUrl:ST.baseUrl.trim().replace(/\/+$/,''),token:ST.token.trim(),selfSigned:ST.selfSigned,timeout:parseInt(ST.timeout,10)||60};}
-  // Hôte affiché dans « Instance : … » : ce qui est SAISI dans le champ base url (live), sinon l'instance configurée.
-  function oauthInst(){var b=(ST.baseUrl||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');return b||(OAUTHAUTH||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');}
+  // Hôte affiché dans « Instance : … » : UNIQUEMENT ce qui est saisi dans le champ base url (live). Vide → « — ».
+  // Aucune trace de l'instance configurée par défaut (demande explicite).
+  function oauthInst(){return (ST.baseUrl||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');}
   function doTest(){
     ST.test='testing';render();
     fetch('/api/setup/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(conn())})
