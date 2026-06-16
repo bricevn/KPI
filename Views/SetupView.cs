@@ -19,12 +19,16 @@ public static class SetupView
 {
     public static string Page(AuthConfig auth, string culture = "en")
     {
-        var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
+        // Pas de défaut gitlab.com : champ VIDE au bootstrap (placeholder) pour ne pas piéger les instances
+        // self-hosted (sinon l'Authority OAuth retombe silencieusement sur gitlab.com). Une fois configuré,
+        // pré-rempli avec l'Authority enregistrée pour permettre la reconfiguration.
+        var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "";
         var lc = Kpi.Localization.Loc.Normalize(culture);
         var langOptions = string.Join("", Kpi.Localization.Loc.List().Select(l =>
             $"<option value=\"{l[0]}\"{(l[0] == lc ? " selected" : "")}>{HtmlAttr(l[1])}</option>"));
         return Html
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
+            .Replace("__OAUTH_CLIENTID__", HtmlAttr(auth.ClientId ?? ""))
             .Replace("__DEFAULT_INSTANCE__", HtmlAttr(defaultInstance))
             .Replace("__SLANG__", lc)
             .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
@@ -355,7 +359,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintPer:"Phases et associations distinctes pour chaque projet.",
       member:"membre", members:"membres", perProjectRecap:"par projet · phases & labels distincts",
       oauthStep1:"Créez une application OAuth sur GitLab (Redirect URI ci-dessous, scope read_user), puis collez les identifiants.",
-      oauthOpenApps:"Ouvrir les Applications GitLab", oauthSaveConnect:"Enregistrer & se connecter",
+      oauthOpenApps:"Ouvrir les Applications GitLab", oauthSaveConnect:"Enregistrer & se connecter", oauthReconfigure:"Reconfigurer l'OAuth", oauthCurrent:"Instance :",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -407,7 +411,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintPer:"Separate phases and mappings for each project.",
       member:"member", members:"members", perProjectRecap:"per project · separate phases &amp; labels",
       oauthStep1:"Create an OAuth application on GitLab (Redirect URI below, scope read_user), then paste the credentials.",
-      oauthOpenApps:"Open GitLab Applications", oauthSaveConnect:"Save & sign in",
+      oauthOpenApps:"Open GitLab Applications", oauthSaveConnect:"Save & sign in", oauthReconfigure:"Reconfigure OAuth", oauthCurrent:"Instance:",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -482,7 +486,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "Fases y asociaciones distintas para cada proyecto.",
       "member": "miembro", "members": "miembros", "perProjectRecap": "por proyecto · fases y etiquetas distintas",
       "oauthStep1": "Crea una aplicación OAuth en GitLab (Redirect URI abajo, scope read_user), luego pega las credenciales.",
-      "oauthOpenApps": "Abrir Aplicaciones de GitLab", "oauthSaveConnect": "Guardar y conectarse",
+      "oauthOpenApps": "Abrir Aplicaciones de GitLab", "oauthSaveConnect": "Guardar y conectarse", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instancia:",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -577,7 +581,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "Eigene Phasen und Zuordnungen für jedes Projekt.",
       "member": "Mitglied", "members": "Mitglieder", "perProjectRecap": "pro Projekt · eigene Phasen &amp; Labels",
       "oauthStep1": "Erstellen Sie eine OAuth-Anwendung in GitLab (Redirect URI unten, scope read_user) und fügen Sie dann die Zugangsdaten ein.",
-      "oauthOpenApps": "GitLab-Anwendungen öffnen", "oauthSaveConnect": "Speichern & anmelden",
+      "oauthOpenApps": "GitLab-Anwendungen öffnen", "oauthSaveConnect": "Speichern & anmelden", "oauthReconfigure": "OAuth neu konfigurieren", "oauthCurrent": "Instanz:",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -672,7 +676,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "Fasi e associazioni distinte per ogni progetto.",
       "member": "membro", "members": "membri", "perProjectRecap": "per progetto · fasi &amp; etichette distinte",
       "oauthStep1": "Crea un'applicazione OAuth su GitLab (Redirect URI sotto, scope read_user), poi incolla le credenziali.",
-      "oauthOpenApps": "Apri Applicazioni GitLab", "oauthSaveConnect": "Salva e accedi",
+      "oauthOpenApps": "Apri Applicazioni GitLab", "oauthSaveConnect": "Salva e accedi", "oauthReconfigure": "Riconfigura OAuth", "oauthCurrent": "Istanza:",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -767,7 +771,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "Fases e associações distintas para cada projeto.",
       "member": "membro", "members": "membros", "perProjectRecap": "por projeto · fases e rótulos distintos",
       "oauthStep1": "Crie uma aplicação OAuth no GitLab (Redirect URI abaixo, scope read_user) e cole as credenciais.",
-      "oauthOpenApps": "Abrir Aplicações GitLab", "oauthSaveConnect": "Guardar e iniciar sessão",
+      "oauthOpenApps": "Abrir Aplicações GitLab", "oauthSaveConnect": "Guardar e iniciar sessão", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instância:",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -862,7 +866,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "Отдельные фазы и связи для каждого проекта.",
       "member": "участник", "members": "участники", "perProjectRecap": "по проекту · отдельные фазы и метки",
       "oauthStep1": "Создайте OAuth-приложение в GitLab (Redirect URI ниже, scope read_user), затем вставьте учётные данные.",
-      "oauthOpenApps": "Открыть приложения GitLab", "oauthSaveConnect": "Сохранить и войти",
+      "oauthOpenApps": "Открыть приложения GitLab", "oauthSaveConnect": "Сохранить и войти", "oauthReconfigure": "Перенастроить OAuth", "oauthCurrent": "Экземпляр:",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -957,7 +961,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "مراحل وارتباطات مستقلة لكل مشروع.",
       "member": "عضو", "members": "أعضاء", "perProjectRecap": "حسب المشروع · مراحل وتسميات مستقلة",
       "oauthStep1": "أنشئ تطبيق OAuth في GitLab (Redirect URI أدناه، scope read_user)، ثم الصق بيانات الاعتماد.",
-      "oauthOpenApps": "فتح تطبيقات GitLab", "oauthSaveConnect": "حفظ وتسجيل الدخول",
+      "oauthOpenApps": "فتح تطبيقات GitLab", "oauthSaveConnect": "حفظ وتسجيل الدخول", "oauthReconfigure": "إعادة تكوين OAuth", "oauthCurrent": "المثيل:",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -1052,7 +1056,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "每个项目使用各自不同的阶段和关联。",
       "member": "名成员", "members": "名成员", "perProjectRecap": "按项目 · 各自独立的阶段和标签",
       "oauthStep1": "在 GitLab 上创建一个 OAuth 应用（下方的 Redirect URI，scope read_user），然后粘贴凭据。",
-      "oauthOpenApps": "打开 GitLab 应用", "oauthSaveConnect": "保存并登录",
+      "oauthOpenApps": "打开 GitLab 应用", "oauthSaveConnect": "保存并登录", "oauthReconfigure": "重新配置 OAuth", "oauthCurrent": "实例：",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -1147,7 +1151,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintPer": "プロジェクトごとに個別のフェーズと関連付け。",
       "member": "メンバー", "members": "メンバー", "perProjectRecap": "プロジェクトごと · フェーズ &amp; ラベルを個別に",
       "oauthStep1": "GitLab で OAuth アプリを作成し（下記の Redirect URI、scope read_user）、認証情報を貼り付けてください。",
-      "oauthOpenApps": "GitLab アプリを開く", "oauthSaveConnect": "保存してサインイン",
+      "oauthOpenApps": "GitLab アプリを開く", "oauthSaveConnect": "保存してサインイン", "oauthReconfigure": "OAuthを再設定", "oauthCurrent": "インスタンス：",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -1190,7 +1194,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',adminErr:'',
+    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'__OAUTH_CLIENTID__',oauthSecret:'',oauthEdit:false,adminErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1260,7 +1264,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var h='<div class="suA-acc'+(gOpen?' open':'')+'"><button class="suA-acchead" data-act="acc1:group"><span class="ic">'+ic('server',16)+'</span><span class="suA-acct">'+T.groupConn+'</span><span class="suA-accprev">'+gPrev+'</span><span class="suA-accchev">'+ic('chevR',16)+'</span></button>';
     if(gOpen){
       h+='<div class="suA-accbody">'
-        +'<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" value="'+esc(ST.baseUrl)+'"></div></div>'
+        +'<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span></div><div class="box">'+sic('server')+'<input data-field="baseUrl" placeholder="https://gitlab.exemple.com" value="'+esc(ST.baseUrl)+'"></div></div>'
         +'<div class="field"><div class="flabel">'+T.groupToken+' <span class="req">*</span>'+info(T.tokenHint)+'</div><div class="box">'+sic('key')+'<input data-field="token" type="'+(ST.showTok?'text':'password')+'" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" value="'+esc(ST.token)+'"><button class="eye" data-act="eye">'+ic('eye',17)+'</button></div></div>'
         +'<div class="suA-testrow"><button class="btn outline sm" data-act="test"'+(ST.test==='testing'?' disabled':'')+'>'+ic('zap',16)+T.testConn+'</button>'+chip+'</div>'
         +'<details class="suA-adv"><summary>'+T.advanced+info(T.advancedHint)+'</summary><div class="suA-advgrid">'
@@ -1276,18 +1280,26 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         h+='<div class="suA-admincard"><span class="suA-adminav" style="background:'+avColor(au.handle||au.name||'a')+'">'+esc((au.name||'?').charAt(0).toUpperCase())+'</span>'
           +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
           +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span><button class="suA-adminchange" data-act="adminchange">'+T.edit+'</button></div>';
-      } else if(!OAUTHOK){
+      } else if(!OAUTHOK || ST.oauthEdit){
         var redir=location.origin+'/signin-gitlab';
-        var appsUrl=(ST.baseUrl||'').replace(/\/+$/,'')+'/-/profile/applications';
+        var bu=(ST.baseUrl||'').replace(/\/+$/,'');
+        var appsUrl=bu+'/-/profile/applications';
+        var reconf=OAUTHOK&&ST.oauthEdit; // reconfiguration : secret optionnel (conservé si vide)
         h+='<div class="suA-oauthsetup">'
-          +'<div class="suA-oauthstep"><span class="suA-oauthnum">1</span><div>'+T.oauthStep1+'<div class="suA-oauthredir">Redirect URI : <code>'+esc(redir)+'</code> · scope <code>read_user</code></div><a class="suA-oauthlink" href="'+esc(appsUrl)+'" target="_blank" rel="noopener">'+T.oauthOpenApps+' '+ic('arrow',13)+'</a></div></div>'
+          // Champ instance EXPLICITE : l'Authority OAuth ne peut plus retomber silencieusement sur gitlab.com.
+          +'<div class="field"><div class="flabel">'+T.baseUrl+' <span class="req">*</span>'+info(T.advancedHint)+'</div><div class="box">'+sic('server')+'<input data-field="baseUrl" placeholder="https://gitlab.exemple.com" value="'+esc(ST.baseUrl)+'"></div></div>'
+          +'<div class="suA-oauthstep"><span class="suA-oauthnum">1</span><div>'+T.oauthStep1+'<div class="suA-oauthredir">Redirect URI : <code>'+esc(redir)+'</code> · scope <code>read_user</code></div>'+(bu?'<a class="suA-oauthlink" href="'+esc(appsUrl)+'" target="_blank" rel="noopener">'+T.oauthOpenApps+' '+ic('arrow',13)+'</a>':'')+'</div></div>'
           +'<div class="field"><div class="flabel">Application ID <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthClientId" value="'+esc(ST.oauthClientId)+'"></div></div>'
-          +'<div class="field"><div class="flabel">Secret <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthSecret" type="password" value="'+esc(ST.oauthSecret)+'"></div></div>';
+          +'<div class="field"><div class="flabel">Secret '+(reconf?'':'<span class="req">*</span>')+'</div><div class="box">'+sic('key')+'<input data-field="oauthSecret" type="password"'+(reconf?' placeholder="••••••••"':'')+' value="'+esc(ST.oauthSecret)+'"></div></div>';
         if(ST.adminErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.adminErr)+'</div></div>';
-        h+='<button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauthsave"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.oauthSaveConnect)+'</button>'
-          +'</div>';
+        h+='<button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauthsave"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.oauthSaveConnect)+'</button>';
+        if(reconf)h+='<button class="btn ghost sm" data-act="oauthcancel" style="margin-top:6px">'+T.cancel+'</button>';
+        h+='</div>';
       } else {
+        var curInst=(ST.baseUrl||'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
         h+='<div class="suA-adminrow"><button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauth"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.withGitlab)+'</button></div>';
+        // Instance courante visible + reconfiguration accessible (corriger une Authority erronée sans redémarrer).
+        h+='<div class="suA-oauthredir" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+T.oauthCurrent+' <code>'+esc(curInst||'—')+'</code><button class="suA-adminchange" data-act="oauthedit">'+T.oauthReconfigure+'</button></div>';
       }
       h+='</div>';
     }
@@ -1511,6 +1523,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
     else if(a==='oauth'){persistST();ST.adminState='connecting';render();window.location.href='/auth/oauth?return=/setup';}
     else if(a==='oauthsave'){doOauthSave();}
+    else if(a==='oauthedit'){ST.oauthEdit=true;ST.adminErr='';render();}
+    else if(a==='oauthcancel'){ST.oauthEdit=false;ST.adminErr='';render();}
     else if(a==='adminchange'){persistST();window.location.href='/auth/oauth?return=/setup';}
     else if(a.indexOf('team:')===0){if(e.target.closest('input,select'))return;var tid2=a.slice(5);var k2=ST.teamOpen.indexOf(tid2);if(k2>=0)ST.teamOpen.splice(k2,1);else ST.teamOpen.push(tid2);render();}
   });

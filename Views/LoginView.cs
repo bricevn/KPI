@@ -26,7 +26,7 @@ public static class LoginView
     /// sans serveur configuré) et on affiche un CTA « Commencer la configuration » vers /setup.</summary>
     public static string Page(AuthConfig auth, string culture = "en", bool configured = true)
     {
-        var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "https://gitlab.com";
+        var defaultInstance = !string.IsNullOrWhiteSpace(auth.Authority) ? auth.Authority.TrimEnd('/') : "";
         var lc = Kpi.Localization.Loc.Normalize(culture);
         string T(string k) => Kpi.Localization.Loc.T(lc, k);
         var langOptions = string.Join("", Kpi.Localization.Loc.List().Select(l =>

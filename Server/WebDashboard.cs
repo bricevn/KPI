@@ -846,20 +846,27 @@ public sealed class WebDashboard
         var clientId     = (b?["clientId"]?.GetValue<string>() ?? "").Trim();
         var clientSecret = (b?["clientSecret"]?.GetValue<string>() ?? "").Trim();
         var authority    = (b?["authority"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
-            return Results.Json(new { ok = false, error = "Application ID et Secret requis." });
+        if (string.IsNullOrWhiteSpace(clientId))
+            return Results.Json(new { ok = false, error = "Application ID requis." });
+        // Instance EXPLICITE et obligatoire : plus de repli silencieux sur l'Authority existante (c'était le piège
+        // qui laissait gitlab.com quand le champ n'était pas renseigné → SSO vers gitlab.com public).
+        if (string.IsNullOrWhiteSpace(authority))
+            return Results.Json(new { ok = false, error = "Renseignez l'URL de l'instance GitLab (ex. https://gitlab.exemple.com)." });
+        if (!Uri.TryCreate(authority, UriKind.Absolute, out var au) || (au.Scheme != Uri.UriSchemeHttp && au.Scheme != Uri.UriSchemeHttps))
+            return Results.Json(new { ok = false, error = "URL d'instance invalide (http/https requis)." });
 
         JsonObject root;
         try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
         catch { root = new JsonObject(); }
         var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
-        if (string.IsNullOrWhiteSpace(authority)) authority = (auth["Authority"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(authority)) return Results.Json(new { ok = false, error = "Instance GitLab inconnue — testez d'abord la connexion au groupe." });
-        if (!Uri.TryCreate(authority, UriKind.Absolute, out var au) || (au.Scheme != Uri.UriSchemeHttp && au.Scheme != Uri.UriSchemeHttps))
-            return Results.Json(new { ok = false, error = "URL d'instance invalide (http/https requis)." });
+        // Secret : requis à la première config ; en RECONFIGURATION (champ laissé vide), on CONSERVE l'existant
+        // (permet de corriger l'instance seule sans recoller le secret).
+        var existingSecret = (auth["ClientSecret"]?.GetValue<string>() ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(clientSecret) && string.IsNullOrWhiteSpace(existingSecret))
+            return Results.Json(new { ok = false, error = "Secret requis." });
         auth["Authority"] = authority;
         auth["ClientId"] = clientId;
-        auth["ClientSecret"] = clientSecret;
+        if (!string.IsNullOrWhiteSpace(clientSecret)) auth["ClientSecret"] = clientSecret;
         if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
         // Cert auto-signé / CA interne : porté par l'étape 1 (avant l'enregistrement du serveur), persisté sur Auth
         // pour que le backchannel OAuth tolère le TLS dès le bootstrap. Conserve une valeur déjà posée si omise.
