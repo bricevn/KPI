@@ -305,6 +305,11 @@ public sealed class WebDashboard
         app.MapPost("/api/accounts", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveAccountsAsync(ctx)));
         app.MapPost("/api/cancel", (HttpContext ctx) => self.CancelAsync(ctx));
         app.MapPost("/api/refresh", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshAsync(ctx)));
+        // Édition de la config depuis le dashboard (ADMIN, cf. RequireAdmin) : listing live des projets/labels
+        // (via le token de groupe STOCKÉ) + sauvegarde des sections Export.* (projets/phases/labels).
+        app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
+        app.MapGet("/api/options/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsLabelsAsync(ctx)));
+        app.MapPost("/api/options", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveOptionsAsync(ctx)));
         // Identité résolue de l'utilisateur courant (rôle/périmètre/vue).
         app.MapGet("/api/me", (HttpContext ctx) => Results.Json(self.ResolveMe(ctx)));
         // Données du dashboard FILTRÉES selon le compte (cœur de la restriction côté serveur).
@@ -763,8 +768,9 @@ public sealed class WebDashboard
 
     private static async Task<JsonNode?> ReadJsonBody(HttpContext ctx)
     {
-        using var r = new StreamReader(ctx.Request.Body);
-        return JsonNode.Parse(await r.ReadToEndAsync());
+        // Corps vide / JSON malformé → null (les appelants tolèrent null via b?[...]) plutôt qu'une 500.
+        try { using var r = new StreamReader(ctx.Request.Body); return JsonNode.Parse(await r.ReadToEndAsync()); }
+        catch { return null; }
     }
 
     // Garde anti-SSRF du setup : URL absolue http/https + (si Auth.Authority défini) même hôte.
@@ -854,7 +860,7 @@ public sealed class WebDashboard
         var http = selfS ? _sharedHttpRelaxed : _sharedHttp;
         var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var perProject = new JsonArray();
-        foreach (var pidNode in b?["projectIds"]?.AsArray() ?? new JsonArray())
+        foreach (var pidNode in (b?["projectIds"] as JsonArray) ?? new JsonArray())
         {
             // ProjectIds tolérant : nombre (id) OU chaîne (id ou chemin "namespace/projet").
             var pid = pidNode is JsonValue v && v.TryGetValue<int>(out var iv) ? iv.ToString() : (pidNode?.GetValue<string>() ?? "");
@@ -875,6 +881,181 @@ public sealed class WebDashboard
             perProject.Add(new JsonObject { ["id"] = pid, ["count"] = count, ["ok"] = ok });
         }
         return Results.Json(new { ok = true, labels = set, total = set.Count, perProject });
+    }
+
+    // --- Édition de la config depuis le dashboard (ADMIN) -------------------------------------------------
+    /// <summary>Serveur GitLab du périmètre courant (claim de session, repli sur le 1er configuré).</summary>
+    private ServerConfig? CurrentServer(HttpContext ctx)
+        => ServerById(ctx.User.FindFirst(ServerClaim)?.Value) ?? _config.ResolveServers().FirstOrDefault();
+
+    // GET /api/options/projects → TOUS les projets accessibles au token de groupe STOCKÉ (+ flag imported).
+    private async Task<IResult> OptionsProjectsAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var server = CurrentServer(ctx);
+        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
+            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
+            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
+        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
+        var imported = new HashSet<int>(_config.Export.ProjectIds ?? new());
+        var projects = new List<object>();
+        var seen = new HashSet<int>();
+        for (int page = 1; page <= 10; page++)
+        {
+            var pj = await GlGet(http, baseUri, $"/api/v4/projects?membership=true&simple=true&per_page=100&page={page}&order_by=name&sort=asc", server.GroupToken, ctx.RequestAborted);
+            if (pj is not JsonArray arr || arr.Count == 0) break;
+            foreach (var p in arr)
+            {
+                if (p is not JsonObject po) continue;
+                var id = po["id"] is JsonValue iv && iv.TryGetValue<int>(out var ii) ? ii : 0;
+                if (id == 0 || !seen.Add(id)) continue;
+                projects.Add(new
+                {
+                    id,
+                    name = po["name"]?.GetValue<string>() ?? "",
+                    group = po["namespace"]?["path"]?.GetValue<string>() ?? "",
+                    groupFull = po["namespace"]?["full_path"]?.GetValue<string>() ?? "",
+                    imported = imported.Contains(id),
+                });
+            }
+            if (arr.Count < 100) break;
+        }
+        return Results.Json(new { ok = true, projects });
+    }
+
+    // GET /api/options/labels?projectIds=4,11 → labels (incl. ancêtres de groupe) des projets choisis.
+    private async Task<IResult> OptionsLabelsAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var server = CurrentServer(ctx);
+        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
+            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
+            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
+        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
+        var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pid in (ctx.Request.Query["projectIds"].ToString() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var enc = Uri.EscapeDataString(pid);
+            for (int page = 1; page <= 5; page++)
+            {
+                var lj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/labels?per_page=100&page={page}&include_ancestor_groups=true&with_counts=false", server.GroupToken, ctx.RequestAborted);
+                if (lj is not JsonArray arr || arr.Count == 0) break;
+                foreach (var l in arr) { var n = l?["name"]?.GetValue<string>(); if (!string.IsNullOrWhiteSpace(n)) set.Add(n); }
+                if (arr.Count < 100) break;
+            }
+        }
+        return Results.Json(new { ok = true, labels = set });
+    }
+
+    // POST /api/options → sauvegarde des sections Export (projets/phases/labels, global + par projet) ET
+    // Servers[<courant>].ProjectIds. PRÉSERVE GroupToken/BaseUrl/Auth/Teams. Hot-reload ; refetch optionnel.
+    // Réutilise la validation de SetupSaveAsync (clés de période uniques, hex strict, label→période croisée).
+    private async Task<IResult> SaveOptionsAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+
+        var projectIds = ((b?["projectIds"] as JsonArray) ?? new JsonArray())
+            .Select(n => n is JsonValue v && v.TryGetValue<int>(out var i) ? i : 0).Where(i => i > 0).Distinct().ToList();
+        if (projectIds.Count == 0) return Results.Json(new { ok = false, error = "Sélectionnez au moins un projet." });
+
+        var periodsArr = new JsonArray();
+        var validKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in (b?["periods"] as JsonArray) ?? new JsonArray())
+        {
+            if (p is not JsonObject po) continue;
+            var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(key) || key == "none" || !validKeys.Add(key)) continue;
+            var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
+            var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
+            var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
+            periodsArr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+        }
+        var trackedLabels = new List<string>();
+        var labelPhases = new Dictionary<string, string>();
+        foreach (var kv in ((b?["labelPhases"] as JsonObject) ?? new JsonObject()))
+        {
+            var ph = Str(kv.Value) ?? "none";
+            if (ph != "none" && validKeys.Count > 0 && !validKeys.Contains(ph)) ph = "none";
+            labelPhases[kv.Key] = ph;
+            if (ph != "none") trackedLabels.Add(kv.Key);
+        }
+        var projectsArr = new JsonArray();
+        foreach (var p in (b?["projects"] as JsonArray) ?? new JsonArray())
+        {
+            if (p is not JsonObject po) continue;
+            var pid = po["id"] is JsonValue piv && piv.TryGetValue<int>(out var pii) ? pii : 0; if (pid == 0) continue;
+            projectsArr.Add(new JsonObject { ["Id"] = pid, ["Name"] = (Str(po["name"]) ?? "").Trim(), ["Group"] = (Str(po["group"]) ?? "").Trim() });
+        }
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+
+        // Serveur courant : on met à jour SES ProjectIds, sans toucher au token ni à l'URL.
+        var serverId = CurrentServer(ctx)?.Id;
+        if (root["Servers"] is JsonArray serversArr && serverId != null)
+            foreach (var sNode in serversArr)
+                if (sNode is JsonObject so && string.Equals(so["Id"]?.GetValue<string>(), serverId, StringComparison.OrdinalIgnoreCase))
+                { so["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i.ToString())).ToArray()); break; }
+
+        var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
+        ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
+        ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
+        ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
+        if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
+        if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
+        if (b?["periodsByProject"] is JsonObject pbp)
+        {
+            var outPbp = new JsonObject();
+            foreach (var kv in pbp)
+            {
+                if (kv.Value is not JsonArray parr) continue;
+                var arr = new JsonArray(); var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in parr)
+                {
+                    if (p is not JsonObject po) continue;
+                    var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
+                    if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
+                    var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
+                    var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
+                    var timed = po["timed"] is JsonValue ptv && ptv.TryGetValue<bool>(out var ptb) ? ptb : true;
+                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+                }
+                outPbp[kv.Key] = arr;
+            }
+            ex["PeriodsByProject"] = outPbp;
+        }
+        if (b?["labelPhasesByProject"] is JsonObject lbp)
+        {
+            var outLbp = new JsonObject();
+            foreach (var kv in lbp)
+            {
+                if (kv.Value is not JsonObject m) continue;
+                var mm = new JsonObject();
+                foreach (var e in m) mm[e.Key] = (Str(e.Value) ?? "none");
+                outLbp[kv.Key] = mm;
+            }
+            ex["LabelPhasesByProject"] = outLbp;
+        }
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveOptions write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); _memberCache.Clear(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveOptions reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        var refetch = b?["refetch"] is JsonValue rv && rv.TryGetValue<bool>(out var rb) && rb;
+        if (refetch) StartSetupFetch(ctx);
+        return Results.Json(new { ok = true, refetch });
     }
 
     // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority
@@ -948,7 +1129,7 @@ public sealed class WebDashboard
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || !SetupHostAllowed(baseUri))
             return Results.Json(new { ok = false, error = "Instance non autorisée." });
 
-        var projectIds = (b?["projectIds"]?.AsArray() ?? new JsonArray()).Select(n => n!.GetValue<int>()).ToList();
+        var projectIds = ((b?["projectIds"] as JsonArray) ?? new JsonArray()).Select(n => n!.GetValue<int>()).ToList();
         if (projectIds.Count == 0) return Results.Json(new { ok = false, error = "Sélectionnez au moins un projet." });
 
         // Catalogue des périodes (phases) — normalisé en PascalCase pour matcher le DTO PeriodDefinition
@@ -957,7 +1138,7 @@ public sealed class WebDashboard
         static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
         var periodsArr = new JsonArray();
         var validPeriodKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in b?["periods"]?.AsArray() ?? new JsonArray())
+        foreach (var p in (b?["periods"] as JsonArray) ?? new JsonArray())
         {
             if (p is not JsonObject po) continue;
             var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
@@ -978,7 +1159,7 @@ public sealed class WebDashboard
 
         var trackedLabels = new List<string>();
         var labelPhases = new Dictionary<string, string>();
-        foreach (var kv in (b?["labelPhases"]?.AsObject() ?? new JsonObject()))
+        foreach (var kv in ((b?["labelPhases"] as JsonObject) ?? new JsonObject()))
         {
             var ph = kv.Value?.GetValue<string>() ?? "none";
             // Validation croisée : un label pointant vers une période inexistante est rétrogradé en « none »
@@ -1003,7 +1184,7 @@ public sealed class WebDashboard
 
         // Projets importés AVEC nom + namespace (l'onglet Options du dashboard ne peut pas dériver les noms des IDs).
         var projectsArr = new JsonArray();
-        foreach (var p in b?["projects"]?.AsArray() ?? new JsonArray())
+        foreach (var p in (b?["projects"] as JsonArray) ?? new JsonArray())
         {
             if (p is not JsonObject po) continue;
             var pid = po["id"] is JsonValue piv && piv.TryGetValue<int>(out var pii) ? pii : 0;
