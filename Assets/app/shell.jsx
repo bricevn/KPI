@@ -21,7 +21,7 @@
 
   // ---- i18n : le dictionnaire + window.t vivent dans i18n.js (chargé avant les .jsx). ----
   // Ici on ne garde que la liste des langues exposée au sélecteur d'Options.
-  const LANGS = (typeof window !== 'undefined' && window.__LANGS__) || [['fr', 'Français'], ['en', 'English']];
+  const LANGS = typeof window !== 'undefined' && window.__LANGS__ || [['fr', 'Français'], ['en', 'English']];
 
   const CHART_TWEAKS = /*EDITMODE-BEGIN*/{
     "recapStyle": "cartes",
@@ -41,11 +41,12 @@
     const [drillLayout, setDrillLayout] = useState(() => load('app-drill', 'modal'));
     const [lang, setLang] = useState(() => window.__LANG__ || load('app-lang', 'fr')); // serveur (cookie) prioritaire
     // Filtres : options et valeurs par défaut DÉRIVÉES des données réelles (A.filterOptions), pas en dur.
-    const [fProject, setFProject] = useState(() => { try { const ps = (window.APP.filterOptions || {}).projects || []; return ps.length ? [ps[0]] : []; } catch (e) { return []; } });
+    const [fProject, setFProject] = useState(() => {try {const ps = (window.APP.filterOptions || {}).projects || [];return ps.length ? [ps[0]] : [];} catch (e) {return [];}});
     const [fMilestone, setFMilestone] = useState([window.t('whole_project')]); // « Tout le projet » = toutes les milestones
     const [fLabel, setFLabel] = useState([]);
     const [fTeam, setFTeam] = useState([]);
     const [fUser, setFUser] = useState([]);
+    const [cmp, setCmp] = useState(null); // comparaison GLOBALE : null = off, sinon milestone de référence
     useEffect(() => {try {localStorage.setItem('app-tab', tab);} catch (e) {}}, [tab]);
     useEffect(() => {try {localStorage.setItem('app-theme', theme);} catch (e) {}}, [theme]);
     useEffect(() => {try {localStorage.setItem('app-accent', accent);} catch (e) {}}, [accent]);
@@ -56,15 +57,15 @@
     useEffect(() => {try {localStorage.setItem('app-lang', lang);} catch (e) {}}, [lang]);
     window.__drillLayout = drillLayout;
     window.__LANG__ = lang;
+    window.__CMP__ = { milestone: cmp };
 
     const appearance = { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout, lang, setLang, langs: LANGS };
 
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
     const TabComp = {
-      dashboard: window.TabDashboard, charts: window.TabCharts, anomalies: window.TabAnomalies,
-      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity,
-      comparison: window.TabComparison, options: window.TabOptions
+      dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
+      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
     }[tab];
 
     const showFilters = tab !== 'options';
@@ -78,7 +79,7 @@
       '--disp-font': NUM_FONTS[numFont] || NUM_FONTS.grotesk
     };
     // Couleurs de phase pilotées par la config (Export.Periods) : surcharge les --p-<key> du CSS.
-    (A.periods || []).forEach((p) => { if (p.key && p.color) rootStyle['--p-' + p.key] = p.color; });
+    (A.periods || []).forEach((p) => {if (p.key && p.color) rootStyle['--p-' + p.key] = p.color;});
 
     // Filtrage réel : on ne garde de fMilestone que les VRAIES milestones (le sentinel « Tout le projet »
     // n'en est pas une → []=toutes). Reconstruit window.APP EN PLACE (mémoïsé par signature).
@@ -113,7 +114,7 @@
         <main className="main">
           <div className="hd">
             <div>
-              <h1 className="disp">{(realMs.length ? A.milestone.name : window.t('whole_project'))} · {window.t('nav_' + tab)}</h1>
+              <h1 className="disp">{realMs.length === 0 ? window.t('whole_project') : realMs.length === 1 ? realMs[0] : realMs.length <= 3 ? realMs.join(' · ') : realMs.length + ' ' + window.t('f_milestone').toLowerCase()} · {window.t('nav_' + tab)}</h1>
               <div className="meta">{A.meta.project} · {window.t('hd_gen')} {A.meta.generated} · {A.totals.issues} {window.t('issues')}</div>
             </div>
             <div className="hd-ms">
@@ -125,9 +126,14 @@
 
           {showFilters &&
           <div className="fl">
-              <window.MultiSelect label={window.t('f_project')} single value={fProject} onChange={setFProject}
+              <window.MultiSelect label={window.t('f_project')} value={fProject} onChange={setFProject}
             options={(A.filterOptions || {}).projects || []} />
-              <window.MultiSelect label={window.t('f_milestone')} single value={fMilestone} onChange={setFMilestone}
+              <window.MultiSelect label={window.t('f_milestone')} value={fMilestone} onChange={(next) => {
+            const WP = window.t('whole_project');
+            const addedWP = next.indexOf(WP) >= 0 && fMilestone.indexOf(WP) < 0;
+            if (addedWP || next.length === 0) {setFMilestone([WP]);return;} // « Tout le projet » exclusif / vide = tout
+            setFMilestone(next.filter((m) => m !== WP)); // une vraie milestone retire le sentinel
+          }}
             options={[window.t('whole_project')].concat((A.filterOptions || {}).milestones || [])} />
               <window.MultiSelect label={window.t('f_label')} value={fLabel} onChange={setFLabel}
             options={(A.filterOptions || {}).labels || []} />
@@ -142,7 +148,7 @@
             </div>
           }
 
-          {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} /> : <Stub name={window.t('nav_' + tab)} />}
+          {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} cmp={cmp} /> : <Stub name={window.t('nav_' + tab)} />}
         </main>
 
         {isCharts &&
@@ -150,12 +156,6 @@
             <window.TweakSection label="Récap par super-groupe" />
             <window.TweakRadio label="Style" value={t.recapStyle} options={['cartes', 'tableau']}
           onChange={(v) => setTweak('recapStyle', v)} />
-            <window.TweakSection label="Section Poids" />
-            <window.TweakRadio label="Représentation" value={t.poidsStyle} options={['barres', 'colonnes', 'matrice']}
-          onChange={(v) => setTweak('poidsStyle', v)} />
-            <window.TweakSection label="Section Temps" />
-            <window.TweakRadio label="Représentation" value={t.tempsStyle} options={['empile', 'phase', 'matrice']}
-          onChange={(v) => setTweak('tempsStyle', v)} />
           </window.TweaksPanel>
         }
       </div>);

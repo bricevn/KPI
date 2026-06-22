@@ -4,8 +4,15 @@
   const TYPE_VAR = { feature: 'var(--c-feature)', enh: 'var(--c-enh)', bug: 'var(--c-bug)', clientbug: 'var(--c-clientbug)', regression: 'var(--c-regression)' };
   const PHASE_VAR = { uiux: 'var(--c-enh)', dev: 'var(--p-dev)', review: 'var(--p-review)', qawait: 'var(--p-qawait)', qa: 'var(--p-qa)', tofix: 'var(--p-tofix)', po: 'var(--p-po)' };
   // Noms de phase : défauts surchargés par les périodes configurées (Export.Periods) si présentes.
-  const PHASE_NAME = (function () { var m = { uiux: 'UI/UX', dev: 'Dev', review: 'Review', qawait: 'QA wait', qa: 'QA', tofix: 'To fix', po: 'PO' }; try { (window.APP.periods || []).forEach(function (p) { if (p.key && p.name) m[p.key] = p.name; }); } catch (e) {} return m; })();
-  const typeColor = (k) => TYPE_VAR[k] || 'var(--ink-faint)';
+  const PHASE_NAME = function () {var m = { uiux: 'UI/UX', dev: 'Dev', review: 'Review', qawait: 'QA wait', qa: 'QA', tofix: 'To fix', po: 'PO' };try {(window.APP.periods || []).forEach(function (p) {if (p.key && p.name) m[p.key] = p.name;});} catch (e) {}return m;}();
+  const typeColor = (k) => {
+    try {const nm = window.APP.typeByKey[k] && window.APP.typeByKey[k].name;const c = gitlabColor(nm);if (c) return c;} catch (e) {}
+    return TYPE_VAR[k] || 'var(--ink-faint)';
+  };
+  // Couleur RÉELLE d'un label GitLab par son nom (placeholder window.APP.labelColors — voir data.js).
+  // ⚠️ CLAUDE CODE : à brancher sur le champ `color` de l'API GitLab Labels.
+  const gitlabColor = (name) => {try {const c = window.APP && window.APP.labelColors && window.APP.labelColors[name];if (c) return c;} catch (e) {}return null;};
+  const labelColor = (name) => gitlabColor(name) || 'var(--ink-faint)';
   const phaseColor = (k) => PHASE_VAR[k] || 'var(--ink-faint)';
   const fmt1 = (n) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
   const pctOf = (a, b) => b ? Math.round(a / b * 100) : 0;
@@ -97,17 +104,22 @@
   // multi-select (or single) dropdown for the global filters
   function MultiSelect({ label, options, value, onChange, single }) {
     const [open, setOpen] = React.useState(false);
+    const [q, setQ] = React.useState('');
     const ref = React.useRef(null);
     React.useEffect(() => {
       const h = (e) => {if (ref.current && !ref.current.contains(e.target)) setOpen(false);};
       document.addEventListener('mousedown', h);
       return () => document.removeEventListener('mousedown', h);
     }, []);
+    React.useEffect(() => {if (!open) setQ('');}, [open]);
     const toggle = (o) => {
       if (single) {onChange([o]);setOpen(false);return;}
       onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
     };
     const summary = value.length === 0 ? window.t('common.all') : single ? value[0] : value.length === 1 ? value[0] : value.length + ' ' + window.t('common.selected');
+    const ql = q.trim().toLowerCase();
+    const shown = ql ? options.filter((o) => String(o).toLowerCase().includes(ql)) : options;
+    const showSearch = options.length > 4;
     return (
       <div className="ms" ref={ref}>
         <button className={'pill' + (open ? ' on' : '')} onClick={() => setOpen((o) => !o)}>
@@ -115,12 +127,21 @@
         </button>
         {open &&
         <div className="ms-pop">
+          {showSearch &&
+          <div className="ms-search">
+            <span className="ms-search-ic">{ICONS.search}</span>
+            <input type="text" autoFocus value={q} placeholder={window.t('common.search')}
+            onChange={(e) => setQ(e.target.value)} onMouseDown={(e) => e.stopPropagation()} />
+            {q && <button className="ms-search-x" onClick={() => setQ('')} aria-label={window.t('common.clear')}>✕</button>}
+          </div>}
           {!single && <div className="ms-head">{value.length} {window.t('common.of')} {options.length}<button className="ms-clear" onClick={() => onChange([])}>{window.t('common.clear')}</button></div>}
-          {options.map((o) =>
-          <label key={o} className={'ms-opt' + (value.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>
-            <span className="ms-box">{value.includes(o) ? '✓' : ''}</span>{o}
-          </label>
-          )}
+          <div className="ms-list">
+            {shown.length ? shown.map((o) =>
+            <label key={o} className={'ms-opt' + (value.includes(o) ? ' on' : '')} onClick={() => toggle(o)}>
+              <span className="ms-box">{value.includes(o) ? '✓' : ''}</span>{o}
+            </label>
+            ) : <div className="ms-empty">{window.t('common.none')}</div>}
+          </div>
         </div>}
       </div>);
   }
@@ -188,7 +209,7 @@
     const max = Math.max(...rows.map((r) => r.v), 1);
     const tot = rows.reduce((s, r) => s + r.v, 0);
     return (
-      <div className="recap">
+      <div className="recap" style={{ '--name-col': 'calc(' + Math.min(30, Math.max(0, ...rows.map((r) => (r.name || '').length))) + 'ch + 18px)' }}>
         <div className="recap-h">{useWeight ? 'Poids par type' : 'Issues par type'}
           <span className="recap-tot">{useWeight ? `${tot} pts · ${issues.length} issues` : `${issues.length} issues`}</span>
         </div>
@@ -375,16 +396,16 @@
     let cycSummary = null;
     if (mode === 'cycle' && issues && issues.length) {
       const ds = issues.map(cyc).sort((a, b) => a - b);
-      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: ds[Math.floor(ds.length / 2)], avg: Math.round(ds.reduce((s, x) => s + x, 0) / ds.length) };
+      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: ds[Math.floor(ds.length / 2)], avg: ds.reduce((s, x) => s + x, 0) / ds.length };
     }
     return (
       <Modal title={title} subtitle={subtitle} headline={headline} onClose={onClose} wide layout={layout}>
         {mode === 'cycle' && cycSummary &&
         <div className="cycstat">
-            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{cycSummary.avg} j</span><span className="cl">moyenne</span></div>
-            <div className="cycstat-item"><span className="cv">{cycSummary.med} j</span><span className="cl">médiane</span></div>
-            <div className="cycstat-item"><span className="cv">{cycSummary.min} j</span><span className="cl">le plus court</span></div>
-            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max} j</span><span className="cl">le plus long</span></div>
+            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{cycSummary.avg.toFixed(1)} j</span><span className="cl">moyenne</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.med.toFixed(1)} j</span><span className="cl">médiane</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.min.toFixed(1)} j</span><span className="cl">le plus court</span></div>
+            <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max.toFixed(1)} j</span><span className="cl">le plus long</span></div>
           </div>}
         {groups ?
         groups.map((g, i) =>
@@ -397,5 +418,44 @@
       </Modal>);
   }
 
-  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML });
+  // ── Comparaison de milestones (GLOBAL, applicable à toutes les vues) ──
+  // Registre de snapshots par milestone. En prod : alimenté par /api/data?milestone=…
+  // Chaque vue lit les quelques champs dont elle a besoin (mêmes clés partout).
+  const CMP = {
+    milestones: ['2026-R1', '2026-R3'],
+    '2026-R1': { progress: 72, weight: 69, approvals: 64, cycle: 16.4, lead: 21.3, anomalies: 18, issuesOpen: 52, issuesClosed: 141, factor: 0.88 },
+    '2026-R3': { progress: 58, weight: 55, approvals: 49, cycle: 19.1, lead: 24.6, anomalies: 27, issuesOpen: 71, issuesClosed: 96, factor: 0.72 }
+  };
+  // baseline d'un compteur quelconque sans snapshot dédié : projection déterministe.
+  const cmpCount = (cur, m) => CMP[m] ? Math.round(cur / CMP[m].factor) : null;
+
+  // Pastille de delta partagée. higherBetter=false → une baisse est positive (cycle, anomalies).
+  function Delta({ cur, prev, higherBetter = true, unit, decimals = 0, milestone }) {
+    if (prev == null || cur == null) return null;
+    const raw = cur - prev;
+    const d = decimals ? Math.round(raw * 10) / 10 : Math.round(raw);
+    const m = milestone || window.__CMP__ && window.__CMP__.milestone;
+    if (d === 0) return <span className="kdelta flat">= {m}</span>;
+    const good = higherBetter ? d > 0 : d < 0;
+    const u = unit === undefined ? window.t ? window.t('dash.pts') : 'pts' : unit;
+    return (
+      <span className={'kdelta ' + (good ? 'up' : 'down')} title={window.t ? window.t('dash.vsMilestone', { m }) : 'vs ' + m}>
+        <span className="kdelta-ar">{d > 0 ? '↑' : '↓'}</span>{(d > 0 ? '+' : '') + d}{u ? ' ' + u : ''}
+        <span className="kdelta-m">{window.t ? window.t('dash.vs') : 'vs'} {m}</span>
+      </span>);
+  }
+
+  // Bandeau de comparaison — affordance IDENTIQUE en haut de chaque vue quand la comparaison est active.
+  function CompareBanner({ milestone, onClear }) {
+    if (!milestone) return null;
+    const t = window.t || ((k) => k);
+    return (
+      <div className="cmp-banner">
+        <span className="cmp-banner-ic">{ICONS.charts}</span>
+        <span className="cmp-banner-txt">{t('cmp.active')} <b>{window.APP && window.APP.milestone.name || ''}</b> {t('dash.vs')} <b>{milestone}</b></span>
+        <button className="cmp-banner-x" onClick={onClear}>{t('cmp.clear')}</button>
+      </div>);
+  }
+
+  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, CMP, cmpCount, Delta, CompareBanner });
 })();

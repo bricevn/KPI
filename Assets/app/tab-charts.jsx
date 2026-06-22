@@ -24,6 +24,15 @@
   }
   const leadOf = (r) => PH.reduce((s, { k }) => s + r[k], 0);
 
+  // Sélecteur de représentation inline (en-tête de section).
+  const SEG_LABEL = { barres: 'Barres', colonnes: 'Colonnes', empile: 'Empilé', phase: 'Par phase' };
+  const SegToggle = ({ value, options, onChange }) =>
+  <div className="g-seg" role="tablist">
+      {options.map((o) =>
+    <button key={o} role="tab" aria-selected={value === o} className={value === o ? 'on' : ''} onClick={() => onChange(o)}>{SEG_LABEL[o] || o}</button>
+    )}
+    </div>;
+
   // ── small shared bits ──────────────────────────────────────────────
   const MetricBar = ({ label, value, total, pct, color, suffix }) =>
   <div className="gm-row">
@@ -116,11 +125,13 @@
 
   // ── Section 2: Poids ───────────────────────────────────────────────
   function PoidsSection({ style }) {
+    const [view, setView] = useState(style || 'barres');
+    React.useEffect(() => {setView(style || 'barres');}, [style]);
     const types = A.types.map((t) => t.key);
     const [pin, setPin] = useState(null);
     const [hov, setHov] = useState(null);
     const hi = hov || pin;
-    React.useEffect(() => {setPin(null);setHov(null);}, [style]);
+    React.useEffect(() => {setPin(null);setHov(null);}, [view]);
     const legProps = (k) => ({
       className: 'g-leg clickable' + (pin === k ? ' pinned' : '') + (hi && hi !== k ? ' faded' : ''),
       onMouseEnter: () => setHov(k), onMouseLeave: () => setHov(null),
@@ -145,9 +156,9 @@
 
     return (
       <div className="g-section">
-        <div className="g-sec-h"><h3>{window.t('charts.poids')}</h3><window.InfoTip text={window.t('charts.poidsTip')} /></div>
+        <div className="g-sec-h"><h3>{window.t('charts.poids')}</h3><window.InfoTip text={window.t('charts.poidsTip')} /><SegToggle value={view} options={['barres', 'colonnes']} onChange={setView} /></div>
 
-        {style === 'barres' &&
+        {view === 'barres' &&
         <div className="pnl"><div className="pnl-b"><Legend />
           <div className="pw-bars">
             {FIB.map((w, wi) =>
@@ -168,7 +179,7 @@
           </div></div></div>
         }
 
-        {style === 'colonnes' &&
+        {view === 'colonnes' &&
         <div className="pnl"><div className="pnl-b"><Legend />
           <div className="pw-grouped">
             {types.map((tk) =>
@@ -191,7 +202,7 @@
           </div></div></div>
         }
 
-        {style === 'matrice' &&
+        {view === 'matrice' &&
         <div className="pnl"><div className="tbl-scroll"><table className="pw-matrix">
             <thead><tr><th>{window.t('charts.typeWeight')}</th>{FIB.map((w) => <th key={w} className="num">{w}</th>)}<th className="num">Σ</th></tr></thead>
             <tbody>
@@ -216,13 +227,15 @@
 
   // ── Section 3: Temps par type ──────────────────────────────────────
   function TempsSection({ style }) {
+    const [view, setView] = useState(style || 'empile');
+    React.useEffect(() => {setView(style || 'empile');}, [style]);
     const types = A.types.map((t) => t.key);
     const maxLead = Math.max(...types.map((tk) => leadOf(A.pivotByKey[tk])));
     const maxPhase = Math.max(...types.flatMap((tk) => PH.map(({ k }) => A.pivotByKey[tk][k])));
     const [pin, setPin] = useState(null);
     const [hov, setHov] = useState(null);
     const hi = hov || pin;
-    React.useEffect(() => {setPin(null);setHov(null);}, [style]);
+    React.useEffect(() => {setPin(null);setHov(null);}, [view]);
     const legProps = (k) => ({
       className: 'g-leg clickable' + (pin === k ? ' pinned' : '') + (hi && hi !== k ? ' faded' : ''),
       onMouseEnter: () => setHov(k), onMouseLeave: () => setHov(null),
@@ -238,11 +251,11 @@
 
     return (
       <div className="g-section">
-        <div className="g-sec-h"><h3>{window.t('charts.temps')}</h3><window.InfoTip text={window.t('charts.tempsTip')} /></div>
+        <div className="g-sec-h"><h3>{window.t('charts.temps')}</h3><window.InfoTip text={window.t('charts.tempsTip')} /><SegToggle value={view} options={['empile', 'phase']} onChange={setView} /></div>
 
-        {style === 'empile' &&
+        {view === 'empile' &&
         <div className="pnl"><div className="pnl-b"><Legend />
-          <div className="tt-stacked">
+          <div className="tt-stacked" style={{ '--name-col': 'calc(' + Math.min(30, Math.max(0, ...types.map((tk) => (A.typeByKey[tk].short || '').length))) + 'ch + 18px)' }}>
             {types.map((tk) => {
                 const r = A.pivotByKey[tk];const lead = leadOf(r);
                 return <div key={tk} className="tt-row">
@@ -256,7 +269,7 @@
           </div></div></div>
         }
 
-        {style === 'phase' &&
+        {view === 'phase' &&
         <div className="pnl"><div className="pnl-b">
           <div className={'g-legend' + (hi ? ' has-hi' : '')}>{types.map((tk) => <span key={tk} {...legProps(tk)}><span className="sw" style={{ background: window.typeColor(tk) }}></span>{A.typeByKey[tk].short}</span>)}</div>
           <div className="tt-byphase">
@@ -276,7 +289,7 @@
           </div></div></div>
         }
 
-        {style === 'matrice' &&
+        {view === 'matrice' &&
         <div className="pnl"><div className="tbl-scroll"><table className="pw-matrix">
             <thead><tr><th>{window.t('charts.typePhase')}</th>{PH.map(({ pk }) => <th key={pk} className="num">{window.PHASE_NAME[pk]}</th>)}<th className="num">{window.t('charts.lead')}</th></tr></thead>
             <tbody>

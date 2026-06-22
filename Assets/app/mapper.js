@@ -312,6 +312,8 @@ window.buildAPP = function (D) {
     superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, weightBuckets: weightBuckets,
     milestone: milestone, meta: meta, FIB: FIB,
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
+    // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.
+    labelColors: (function () { var m = {}, lc = D.labelColors || {}; for (var k in lc) { var v = lc[k]; m[k] = (v && (typeof v === 'string' ? v : v.color)) || ''; } return m; })(),
     cal: { START: new Date(START), DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, dayDate: function (d) { return new Date(START + d * MS_DAY); }, fmtDay: function (d) { return fmtFr(START + d * MS_DAY); } },
     tabs: [
       { id: 'dashboard', label: 'Dashboard' }, { id: 'charts', label: 'Graphiques' },

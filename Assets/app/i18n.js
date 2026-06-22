@@ -4,6 +4,7 @@
 (function () {
   const I18N = {
     fr: {
+      'common.search': 'Rechercher…', 'common.none': 'Aucun résultat',
       // ===== chrome (sidebar / en-tête / filtres) =====
       nav_dashboard: 'Dashboard', nav_charts: 'Graphiques', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendrier', nav_velocity: 'Vélocité', nav_options: 'Options', nav_comparison: 'Évolution',
@@ -140,6 +141,7 @@
       'opt.newPhase': 'Nouvelle phase', 'opt.addPhase': 'Ajouter une phase', 'opt.phasesEditNote': 'Définissez vos phases (nom, couleur), puis associez chaque label Prod:: à une phase.', 'opt.assocLabels': 'Association des labels',
     },
     en: {
+      'common.search': 'Search…', 'common.none': 'No results',
       nav_dashboard: 'Dashboard', nav_charts: 'Charts', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendar', nav_velocity: 'Velocity', nav_options: 'Options', nav_comparison: 'Evolution',
       'cmpv.closed': 'Closed issues', 'cmpv.anomalies': 'Anomalies', 'cmpv.returns': 'Returns', 'cmpv.noData': 'No milestone in the extracted data — run an extraction to compare evolution.',
@@ -264,6 +266,7 @@
       'opt.newPhase': 'New phase', 'opt.addPhase': 'Add a phase', 'opt.phasesEditNote': 'Define your phases (name, color), then link each Prod:: label to a phase.', 'opt.assocLabels': 'Label mapping',
     },
     es: {
+      'common.search': 'Buscar…', 'common.none': 'Sin resultados',
       "nav_dashboard": "Panel",
       "nav_charts": "Gráficos",
       "nav_anomalies": "Anomalías",
@@ -513,6 +516,7 @@
       "opt.assocLabels": "Mapeo de etiquetas",
     },
     de: {
+      'common.search': 'Suchen…', 'common.none': 'Keine Ergebnisse',
       "nav_dashboard": "Dashboard",
       "nav_charts": "Diagramme",
       "nav_anomalies": "Anomalien",
@@ -762,6 +766,7 @@
       "opt.assocLabels": "Label-Zuordnung",
     },
     it: {
+      'common.search': 'Cerca…', 'common.none': 'Nessun risultato',
       "nav_dashboard": "Dashboard",
       "nav_charts": "Grafici",
       "nav_anomalies": "Anomalie",
@@ -1011,6 +1016,7 @@
       "opt.assocLabels": "Mapping etichette",
     },
     pt: {
+      'common.search': 'Pesquisar…', 'common.none': 'Nenhum resultado',
       "nav_dashboard": "Dashboard",
       "nav_charts": "Gráficos",
       "nav_anomalies": "Anomalias",
@@ -1260,6 +1266,7 @@
       "opt.assocLabels": "Mapeamento de rótulos",
     },
     ru: {
+      'common.search': 'Поиск…', 'common.none': 'Нет результатов',
       "nav_dashboard": "Панель управления",
       "nav_charts": "Графики",
       "nav_anomalies": "Аномалии",
@@ -1509,6 +1516,7 @@
       "opt.assocLabels": "Сопоставление меток",
     },
     ar: {
+      'common.search': 'بحث…', 'common.none': 'لا نتائج',
       "nav_dashboard": "لوحة التحكم",
       "nav_charts": "الرسوم البيانية",
       "nav_anomalies": "الحالات الشاذة",
@@ -1758,6 +1766,7 @@
       "opt.assocLabels": "تعيين التسميات",
     },
     zh: {
+      'common.search': '搜索…', 'common.none': '无结果',
       "nav_dashboard": "仪表板",
       "nav_charts": "图表",
       "nav_anomalies": "异常",
@@ -2007,6 +2016,7 @@
       "opt.assocLabels": "标签映射",
     },
     ja: {
+      'common.search': '検索…', 'common.none': '結果なし',
       "nav_dashboard": "ダッシュボード",
       "nav_charts": "グラフ",
       "nav_anomalies": "異常",
