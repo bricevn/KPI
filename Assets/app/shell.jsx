@@ -1,7 +1,7 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
-  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity'];
+  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
 
@@ -63,7 +63,8 @@
 
     const TabComp = {
       dashboard: window.TabDashboard, charts: window.TabCharts, anomalies: window.TabAnomalies,
-      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
+      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity,
+      comparison: window.TabComparison, options: window.TabOptions
     }[tab];
 
     const showFilters = tab !== 'options';

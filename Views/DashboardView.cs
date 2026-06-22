@@ -237,7 +237,7 @@ public sealed class DashboardView
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
             + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
         sb.AppendLine("  <script>" + A("app", "i18n.js") + "</script>");
-        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
+        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");
