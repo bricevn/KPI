@@ -46,7 +46,6 @@
     const [fLabel, setFLabel] = useState([]);
     const [fTeam, setFTeam] = useState([]);
     const [fUser, setFUser] = useState([]);
-    const [cmp, setCmp] = useState(null); // comparaison GLOBALE : null = off, sinon milestone de référence
     useEffect(() => {try {localStorage.setItem('app-tab', tab);} catch (e) {}}, [tab]);
     useEffect(() => {try {localStorage.setItem('app-theme', theme);} catch (e) {}}, [theme]);
     useEffect(() => {try {localStorage.setItem('app-accent', accent);} catch (e) {}}, [accent]);
@@ -57,7 +56,6 @@
     useEffect(() => {try {localStorage.setItem('app-lang', lang);} catch (e) {}}, [lang]);
     window.__drillLayout = drillLayout;
     window.__LANG__ = lang;
-    window.__CMP__ = { milestone: cmp };
 
     const appearance = { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout, lang, setLang, langs: LANGS };
 
@@ -148,7 +146,7 @@
             </div>
           }
 
-          {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} cmp={cmp} /> : <Stub name={window.t('nav_' + tab)} />}
+          {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} /> : <Stub name={window.t('nav_' + tab)} />}
         </main>
 
         {isCharts &&

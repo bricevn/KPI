@@ -418,44 +418,5 @@
       </Modal>);
   }
 
-  // ── Comparaison de milestones (GLOBAL, applicable à toutes les vues) ──
-  // Registre de snapshots par milestone. En prod : alimenté par /api/data?milestone=…
-  // Chaque vue lit les quelques champs dont elle a besoin (mêmes clés partout).
-  const CMP = {
-    milestones: ['2026-R1', '2026-R3'],
-    '2026-R1': { progress: 72, weight: 69, approvals: 64, cycle: 16.4, lead: 21.3, anomalies: 18, issuesOpen: 52, issuesClosed: 141, factor: 0.88 },
-    '2026-R3': { progress: 58, weight: 55, approvals: 49, cycle: 19.1, lead: 24.6, anomalies: 27, issuesOpen: 71, issuesClosed: 96, factor: 0.72 }
-  };
-  // baseline d'un compteur quelconque sans snapshot dédié : projection déterministe.
-  const cmpCount = (cur, m) => CMP[m] ? Math.round(cur / CMP[m].factor) : null;
-
-  // Pastille de delta partagée. higherBetter=false → une baisse est positive (cycle, anomalies).
-  function Delta({ cur, prev, higherBetter = true, unit, decimals = 0, milestone }) {
-    if (prev == null || cur == null) return null;
-    const raw = cur - prev;
-    const d = decimals ? Math.round(raw * 10) / 10 : Math.round(raw);
-    const m = milestone || window.__CMP__ && window.__CMP__.milestone;
-    if (d === 0) return <span className="kdelta flat">= {m}</span>;
-    const good = higherBetter ? d > 0 : d < 0;
-    const u = unit === undefined ? window.t ? window.t('dash.pts') : 'pts' : unit;
-    return (
-      <span className={'kdelta ' + (good ? 'up' : 'down')} title={window.t ? window.t('dash.vsMilestone', { m }) : 'vs ' + m}>
-        <span className="kdelta-ar">{d > 0 ? '↑' : '↓'}</span>{(d > 0 ? '+' : '') + d}{u ? ' ' + u : ''}
-        <span className="kdelta-m">{window.t ? window.t('dash.vs') : 'vs'} {m}</span>
-      </span>);
-  }
-
-  // Bandeau de comparaison — affordance IDENTIQUE en haut de chaque vue quand la comparaison est active.
-  function CompareBanner({ milestone, onClear }) {
-    if (!milestone) return null;
-    const t = window.t || ((k) => k);
-    return (
-      <div className="cmp-banner">
-        <span className="cmp-banner-ic">{ICONS.charts}</span>
-        <span className="cmp-banner-txt">{t('cmp.active')} <b>{window.APP && window.APP.milestone.name || ''}</b> {t('dash.vs')} <b>{milestone}</b></span>
-        <button className="cmp-banner-x" onClick={onClear}>{t('cmp.clear')}</button>
-      </div>);
-  }
-
-  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, CMP, cmpCount, Delta, CompareBanner });
+  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML });
 })();
