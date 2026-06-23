@@ -247,6 +247,9 @@
 .cmpv-fc{display:block; width:100%; height:auto; overflow:visible;}
 .cmpv-fc-val{font-family:var(--disp-font,'Space Grotesk'),sans-serif; font-weight:700; font-size:19px; fill:var(--ink-dim);}
 .cmpv-fc-val.cur{fill:var(--accent); font-size:21px;}
+.cmpv-fc-val.hov{fill:var(--ink);}
+.cmpv-fc-pt circle{transition:r .12s ease;}
+.cmpv-fc-hint{font-size:12px; color:var(--ink-faint); margin:0 0 4px; display:flex; align-items:center; gap:6px;}
 .cmpv-fc-x{font-family:var(--disp-font,'Space Grotesk'),sans-serif; font-size:15px; fill:var(--ink-faint);}
 .cmpv-fc-x.cur{fill:var(--accent); font-weight:700;}
 .charts{display:flex; flex-direction:column; gap:22px;}
@@ -502,6 +505,24 @@
 .opt-phx{flex:none; border:0; background:none; color:var(--ink-faint); font-size:20px; line-height:1; cursor:pointer; padding:0 6px; border-radius:6px;}
 .opt-phx:hover{color:var(--bad);}
 
+/* options — éditeur d'équipes */
+.opt-teams{display:flex; flex-direction:column; gap:10px;}
+.opt-team{border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--panel-2); transition:box-shadow .12s, border-color .12s;}
+.opt-team.dragover{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+.opt-team-hd{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+.opt-team-members{display:flex; flex-direction:column; gap:6px;}
+.opt-member{display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:9px; background:var(--panel); cursor:grab;}
+.opt-member:active{cursor:grabbing;}
+.opt-member.lead{box-shadow:inset 0 0 0 2px #eab308;}
+.opt-grip{flex:none; color:var(--ink-faint); font-size:13px; line-height:1; letter-spacing:-2px; cursor:grab; user-select:none;}
+.opt-member-nm{font-size:13px; color:var(--ink); white-space:nowrap;}
+.opt-lead-tag{font-size:10px; font-weight:700; color:#8a6d00; background:rgba(234,179,8,.18); padding:1px 7px; border-radius:999px;}
+.opt-member .opt-star{margin-left:auto; flex:none; border:0; background:none; cursor:pointer; font-size:15px; line-height:1; color:var(--ink-faint); padding:2px 4px; border-radius:6px;}
+.opt-member .opt-star.on{color:#eab308;}
+.opt-member .opt-star:hover{color:#eab308;}
+.opt-dropempty{border:1px dashed var(--line); border-radius:8px; text-align:center; padding:8px; color:var(--ink-faint);}
+.opt-addmem{align-self:flex-start; margin-top:8px;}
+
 /* ---- KPI progress bar + line sparkline (review) ---- */
 .kbar{height:9px; border-radius:6px; background:var(--panel-3); box-shadow:inset 0 0 0 1px var(--line); overflow:hidden; margin-top:12px;}
 .kbar i{display:block; height:100%; border-radius:6px;}
@@ -521,7 +542,7 @@
 /* ---- multi-select filter dropdown (review) ---- */
 .ms{position:relative;}
 .ms .pill.on{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
-.ms-pop{position:absolute; top:calc(100% + 6px); left:0; z-index:30; min-width:240px;
+.ms-pop{position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); z-index:30; min-width:240px; max-width:min(92vw,360px);
   background:var(--panel); border:1px solid var(--line); border-radius:13px; box-shadow:0 12px 32px rgba(15,30,60,.18);
   padding:6px; max-height:320px; overflow:hidden; display:flex; flex-direction:column;}
 .ms-search{position:relative; display:flex; align-items:center; margin:2px 2px 6px; flex:none;}

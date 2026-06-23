@@ -1,5 +1,5 @@
 // Options tab — apparence, régénération, et CONFIGURATION.
-// Admin : éditeur (projets / phases / labels), porte la logique de /setup en React, sauve via /api/options.
+// Admin : éditeur (projets / phases / labels / équipes), porte la logique de /setup en React, sauve via /api/options.
 // Non-admin : reflet lecture seule de la config (window.__DATA__.setup).
 (function () {
   const { useState, useEffect } = React;
@@ -26,6 +26,10 @@
   const mapClone = (obj, fn) => { const o = {}; Object.keys(obj || {}).forEach((k) => { o[k] = fn(obj[k]); }); return o; };
   const sameSet = (a, b) => a.length === b.length && a.slice().sort().join(',') === b.slice().sort().join(',');
   const clonePhases = (arr) => (arr || []).map((p) => ({ key: p.key, name: p.name, color: p.color, timed: p.timed !== false }));
+  // Équipes : modèle d'édition local { name, members:[username], lead } — lead = 1er membre (convention de persistance).
+  const cloneTeams = (arr) => (arr || []).map((t) => ({ name: t.name, members: (t.members || []).slice(), lead: (t.members || [])[0] || null }));
+  // Pour le POST : remet le lead en tête de la liste des membres (aucun champ « lead » dans appsettings).
+  const orderTeam = (t) => ({ name: t.name, members: t.lead ? [t.lead].concat((t.members || []).filter((m) => m !== t.lead)) : (t.members || []).slice() });
 
   function Toggle({ on, onClick }) {
     return <button onClick={onClick} style={{ width: 42, height: 24, borderRadius: 999, border: 0, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--panel-3)', position: 'relative', transition: 'background .15s' }}>
@@ -35,6 +39,96 @@
 
   const selStyle = { border: '1px solid var(--line)', borderRadius: 9, background: 'var(--panel-2)', color: 'var(--ink)', padding: '9px 12px', font: '14px system-ui' };
   const subGrey = { fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--ink-faint)' };
+
+  // ===================== ÉDITEUR D'ÉQUIPES (admin, contrôlé) =====================
+  // État porté par le parent (AdminConfigEditor) pour être inclus dans le POST /api/options.
+  // Par membre : lead (★), glisser-déposer entre groupes, retirer. Groupes : ajouter / renommer / supprimer.
+  function TeamsEditor({ teams, setTeams }) {
+    const peopleById = A.peopleById || {};
+    const allPeople = A.people || Object.keys(peopleById).map((id) => peopleById[id]);
+    const personName = (id) => (peopleById[id] || {}).name || id;
+    const [dragOver, setDragOver] = useState(null);
+    const dragRef = React.useRef(null); // { from, id }
+    const addGroup = () => setTeams((ts) => ts.concat([{ name: window.t('opt.newTeam'), members: [], lead: null }]));
+    const removeGroup = (i) => setTeams((ts) => ts.filter((_, j) => j !== i));
+    const renameGroup = (i, name) => setTeams((ts) => ts.map((t, j) => j === i ? Object.assign({}, t, { name }) : t));
+    const addMember = (i, id) => { if (!id) return; setTeams((ts) => ts.map((t, j) => j === i && t.members.indexOf(id) < 0 ? Object.assign({}, t, { members: t.members.concat([id]), lead: t.lead || id }) : t)); };
+    const removeMember = (i, id) => setTeams((ts) => ts.map((t, j) => { if (j !== i) return t; const members = t.members.filter((m) => m !== id); return Object.assign({}, t, { members: members, lead: t.lead === id ? members[0] || null : t.lead }); }));
+    const setLead = (i, id) => setTeams((ts) => ts.map((t, j) => j === i ? Object.assign({}, t, { lead: id }) : t));
+    const moveMember = (from, id, to) => {
+      if (to == null || to === from) return;
+      setTeams((ts) => {
+        const arr = ts.map((t) => Object.assign({}, t, { members: t.members.slice() }));
+        const f = arr[from]; if (!f) return ts; f.members = f.members.filter((m) => m !== id); if (f.lead === id) f.lead = f.members[0] || null;
+        const tg = arr[to]; if (tg && tg.members.indexOf(id) < 0) { tg.members.push(id); tg.lead = tg.lead || id; }
+        return arr;
+      });
+    };
+    const onDrop = (to) => { const d = dragRef.current; setDragOver(null); if (d) moveMember(d.from, d.id, to); dragRef.current = null; };
+    return (
+      <div className="opt-teams">
+        {teams.map((tm, i) => {
+          const avail = allPeople.filter((p) => tm.members.indexOf(p.id) < 0);
+          return (
+            <div key={i} className={'opt-team' + (dragOver === i ? ' dragover' : '')}
+              onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
+              onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(null); }}
+              onDrop={() => onDrop(i)}>
+              <div className="opt-team-hd">
+                <input className="opt-phname" value={tm.name} onChange={(e) => renameGroup(i, e.target.value)} />
+                <button className="opt-phx" title="×" onClick={() => removeGroup(i)}>×</button>
+              </div>
+              <div className="opt-team-members">
+                {tm.members.length ? tm.members.map((id) =>
+                <div key={id} className={'opt-member' + (tm.lead === id ? ' lead' : '')} draggable
+                  onDragStart={(e) => { dragRef.current = { from: i, id: id }; e.dataTransfer.effectAllowed = 'move'; }}
+                  onDragEnd={() => { dragRef.current = null; setDragOver(null); }}>
+                  <span className="opt-grip" aria-hidden="true">⠿</span>
+                  <window.Avatar pid={id} size={20} />
+                  <span className="opt-member-nm">{personName(id)}</span>
+                  {tm.lead === id && <span className="opt-lead-tag">{window.t('opt.lead')}</span>}
+                  <button className={'opt-star' + (tm.lead === id ? ' on' : '')} title={window.t('opt.setLeadHint')} onClick={() => setLead(i, id)}>★</button>
+                  <button className="opt-phx" title="×" onClick={() => removeMember(i, id)}>×</button>
+                </div>
+                ) : <p className="opt-note opt-dropempty" style={{ margin: '2px 0' }}>{window.t('opt.dropHere')}</p>}
+              </div>
+              {avail.length > 0 &&
+              <select className="opt-mini opt-addmem" value="" onChange={(e) => { addMember(i, e.target.value); e.target.value = ''; }}>
+                <option value="">+ {window.t('opt.addMember')}</option>
+                {avail.map((p) => <option key={p.id} value={p.id}>{personName(p.id)}</option>)}
+              </select>}
+            </div>);
+        })}
+        <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={addGroup}>{window.t('opt.addTeam')}</button>
+      </div>);
+  }
+
+  // Équipes en lecture seule (non-admin) — lead = 1er membre, mis en évidence (contour jaune + badge).
+  function TeamsReadOnly({ teams }) {
+    const peopleById = A.peopleById || {};
+    const personName = (id) => (peopleById[id] || {}).name || id;
+    if (!teams.length) return <p className="opt-note">{window.t('opt.noTeams')}</p>;
+    return (
+      <div className="opt-teams">
+        {teams.map((tm) => {
+          const members = tm.members || [];
+          const lead = members[0] || null;
+          return (
+            <div key={tm.name} className="opt-team">
+              <div className="opt-team-hd"><span style={{ fontWeight: 700, fontSize: 13 }}>{tm.name}</span></div>
+              <div className="opt-team-members">
+                {members.map((id) =>
+                <div key={id} className={'opt-member' + (lead === id ? ' lead' : '')} style={{ cursor: 'default' }}>
+                  <window.Avatar pid={id} size={20} />
+                  <span className="opt-member-nm">{personName(id)}</span>
+                  {lead === id && <span className="opt-lead-tag">{window.t('opt.lead')}</span>}
+                </div>
+                )}
+              </div>
+            </div>);
+        })}
+      </div>);
+  }
 
   // ===================== ÉDITEUR ADMIN =====================
   function AdminConfigEditor({ S }) {
@@ -48,6 +142,7 @@
     const [phByProj, setPhByProj] = useState(() => mapClone(S.periodsByProject || {}, clonePhases));
     const [lpGlobal, setLpGlobal] = useState(() => Object.assign({}, S.labelPhases || {}));
     const [lpByProj, setLpByProj] = useState(() => mapClone(S.labelPhasesByProject || {}, (m) => Object.assign({}, m)));
+    const [teams, setTeams] = useState(() => cloneTeams(S.teams));
     const [labelsCache, setLabelsCache] = useState({});
     const [openColor, setOpenColor] = useState(null);
     const [saving, setSaving] = useState('idle');                         // idle | busy | done | err
@@ -113,7 +208,6 @@
     }, [curLabels, lbScope, ap]);
 
     const payload = () => {
-      const phKeys = phaseList().map((p) => p.key);
       const out = {
         projectIds: importIds,
         projects: importedProjects().map((p) => ({ id: p.id, name: p.name, group: p.groupFull || p.group || '' })),
@@ -124,6 +218,8 @@
         // Un projet retiré (filterImport) est exclu → ses overrides sont nettoyés côté serveur.
         periodsByProject: mapClone(filterImport(phByProj), (a) => a.map((p) => ({ key: p.key, name: p.name, color: p.color, timed: p.timed !== false }))),
         labelPhasesByProject: mapClone(filterImport(lpByProj), (m) => Object.assign({}, m)),
+        // Équipes : lead remis en tête de liste (persisté comme 1er membre). Groupes vides ignorés côté serveur.
+        teams: teams.map(orderTeam),
         refetch: !sameSet(importIds, initImport),
       };
       return out;
@@ -229,6 +325,13 @@
               </div>)}
         </div>
 
+        {/* ---- Équipes ---- */}
+        <div className="opt-sec">
+          <h3>{window.t('opt.teams')}</h3>
+          <p className="lead">{window.t('opt.teamsSub')}</p>
+          <TeamsEditor teams={teams} setTeams={setTeams} />
+        </div>
+
         {/* ---- Barre d'actions ---- */}
         <div className="opt-sec" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-primary" disabled={saving === 'busy' || allProjects === null} onClick={doSave}>{saving === 'busy' ? window.t('opt.saving') : window.t('opt.save')}</button>
@@ -245,13 +348,16 @@
     const periodsGlobal = S.periods || [];
     const lpGlobal = S.labelPhases || {};
     const trackedLabels = S.trackedLabels || [];
+    const teams = S.teams || [];
     const phaseColor = (key) => key === 'none' ? '#5f6b7a' : ((periodsGlobal.find((p) => p.key === key) || {}).color || '#5f6b7a');
     const phaseName = (key) => key === 'none' ? window.t('opt.phNone') : ((periodsGlobal.find((p) => p.key === key) || {}).name || key);
-    const labelsToShow = trackedLabels.length ? trackedLabels : Object.keys(lpGlobal);
+    // Cette section ne reflète QUE les labels « Prod::* » (phases de production).
+    const allLabels = trackedLabels.length ? trackedLabels : Object.keys(lpGlobal);
+    const prodLabels = allLabels.filter((l) => /^prod::/i.test(l));
     return (
       <div className="opt-sec">
         <h3>{window.t('opt.config')}</h3>
-        <p className="lead">{window.t('opt.configLead', { setup: '/setup', file: 'appsettings.json' })}</p>
+        <p className="lead">{window.t('opt.configLead', { setup: '/setup' })}</p>
         <div className="opt-sub">{window.t('opt.importedProjects')}</div>
         <div className="checklist">
           {projects.length ? projects.map((p) => <label key={p.id} className="on" style={{ cursor: 'default' }}><input type="checkbox" readOnly checked style={{ pointerEvents: 'none' }} />{p.name} <span style={{ opacity: .6, fontFamily: 'var(--font-mono,monospace)', fontSize: 11 }}>#{p.id}</span></label>) : <p className="opt-note">{window.t('opt.noProjects')}</p>}
@@ -260,10 +366,12 @@
         <div className="opt-phases">
           {periodsGlobal.length ? periodsGlobal.map((p) => <div className="opt-phrow" key={p.key}><div className="opt-swatchwrap"><span className="opt-swatch" style={{ background: p.color, cursor: 'default', display: 'inline-block' }}></span></div><span className="opt-phname" style={{ padding: '6px 4px' }}>{p.name}</span></div>) : <p className="opt-note">{window.t('opt.noPhases')}</p>}
         </div>
-        <div className="opt-sub">{window.t('opt.assocLabels')} <span style={subGrey}>Prod::</span></div>
+        <div className="opt-sub">{window.t('opt.assocLabels')} <span style={subGrey}>· {window.t('opt.assocProdOnly')}</span></div>
         <div className="opt-map">
-          {labelsToShow.length ? labelsToShow.map((l) => { const key = lpGlobal[l] || 'none'; return <div className="opt-maprow" key={l}><span className="opt-dot" style={{ background: phaseColor(key) }}></span><span className="opt-mlabel">{l}</span><span style={{ fontSize: 12, color: 'var(--ink-faint)', marginLeft: 'auto' }}>{phaseName(key)}</span></div>; }) : <p className="opt-note">{window.t('opt.noLabels')}</p>}
+          {prodLabels.length ? prodLabels.map((l) => { const key = lpGlobal[l] || 'none'; return <div className="opt-maprow" key={l}><span className="opt-dot" style={{ background: phaseColor(key) }}></span><span className="opt-mlabel">{l}</span><span style={{ fontSize: 12, color: 'var(--ink-faint)', marginLeft: 'auto' }}>{phaseName(key)}</span></div>; }) : <p className="opt-note">{window.t('opt.noLabels')}</p>}
         </div>
+        <div className="opt-sub">{window.t('opt.teams')} <span style={subGrey}>· {window.t('opt.teamsSub')}</span></div>
+        <TeamsReadOnly teams={teams} />
       </div>);
   }
 
@@ -272,10 +380,7 @@
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
     const S = (window.__DATA__ || {}).setup || {};
     const isAdmin = !!S.isAdmin;
-    const allTeams = S.teams || [];
     const milestones = (A.filterOptions || {}).milestones || [];
-    const peopleById = A.peopleById || {};
-    const personName = (id) => (peopleById[id] || {}).name || id;
 
     const [regenMs, setRegenMs] = useState('');
     const [refreshState, setRefreshState] = useState('idle');
@@ -343,22 +448,6 @@
         </div>}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
-
-        {/* Équipes — lecture seule (édition dans /setup) */}
-        <div className="opt-sec">
-          <div className="opt-sub">{window.t('opt.teams')} <span style={subGrey}>· {window.t('opt.teamsSub')}</span></div>
-          {allTeams.length ?
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-            {allTeams.map((tm) =>
-            <div key={tm.name} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{tm.name}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {(tm.members || []).map((id) => <span key={id} className="tag"><window.Avatar pid={id} size={18} />{personName(id)}</span>)}
-              </div>
-            </div>)}
-          </div>
-          : <p className="opt-note">{window.t('opt.noTeams')}</p>}
-        </div>
       </div>);
   };
 })();

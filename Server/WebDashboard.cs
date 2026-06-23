@@ -947,8 +947,9 @@ public sealed class WebDashboard
         return Results.Json(new { ok = true, labels = set });
     }
 
-    // POST /api/options → sauvegarde des sections Export (projets/phases/labels, global + par projet) ET
-    // Servers[<courant>].ProjectIds. PRÉSERVE GroupToken/BaseUrl/Auth/Teams. Hot-reload ; refetch optionnel.
+    // POST /api/options → sauvegarde des sections Export (projets/phases/labels/équipes, global + par projet) ET
+    // Servers[<courant>].ProjectIds. PRÉSERVE GroupToken/BaseUrl/Auth (Teams écrites si transmises, sinon préservées).
+    // Hot-reload ; refetch optionnel.
     // Réutilise la validation de SetupSaveAsync (clés de période uniques, hex strict, label→période croisée).
     private async Task<IResult> SaveOptionsAsync(HttpContext ctx)
     {
@@ -1038,6 +1039,27 @@ public sealed class WebDashboard
                 outLbp[kv.Key] = mm;
             }
             ex["LabelPhasesByProject"] = outLbp;
+        }
+        // Équipes éditées dans l'onglet Options : { name, members:[username] } — lead = 1er membre (pas de
+        // champ « lead » en config). N'écrit QUE si le client transmet "teams" (sinon préserve l'existant) ;
+        // TeamGroups (mapping équipe→groupe GitLab, posé au /setup) est laissé intact.
+        if (b?["teams"] is JsonArray teamsArr)
+        {
+            var teams = new JsonObject();
+            foreach (var t in teamsArr)
+            {
+                if (t is not JsonObject to) continue;
+                var name = (Str(to["name"]) ?? "").Trim();
+                if (name.Length == 0 || teams.ContainsKey(name)) continue;
+                var arr = new JsonArray(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var m in (to["members"] as JsonArray) ?? new JsonArray())
+                {
+                    var u = (Str(m) ?? "").Trim();
+                    if (u.Length > 0 && seen.Add(u)) arr.Add(JsonValue.Create(u));
+                }
+                teams[name] = arr;
+            }
+            ex["Teams"] = teams;
         }
 
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
