@@ -80,6 +80,11 @@
 
   // Graphe d'évolution : la valeur est imprimée directement sur chaque point. viewBox uniforme → pas de scroll.
   function FocusChart({ cols, fm, last }) {
+    const [hover, setHover] = React.useState(null);
+    const [pinned, setPinned] = React.useState(() => new Set());
+    // reset l'épinglage quand on change de métrique ou de sélection de milestones
+    React.useEffect(() => {setPinned(new Set());setHover(null);}, [fm.k, cols.join('|')]);
+    const togglePin = (i) => setPinned((prev) => {const nx = new Set(prev);nx.has(i) ? nx.delete(i) : nx.add(i);return nx;});
     const vals = cols.map((c) => fm.vals[c]);
     const n = vals.length;
     const W = 1000, H = 300, padL = 40, padR = 40, padT = 50, padB = 40;
@@ -106,12 +111,17 @@
           const g = dprev == null || dprev === 0 ? null : fm.hb ? dprev > 0 : dprev < 0;
           const dotCol = isCur ? 'var(--accent)' : g == null ? 'var(--ink-faint)' : g ? 'var(--c-good)' : 'var(--c-bad)';
           const showX = i % step === 0 || isCur || i === 0;
+          const isHover = hover === i;
+          const isPinned = pinned.has(i);
+          const showVal = isCur || isHover || isPinned; // la valeur courante reste toujours visible
           return (
-            <g key={cols[i]}>
-              {isCur && <line x1={p[0]} y1={padT - 18} x2={p[0]} y2={H - padB} stroke="var(--accent)" strokeWidth="1" strokeDasharray="3 4" opacity="0.5" />}
-              <circle cx={p[0]} cy={p[1]} r={isCur ? 5.5 : 4} fill={dotCol} />
-              <text x={p[0]} y={p[1] - 15} className={'cmpv-fc-val' + (isCur ? ' cur' : '')} textAnchor="middle">{fmt(vals[i], fm.unit)}</text>
+            <g key={cols[i]} className="cmpv-fc-pt" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover((h) => h === i ? null : h)} onClick={() => togglePin(i)} style={{ cursor: 'pointer' }}>
+              {(isCur || isHover || isPinned) && <line x1={p[0]} y1={padT - 18} x2={p[0]} y2={H - padB} stroke={isCur ? 'var(--accent)' : 'var(--line)'} strokeWidth="1" strokeDasharray="3 4" opacity={isCur ? 0.5 : 0.9} />}
+              <circle cx={p[0]} cy={p[1]} r={isCur || isHover ? 5.5 : isPinned ? 5 : 4} fill={dotCol} />
+              {isPinned && !isCur && <circle cx={p[0]} cy={p[1]} r="8.5" fill="none" stroke={dotCol} strokeWidth="1.5" opacity="0.6" />}
+              {showVal && <text x={p[0]} y={p[1] - 15} className={'cmpv-fc-val' + (isCur ? ' cur' : '') + (isHover && !isCur ? ' hov' : '')} textAnchor="middle">{fmt(vals[i], fm.unit)}</text>}
               {showX && <text x={p[0]} y={H - padB + 24} className={'cmpv-fc-x' + (isCur ? ' cur' : '')} textAnchor="middle">{cols[i]}</text>}
+              <circle cx={p[0]} cy={p[1]} r="16" fill="transparent" />
             </g>);
         })}
       </svg>);
@@ -239,6 +249,7 @@
         <div className="pnl">
           <div className="pnl-h"><h3>{t('cmpv.evolution')} · {t(fm.label)}</h3><window.InfoTip text={t('cmpv.evolutionTip')} /></div>
           <div className="pnl-b">
+            <div className="cmpv-fc-hint">{t('cmpv.fcHint')}</div>
             <div className="cmpv-focus-full">
               <FocusChart cols={cols} fm={fm} last={last} />
             </div>

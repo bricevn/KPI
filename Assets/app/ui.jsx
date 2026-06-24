@@ -388,7 +388,7 @@
         <div className="drill-list">
           {items.length ? items.map((d) =>
         <IssueRowMini key={d.iid} d={d}
-        meta={mode === 'cycle' ? <span className="cyc-badge" style={{ color: cycleTone(cyc(d)), borderColor: cycleTone(cyc(d)) }}>{cyc(d)} j</span> : null} />
+        meta={mode === 'cycle' ? <span className="cyc-badge" style={{ color: cycleTone(cyc(d)), borderColor: cycleTone(cyc(d)) }}>{Math.round(cyc(d) * 10) / 10} j</span> : null} />
         ) : <div className="empty">Aucune issue.</div>}
         </div>
       </React.Fragment>;
