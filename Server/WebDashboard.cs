@@ -1061,6 +1061,29 @@ public sealed class WebDashboard
             }
             ex["Teams"] = teams;
         }
+        // Équipes PAR PROJET : { "projectId": [ {name, members:[username]} ] } → { name → members } par projet.
+        // N'écrit QUE si transmis (sinon préserve l'existant).
+        if (b?["teamsByProject"] is JsonObject tbp)
+        {
+            var outTbp = new JsonObject();
+            foreach (var kv in tbp)
+            {
+                if (kv.Value is not JsonArray tarr) continue;
+                var teamsObj = new JsonObject();
+                foreach (var t in tarr)
+                {
+                    if (t is not JsonObject to) continue;
+                    var name = (Str(to["name"]) ?? "").Trim();
+                    if (name.Length == 0 || teamsObj.ContainsKey(name)) continue;
+                    var arr = new JsonArray(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var m in (to["members"] as JsonArray) ?? new JsonArray())
+                    { var u = (Str(m) ?? "").Trim(); if (u.Length > 0 && seen.Add(u)) arr.Add(JsonValue.Create(u)); }
+                    teamsObj[name] = arr;
+                }
+                outTbp[kv.Key] = teamsObj;
+            }
+            ex["TeamsByProject"] = outTbp;
+        }
 
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try
@@ -1710,6 +1733,10 @@ public sealed class WebDashboard
             labelPhases = cfg.Export.LabelPhases ?? new(),
             labelPhasesByProject = (cfg.Export.LabelPhasesByProject ?? new()).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
             teams = scopedTeams.Select(kv => new { name = kv.Key, group = (cfg.Export.TeamGroups != null && cfg.Export.TeamGroups.TryGetValue(kv.Key, out var g)) ? g : "", members = kv.Value }).ToList(),
+            // Équipes par projet — réservé à l'admin (rosters par projet ; les non-admins n'ont que leurs équipes scopées).
+            teamsByProject = string.Equals(r.Role, "admin", StringComparison.OrdinalIgnoreCase)
+                ? (cfg.Export.TeamsByProject ?? new()).ToDictionary(kv => kv.Key.ToString(), kv => (object)kv.Value.Select(t => new { name = t.Key, members = t.Value }).ToList())
+                : new Dictionary<string, object>(),
             trackedLabels = cfg.Export.TrackedLabels ?? new(),
         };
 

@@ -153,6 +153,12 @@ public sealed class ExportConfig
     /// <see cref="Teams"/> (membres) reste la source pour le filtrage ; ceci n'ajoute que le rattachement projet.
     /// </summary>
     public Dictionary<string, string> TeamGroups { get; set; } = new();
+
+    /// <summary>
+    /// Équipes PAR PROJET (clé = id de projet GitLab ; valeur = nom d'équipe → membres). Écrit par l'onglet
+    /// Options en portée « par projet ». Vide pour un projet ⇒ repli sur <see cref="Teams"/> global.
+    /// </summary>
+    public Dictionary<int, Dictionary<string, List<string>>> TeamsByProject { get; set; } = new();
 }
 
 /// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>
