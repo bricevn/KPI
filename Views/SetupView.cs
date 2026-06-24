@@ -50,7 +50,7 @@ public static class SetupView
 :root{
   --bg:#0a0e13;--panel:#141a22;--panel-2:#1b232d;--panel-3:#222c37;
   --ink:#e9eef4;--ink-dim:#9aa6b6;--ink-faint:#5f6b7a;--line:#222c37;--line-2:#1b232d;
-  --accent:#2b7fff;--accent-soft:rgba(43,127,255,.16);
+  --accent:#2b7fff;--accent-soft:rgba(43,127,255,.16);--accent-2:#4d97ff;
   --good:#1f9d6b;--good-soft:rgba(31,157,107,.16);--bad:#ff6f63;--bad-soft:rgba(255,111,99,.14);
   --disp:'Space Grotesk',system-ui,sans-serif;--sans:system-ui,'Segoe UI',sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,monospace;--ease:cubic-bezier(.2,0,0,1);
@@ -111,6 +111,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .btn:hover{transform:translateY(-1px);}
 .btn.primary{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(43,127,255,.28);}
 .btn.ghost{background:transparent;color:var(--ink-dim);border:1px solid var(--line);}
+.btn.ghost:hover{color:var(--ink);border-color:var(--ink-faint);}
 .btn.outline{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);}
 .btn.outline:hover{border-color:var(--accent);}
 .btn.sm{height:40px;padding:0 16px;font-size:13.5px;}
@@ -177,15 +178,18 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .prereq{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:999px;margin-right:6px;}
 .subh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin:16px 0 9px;display:flex;align-items:center;gap:8px;}
 .subc{font-family:var(--mono);font-weight:600;color:var(--ink-dim);font-size:11px;background:var(--panel-3);padding:1px 7px;border-radius:999px;}
-.phases{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
-.phrow{display:flex;align-items:center;gap:10px;}
+.phases{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.phrow{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:7px 9px;}
+.phadd{grid-column:1/-1;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--line);background:none;color:var(--ink-dim);font:600 13px var(--sans);padding:10px;border-radius:11px;cursor:pointer;transition:border-color .12s,color .12s;}
+.phadd:hover{border-color:var(--accent);color:var(--accent);}
 .swatchwrap{position:relative;flex:none;}
 .swatch{width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.14);cursor:pointer;padding:0;}
 .pop{position:absolute;top:32px;left:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);}
 .pc{width:22px;height:22px;border-radius:6px;border:1px solid rgba(255,255,255,.14);cursor:pointer;padding:0;}
 .pc.on{outline:2px solid var(--ink);outline-offset:1px;}
-.phname{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:600 13.5px var(--sans);padding:8px 11px;outline:none;}
-.phname:focus{border-color:var(--accent);}
+.phname{flex:1;min-width:0;background:none;border:1px solid transparent;border-radius:8px;color:var(--ink);font:600 13px var(--sans);padding:6px 8px;outline:none;}
+.phname:hover{border-color:var(--line);}
+.phname:focus{border-color:var(--accent);background:var(--panel-2);}
 .phx{flex:none;border:0;background:none;color:var(--ink-faint);font-size:20px;line-height:1;cursor:pointer;padding:0 6px;border-radius:6px;}
 .phx:hover{color:var(--bad);}
 /* étape Phases : accordéons (Phases / Association des labels), un seul ouvert à la fois */
@@ -194,7 +198,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-acchead{display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;background:none;border:0;cursor:pointer;color:var(--ink);font:inherit;text-align:left;}
 .suA-acchead:hover{background:var(--panel-3);}
 .suA-acchead .ic{color:var(--accent);display:flex;flex:none;}
-.suA-acct{font-weight:700;font-size:14px;}
+.suA-acct{font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:8px;}
 .suA-accchev{margin-left:auto;display:flex;color:var(--ink-faint);transition:transform .2s var(--ease);}
 .suA-acc.open .suA-accchev{transform:rotate(90deg);}
 .suA-accbody{padding:4px 15px 16px;display:flex;flex-direction:column;gap:12px;}
@@ -253,12 +257,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-reconf{margin-top:10px;}
 /* étape 1 — formulaire de configuration OAuth (in-app, sans édition d'appsettings) */
 .suA-oauthsetup{display:flex;flex-direction:column;gap:12px;}
-.suA-oauthstep{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-dim);line-height:1.45;}
-.suA-oauthnum{width:22px;height:22px;border-radius:7px;flex:none;background:var(--panel-3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--ink);}
+.suA-oauthstep{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-dim);line-height:1.45;}
 .suA-oauthlink{color:var(--accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
 .suA-oauthlink:hover{text-decoration:underline;}
-.suA-oauthredir{font-size:11.5px;color:var(--ink-faint);margin-top:5px;}
-.suA-oauthredir code{font-family:var(--mono);background:var(--panel-3);padding:1px 5px;border-radius:5px;color:var(--ink-dim);}
+.suA-oauthhint{font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:-4px;}
+.suA-oauthhint b{color:var(--ink-dim);font-weight:600;}
+.suA-oauthhint code{font-family:var(--mono);background:var(--panel-3);padding:1px 6px;border-radius:5px;color:var(--ink-dim);}
 /* étape 3 — portée des phases (tous / par projet) */
 .suA-scope{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
 .suA-seg{display:inline-flex;background:var(--panel-3);border-radius:10px;padding:3px;gap:2px;flex:none;}
@@ -282,21 +286,26 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-teampreview{display:inline-flex;flex:none;}
 .suA-teampreview>*+*{margin-left:-6px;}
 .suA-teampreview>*{box-shadow:0 0 0 2px var(--panel-2);border-radius:50%;}
-/* écran de chargement post-setup (loader temps réel) */
+/* écran de chargement post-setup (loader temps réel — design « barres de marque ») */
 .ld-dots{display:inline-flex;align-items:center;}
 .ld-dots b{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:4px;animation:lddot 1.2s ease-in-out infinite;}
 .ld-dots b:nth-child(2){animation-delay:.18s;}.ld-dots b:nth-child(3){animation-delay:.36s;}
 @keyframes lddot{0%,60%,100%{opacity:.25;transform:translateY(0);}30%{opacity:1;transform:translateY(-3px);}}
-.ld-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px;}
-.ld-bars{display:flex;align-items:flex-end;gap:9px;height:120px;}
-.ld-bars i{display:block;width:16px;height:100%;background:var(--panel-2);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden;}
-.ld-bars b{display:block;width:100%;background:var(--accent);border-radius:6px;transition:height .5s var(--ease);}
-.ld-pct{font-family:var(--disp);font-weight:700;font-size:48px;line-height:1;color:var(--ink);}
-.ld-pct span{font-size:26px;color:var(--ink-faint);margin-left:2px;}
-.ld-status{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink-dim);font-weight:600;}
+.ld-launch{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:40px;text-align:center;position:relative;}
+.ld-logo{width:64px;height:64px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 40px rgba(43,127,255,.32);}
+.ld-bars{display:flex;align-items:flex-end;gap:13px;height:150px;width:340px;max-width:100%;}
+.ld-bars i{flex:1;height:100%;border-radius:8px 8px 0 0;background:var(--panel-2);position:relative;overflow:hidden;}
+.ld-bars i b{position:absolute;left:0;right:0;bottom:0;display:block;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--accent-2),var(--accent));transition:height .35s var(--ease);}
+.ld-bars i b::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.18),transparent 60%);}
+.ld-pct{font-family:var(--disp);font-weight:700;letter-spacing:-.03em;font-size:54px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;}
+.ld-pct span{font-size:28px;color:var(--ink-faint);margin-left:2px;}
+.ld-status{display:flex;align-items:center;gap:8px;justify-content:center;min-height:20px;font-size:14px;color:var(--ink-dim);}
 .ld-status.err{color:var(--bad);}
 .ld-status .okic{color:var(--good);display:flex;}
-.ld-meta{font-size:12px;color:var(--ink-faint);}
+.ld-meta{display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+.ld-meta .dot{opacity:.5;}
+.ld-cancel{position:absolute;bottom:26px;right:28px;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-dim);font-family:var(--sans);font-size:13px;cursor:pointer;transition:border-color .14s,color .14s;}
+.ld-cancel:hover{border-color:var(--bad);color:var(--bad);}
 @media(max-width:720px){.checklist{grid-template-columns:1fr;}.suA-top,.foot{padding-left:20px;padding-right:20px;}.bodyinner{padding:14px 20px 24px;}}
 </style>
 </head>
@@ -330,21 +339,21 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       stepConnexion:"Connexion", stepProjets:"Projets", stepPhases:"Phases", stepEquipes:"Équipes", stepVerif:"Vérif.",
       eb1:"Étape 1 · Connexion", eb2:"Étape 2 · Projets", eb3:"Étape 3 · Phases", eb4:"Étape 4 · Équipes", eb5:"Étape 5 · Vérification",
       ht1:"Connexion à GitLab", ht2:"Projets à importer", ht3:"Phases de production", ht4:"Équipes", ht5:"Tout est prêt",
-      hs1:"Renseignez l'instance et un token de service pour permettre l'extraction des données.",
+      hs1:"Connectez le groupe à suivre, puis identifiez-vous comme administrateur.",
       hs2:"Choisissez les projets à suivre par défaut. La liste provient de la connexion testée.",
       hs3:"Associez les labels qui représentent une phase de production ; laissez « Non suivi » pour les autres.",
       hs4:"Vérifiez les équipes importées (groupes GitLab) et ajustez si besoin.",
       hs5:"Vérifiez la configuration. Vous pourrez tout modifier ensuite dans Options.",
       baseUrl:"Base URL", serviceToken:"Token de service",
-      tokenHint:"Token de groupe, de projet ou personnel (scope read_api). Stocké côté serveur, jamais affiché aux utilisateurs.",
+      tokenHint:"Group access token (scope read_api), créé sur le groupe à suivre. Déjà rattaché à ce groupe — donne accès à tous ses projets. Jamais affiché aux utilisateurs.",
       adminLabel:"Compte(s) administrateur", adminHint:"Username(s) GitLab admin — 1re mise en service. Plusieurs : séparés par des virgules.",
-      timeout:"Timeout (s)", timeoutHint:"Délai max d'une requête à l'API.",
-      selfSigned:"Certificats auto-signés", selfSignedSub:"Pour les instances internes",
+      timeout:"Timeout (s)", timeoutHint:"Temps d'attente max d'une réponse de l'API avant abandon. À augmenter si l'instance est lente ou les projets volumineux.",
+      selfSigned:"Certificats auto-signés", selfSignedSub:"À activer si votre GitLab interne utilise un certificat HTTPS non reconnu (auto-signé). Sinon la connexion échouera.",
       testConn:"Tester la connexion", testing:"Test en cours…",
-      connected:"Connecté · ", accessibleProjects:" projets accessibles",
-      testFailed:"Échec · vérifiez l'URL et le token", notTested:"Non testé",
+      connected:"Connecté · ", accessibleProjects:" projets visibles dans le groupe",
+      testFailed:"Échec · vérifiez l'URL, le groupe et le token", notTested:"Non testé",
       requiredField:"champ obligatoire · une connexion réussie est requise pour continuer.",
-      projSelectedOf:" projet(s) sélectionné(s) sur ", accessible:" accessibles.",
+      projSelectedOf:" projet(s) sélectionné(s) sur ", accessible:" accessibles. Vous pourrez en ajouter d'autres plus tard.",
       loadingLabels:"Chargement des labels des projets sélectionnés…",
       selectAll:"Tout cocher", deselectAll:"Tout décocher",
       noProdLabels:"Aucun label Prod:: trouvé sur les projets sélectionnés.",
@@ -352,7 +361,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Sélectionnez au moins un projet (étape Projets) pour charger ses labels.",
       noLabelsFetched:"Aucun label récupéré pour ce(s) projet(s). Vérifiez que le token a le scope read_api et accès au projet.",
       labelsNonProd:"labels récupérés, mais aucun dans le scope « Prod:: ». Les phases se basent sur des labels « Prod::Xxx ». Vos labels :",
-      groupConn:"Connexion à GitLab", groupToken:"Token", advanced:"Options avancées",
+      groupConn:"Connexion au groupe", groupToken:"Token de groupe", advanced:"Options avancées",
       advancedHint:"À ajuster uniquement pour les instances GitLab auto-hébergées. Les valeurs par défaut conviennent à gitlab.com.",
       adminSec:"Administrateur", adminNone:"Non identifié", adminOk:"Administrateur", connecting:"Connexion à GitLab…",
       withGitlab:"Se connecter avec GitLab", connectedShort:"Connecté",
@@ -361,8 +370,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Mêmes phases et associations pour tous les projets importés.",
       scopeHintPer:"Phases et associations distinctes pour chaque projet.",
       member:"membre", members:"membres", perProjectRecap:"par projet · phases & labels distincts",
-      oauthStep1:"Créez une application OAuth sur GitLab (Redirect URI ci-dessous, scope read_user), puis collez les identifiants.",
-      oauthOpenApps:"Ouvrir les Applications GitLab", oauthSaveConnect:"Enregistrer & se connecter", oauthReconfigure:"Reconfigurer l'OAuth", oauthCurrent:"Instance :", oauthFillInstance:"Renseignez d'abord l'URL dans « Connexion à GitLab ».",
+      oauthScopeHint:"L'application doit avoir <b>au minimum</b> le scope <code>read_user</code>.",
+      oauthOpenApps:"Ouvrir les Applications GitLab", appId:"Application ID", secret:"Secret", oauthSaveConnect:"Enregistrer & se connecter", oauthReconfigure:"Reconfigurer l'OAuth", oauthCurrent:"Instance :", oauthFillInstance:"Renseignez d'abord l'URL dans « Connexion au groupe ».",
       prereq:"Prérequis", prereqText:"Seuls les labels Prod:: sont pris en compte. Personnalisez vos phases (nom, couleur, ajout/suppression), puis reliez-y vos labels.",
       phases:"Phases", changeColor:"Changer la couleur", deletePhase:"Supprimer la phase", addPhase:"Ajouter une phase",
       labelMapping:"Association des labels", notTracked:"Non suivi",
@@ -382,21 +391,21 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       stepConnexion:"Connection", stepProjets:"Projects", stepPhases:"Phases", stepEquipes:"Teams", stepVerif:"Review",
       eb1:"Step 1 · Connection", eb2:"Step 2 · Projects", eb3:"Step 3 · Phases", eb4:"Step 4 · Teams", eb5:"Step 5 · Verification",
       ht1:"Connect to GitLab", ht2:"Projects to import", ht3:"Production phases", ht4:"Teams", ht5:"All set",
-      hs1:"Enter the instance and a service token to allow data extraction.",
+      hs1:"Connect the group to track, then sign in as administrator.",
       hs2:"Choose the projects to track by default. The list comes from the tested connection.",
       hs3:"Map the labels that represent a production phase; leave \"Not tracked\" for the others.",
       hs4:"Review the imported teams (GitLab groups) and adjust if needed.",
       hs5:"Review the configuration. You can change everything later in Options.",
       baseUrl:"Base URL", serviceToken:"Service token",
-      tokenHint:"Group, project, or personal token (read_api scope). Stored server-side, never shown to users.",
+      tokenHint:"Group access token (scope read_api), created on the group to track. Already scoped to that group — grants access to all its projects. Never shown to users.",
       adminLabel:"Admin account(s)", adminHint:"GitLab admin username(s) — first setup only. Comma-separated for several.",
-      timeout:"Timeout (s)", timeoutHint:"Max delay for an API request.",
-      selfSigned:"Self-signed certificates", selfSignedSub:"For internal instances",
+      timeout:"Timeout (s)", timeoutHint:"Max wait for an API response before giving up. Increase if the instance is slow or projects are large.",
+      selfSigned:"Self-signed certificates", selfSignedSub:"Enable if your internal GitLab uses an untrusted (self-signed) HTTPS certificate. Otherwise the connection will fail.",
       testConn:"Test connection", testing:"Testing…",
-      connected:"Connected · ", accessibleProjects:" accessible projects",
-      testFailed:"Failed · check URL and token", notTested:"Not tested",
+      connected:"Connected · ", accessibleProjects:" projects visible in the group",
+      testFailed:"Failed · check the URL, group and token", notTested:"Not tested",
       requiredField:"required field · a successful connection is required to continue.",
-      projSelectedOf:" project(s) selected of ", accessible:" accessible.",
+      projSelectedOf:" project(s) selected of ", accessible:" accessible. You can add more later.",
       loadingLabels:"Loading labels…",
       selectAll:"Select all", deselectAll:"Deselect all",
       noProdLabels:"No Prod:: labels found on the selected projects.",
@@ -404,7 +413,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       noProjForLabels:"Select at least one project (Projects step) to load its labels.",
       noLabelsFetched:"No label fetched for this project. Check that the token has the read_api scope and access to the project.",
       labelsNonProd:"labels fetched, but none in the « Prod:: » scope. Phases rely on « Prod::Xxx » labels. Your labels:",
-      groupConn:"GitLab connection", groupToken:"Token", advanced:"Advanced options",
+      groupConn:"Group connection", groupToken:"Group token", advanced:"Advanced options",
       advancedHint:"Adjust only for self-hosted GitLab instances. The defaults work for gitlab.com.",
       adminSec:"Administrator", adminNone:"Not identified", adminOk:"Administrator", connecting:"Connecting to GitLab…",
       withGitlab:"Sign in with GitLab", connectedShort:"Connected",
@@ -413,8 +422,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       scopeHintAll:"Same phases and mappings for all imported projects.",
       scopeHintPer:"Separate phases and mappings for each project.",
       member:"member", members:"members", perProjectRecap:"per project · separate phases &amp; labels",
-      oauthStep1:"Create an OAuth application on GitLab (Redirect URI below, scope read_user), then paste the credentials.",
-      oauthOpenApps:"Open GitLab Applications", oauthSaveConnect:"Save & sign in", oauthReconfigure:"Reconfigure OAuth", oauthCurrent:"Instance:", oauthFillInstance:"Set the instance URL in “GitLab connection” first.",
+      oauthScopeHint:"The application needs <b>at least</b> the <code>read_user</code> scope.",
+      oauthOpenApps:"Open GitLab Applications", appId:"Application ID", secret:"Secret", oauthSaveConnect:"Save & sign in", oauthReconfigure:"Reconfigure OAuth", oauthCurrent:"Instance:", oauthFillInstance:"Set the instance URL in “Group connection” first.",
       prereq:"Prerequisite", prereqText:"Only Prod:: labels are taken into account. Customize your phases (name, color, add/remove), then link your labels to them.",
       phases:"Phases", changeColor:"Change color", deletePhase:"Delete phase", addPhase:"Add a phase",
       labelMapping:"Label mapping", notTracked:"Not tracked",
@@ -450,27 +459,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "Fases de producción",
       "ht4": "Equipos",
       "ht5": "Todo listo",
-      "hs1": "Ingresa la instancia y un token de servicio para permitir la extracción de datos.",
+      "hs1": "Conecta el grupo a seguir, luego inicia sesión como administrador.",
       "hs2": "Elige los proyectos a rastrear de forma predeterminada. La lista proviene de la conexión probada.",
       "hs3": "Asigna las etiquetas que representan una fase de producción; deja «No rastreada» para las otras.",
       "hs4": "Revisa los equipos importados (grupos de GitLab) y ajusta si es necesario.",
       "hs5": "Revisa la configuración. Puedes cambiar todo más tarde en Opciones.",
       "baseUrl": "URL base",
       "serviceToken": "Token de servicio",
-      "tokenHint": "Token de grupo, de proyecto o personal (alcance read_api). Almacenado en el servidor, nunca se muestra a los usuarios.",
+      "tokenHint": "Group access token (scope read_api), creado en el grupo a seguir. Ya vinculado a ese grupo — da acceso a todos sus proyectos. Nunca se muestra a los usuarios.",
       "timeout": "Tiempo de espera (s)",
-      "timeoutHint": "Retraso máximo para una solicitud de API.",
+      "timeoutHint": "Tiempo máx. de espera de una respuesta de la API antes de abandonar. Auméntalo si la instancia es lenta o los proyectos son grandes.",
       "selfSigned": "Certificados autofirmados",
-      "selfSignedSub": "Para instancias internas",
+      "selfSignedSub": "Actívalo si tu GitLab interno usa un certificado HTTPS no reconocido (autofirmado). De lo contrario, la conexión fallará.",
       "testConn": "Probar conexión",
       "testing": "Probando…",
       "connected": "Conectado · ",
-      "accessibleProjects": " proyectos accesibles",
-      "testFailed": "Falló · verifica la URL y el token",
+      "accessibleProjects": " proyectos visibles en el grupo",
+      "testFailed": "Error · verifica la URL, el grupo y el token",
       "notTested": "No probado",
       "requiredField": "campo obligatorio · se requiere una conexión exitosa para continuar.",
       "projSelectedOf": " proyecto(s) seleccionado(s) de ",
-      "accessible": " accesibles.",
+      "accessible": " accesibles. Podrás agregar más después.",
       "loadingLabels": "Cargando etiquetas…",
       "selectAll": "Seleccionar todo",
       "deselectAll": "Deseleccionar todo",
@@ -479,7 +488,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecciona al menos un proyecto (paso Proyectos) para cargar sus etiquetas.",
       "noLabelsFetched": "No se recuperó ninguna etiqueta para este proyecto. Verifica que el token tenga el alcance read_api y acceso al proyecto.",
       "labelsNonProd": "etiquetas recuperadas, pero ninguna en el ámbito « Prod:: ». Las fases se basan en etiquetas « Prod::Xxx ». Tus etiquetas:",
-      "groupConn": "Conexión a GitLab", "groupToken": "Token", "advanced": "Opciones avanzadas",
+      "groupConn": "Conexión al grupo", "groupToken": "Token de grupo", "advanced": "Opciones avanzadas",
       "advancedHint": "Ajústalo solo en instancias de GitLab autoalojadas. Los valores predeterminados son adecuados para gitlab.com.",
       "adminSec": "Administrador", "adminNone": "Sin identificar", "adminOk": "Administrador", "connecting": "Conectando con GitLab…",
       "withGitlab": "Conectarse con GitLab", "connectedShort": "Conectado",
@@ -488,8 +497,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mismas fases y asociaciones para todos los proyectos importados.",
       "scopeHintPer": "Fases y asociaciones distintas para cada proyecto.",
       "member": "miembro", "members": "miembros", "perProjectRecap": "por proyecto · fases y etiquetas distintas",
-      "oauthStep1": "Crea una aplicación OAuth en GitLab (Redirect URI abajo, scope read_user), luego pega las credenciales.",
-      "oauthOpenApps": "Abrir Aplicaciones de GitLab", "oauthSaveConnect": "Guardar y conectarse", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instancia:", "oauthFillInstance": "Primero indica la URL en «Conexión a GitLab».",
+      "oauthScopeHint": "La aplicación necesita <b>como mínimo</b> el scope <code>read_user</code>.",
+      "oauthOpenApps": "Abrir Aplicaciones de GitLab", "appId": "ID de aplicación", "secret": "Secreto", "oauthSaveConnect": "Guardar y conectarse", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instancia:", "oauthFillInstance": "Primero indica la URL en «Conexión al grupo».",
       "prereq": "Requisito previo",
       "prereqText": "Solo se tienen en cuenta las etiquetas Prod::. Personaliza tus fases (nombre, color, añadir/quitar), luego vincula tus etiquetas a ellas.",
       "phases": "Fases",
@@ -545,27 +554,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "Produktionsphasen",
       "ht4": "Teams",
       "ht5": "Alles bereit",
-      "hs1": "Geben Sie die Instanz und ein Service-Token ein, um die Datenextraktion zu ermöglichen.",
+      "hs1": "Verbinden Sie die zu verfolgende Gruppe und melden Sie sich als Administrator an.",
       "hs2": "Wählen Sie die Standard-Projekte aus, die Sie verfolgen möchten. Die Liste stammt aus der getesteten Verbindung.",
       "hs3": "Ordnen Sie die Label, die eine Produktionsphase darstellen, einer Phase zu; lassen Sie \"Nicht verfolgt\" für die anderen.",
       "hs4": "Überprüfen Sie die importierten Teams (GitLab-Gruppen) und passen Sie sie ggf. an.",
       "hs5": "Überprüfen Sie die Konfiguration. Sie können später alles unter \"Optionen\" ändern.",
       "baseUrl": "Basis-URL",
       "serviceToken": "Service-Token",
-      "tokenHint": "Gruppen-, Projekt- oder persönlicher Token (Bereich read_api). Serverseitig gespeichert, wird Benutzern niemals angezeigt.",
+      "tokenHint": "Group access token (Scope read_api), erstellt für die zu verfolgende Gruppe. Bereits an diese Gruppe gebunden — gewährt Zugriff auf alle ihre Projekte. Wird Benutzern nie angezeigt.",
       "timeout": "Timeout (s)",
-      "timeoutHint": "Maximale Verzögerung für eine API-Anfrage.",
+      "timeoutHint": "Maximale Wartezeit auf eine API-Antwort vor dem Abbruch. Erhöhen, wenn die Instanz langsam oder die Projekte groß sind.",
       "selfSigned": "Selbstsignierte Zertifikate",
-      "selfSignedSub": "Für interne Instanzen",
+      "selfSignedSub": "Aktivieren, wenn Ihr internes GitLab ein nicht vertrauenswürdiges (selbstsigniertes) HTTPS-Zertifikat verwendet. Andernfalls schlägt die Verbindung fehl.",
       "testConn": "Verbindung testen",
       "testing": "Wird getestet…",
       "connected": "Verbunden · ",
-      "accessibleProjects": " verfügbare Projekte",
-      "testFailed": "Fehlgeschlagen · überprüfen Sie URL und Token",
+      "accessibleProjects": " in der Gruppe sichtbare Projekte",
+      "testFailed": "Fehlgeschlagen · URL, Gruppe und Token prüfen",
       "notTested": "Nicht getestet",
       "requiredField": "erforderliches Feld · eine erfolgreiche Verbindung ist erforderlich, um fortzufahren.",
       "projSelectedOf": " Projekt(e) ausgewählt von ",
-      "accessible": " verfügbar.",
+      "accessible": " verfügbar. Weitere können Sie später hinzufügen.",
       "loadingLabels": "Label werden geladen…",
       "selectAll": "Alle auswählen",
       "deselectAll": "Alle abwählen",
@@ -574,7 +583,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Wählen Sie mindestens ein Projekt (Schritt Projekte), um dessen Label zu laden.",
       "noLabelsFetched": "Kein Label für dieses Projekt abgerufen. Prüfen Sie, ob das Token den Bereich read_api und Zugriff auf das Projekt hat.",
       "labelsNonProd": "Labels abgerufen, aber keines im « Prod:: »-Bereich. Phasen basieren auf « Prod::Xxx »-Labels. Ihre Labels:",
-      "groupConn": "GitLab-Verbindung", "groupToken": "Token", "advanced": "Erweiterte Optionen",
+      "groupConn": "Gruppenverbindung", "groupToken": "Gruppen-Token", "advanced": "Erweiterte Optionen",
       "advancedHint": "Nur für selbst gehostete GitLab-Instanzen anzupassen. Die Standardwerte eignen sich für gitlab.com.",
       "adminSec": "Administrator", "adminNone": "Nicht identifiziert", "adminOk": "Administrator", "connecting": "Verbindung zu GitLab…",
       "withGitlab": "Mit GitLab anmelden", "connectedShort": "Verbunden",
@@ -583,8 +592,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Gleiche Phasen und Zuordnungen für alle importierten Projekte.",
       "scopeHintPer": "Eigene Phasen und Zuordnungen für jedes Projekt.",
       "member": "Mitglied", "members": "Mitglieder", "perProjectRecap": "pro Projekt · eigene Phasen &amp; Labels",
-      "oauthStep1": "Erstellen Sie eine OAuth-Anwendung in GitLab (Redirect URI unten, scope read_user) und fügen Sie dann die Zugangsdaten ein.",
-      "oauthOpenApps": "GitLab-Anwendungen öffnen", "oauthSaveConnect": "Speichern & anmelden", "oauthReconfigure": "OAuth neu konfigurieren", "oauthCurrent": "Instanz:", "oauthFillInstance": "Geben Sie zuerst die URL unter „GitLab-Verbindung“ ein.",
+      "oauthScopeHint": "Die Anwendung benötigt <b>mindestens</b> den Scope <code>read_user</code>.",
+      "oauthOpenApps": "GitLab-Anwendungen öffnen", "appId": "Anwendungs-ID", "secret": "Geheimnis", "oauthSaveConnect": "Speichern & anmelden", "oauthReconfigure": "OAuth neu konfigurieren", "oauthCurrent": "Instanz:", "oauthFillInstance": "Geben Sie zuerst die URL unter „Gruppenverbindung“ ein.",
       "prereq": "Voraussetzung",
       "prereqText": "Nur Label Prod:: werden berücksichtigt. Passen Sie Ihre Phasen an (Name, Farbe, Hinzufügen/Entfernen), verknüpfen Sie dann Ihre Label damit.",
       "phases": "Phasen",
@@ -640,27 +649,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "Fasi di produzione",
       "ht4": "Team",
       "ht5": "Tutto è pronto",
-      "hs1": "Inserisci l'istanza e un token di servizio per consentire l'estrazione dei dati.",
+      "hs1": "Collega il gruppo da monitorare, poi accedi come amministratore.",
       "hs2": "Scegli i progetti da tracciare per impostazione predefinita. L'elenco proviene dalla connessione testata.",
       "hs3": "Mappa le etichette che rappresentano una fase di produzione; lascia \"Non tracciato\" per le altre.",
       "hs4": "Rivedi i team importati (gruppi GitLab) e regola se necessario.",
       "hs5": "Rivedi la configurazione. Potrai modificare tutto in seguito in Opzioni.",
       "baseUrl": "URL base",
       "serviceToken": "Token di servizio",
-      "tokenHint": "Token di gruppo, di progetto o personale (scope read_api). Archiviato lato server, mai mostrato agli utenti.",
+      "tokenHint": "Group access token (scope read_api), creato sul gruppo da monitorare. Già associato a quel gruppo — dà accesso a tutti i suoi progetti. Mai mostrato agli utenti.",
       "timeout": "Timeout (s)",
-      "timeoutHint": "Ritardo massimo per una richiesta API.",
+      "timeoutHint": "Tempo massimo di attesa di una risposta dell'API prima di rinunciare. Aumentalo se l'istanza è lenta o i progetti sono grandi.",
       "selfSigned": "Certificati autofirmati",
-      "selfSignedSub": "Per istanze interne",
+      "selfSignedSub": "Attivalo se il tuo GitLab interno usa un certificato HTTPS non attendibile (autofirmato). Altrimenti la connessione fallirà.",
       "testConn": "Prova connessione",
       "testing": "Test in corso…",
       "connected": "Connesso · ",
-      "accessibleProjects": " progetti accessibili",
-      "testFailed": "Fallito · verifica URL e token",
+      "accessibleProjects": " progetti visibili nel gruppo",
+      "testFailed": "Errore · verifica URL, gruppo e token",
       "notTested": "Non testato",
       "requiredField": "campo obbligatorio · è richiesta una connessione riuscita per continuare.",
       "projSelectedOf": " progetto(i) selezionato(i) su ",
-      "accessible": " accessibili.",
+      "accessible": " accessibili. Potrai aggiungerne altri in seguito.",
       "loadingLabels": "Caricamento etichette…",
       "selectAll": "Seleziona tutto",
       "deselectAll": "Deseleziona tutto",
@@ -669,7 +678,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Seleziona almeno un progetto (passaggio Progetti) per caricarne le etichette.",
       "noLabelsFetched": "Nessuna etichetta recuperata per questo progetto. Verifica che il token abbia lo scope read_api e accesso al progetto.",
       "labelsNonProd": "etichette recuperate, ma nessuna nello scope « Prod:: ». Le fasi si basano su etichette « Prod::Xxx ». Le tue etichette:",
-      "groupConn": "Connessione a GitLab", "groupToken": "Token", "advanced": "Opzioni avanzate",
+      "groupConn": "Connessione al gruppo", "groupToken": "Token del gruppo", "advanced": "Opzioni avanzate",
       "advancedHint": "Da regolare solo per le istanze GitLab self-hosted. I valori predefiniti vanno bene per gitlab.com.",
       "adminSec": "Amministratore", "adminNone": "Non identificato", "adminOk": "Amministratore", "connecting": "Connessione a GitLab…",
       "withGitlab": "Accedi con GitLab", "connectedShort": "Connesso",
@@ -678,8 +687,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Stesse fasi e associazioni per tutti i progetti importati.",
       "scopeHintPer": "Fasi e associazioni distinte per ogni progetto.",
       "member": "membro", "members": "membri", "perProjectRecap": "per progetto · fasi &amp; etichette distinte",
-      "oauthStep1": "Crea un'applicazione OAuth su GitLab (Redirect URI sotto, scope read_user), poi incolla le credenziali.",
-      "oauthOpenApps": "Apri Applicazioni GitLab", "oauthSaveConnect": "Salva e accedi", "oauthReconfigure": "Riconfigura OAuth", "oauthCurrent": "Istanza:", "oauthFillInstance": "Inserisci prima l'URL in «Connessione a GitLab».",
+      "oauthScopeHint": "L'applicazione richiede <b>almeno</b> lo scope <code>read_user</code>.",
+      "oauthOpenApps": "Apri Applicazioni GitLab", "appId": "ID applicazione", "secret": "Segreto", "oauthSaveConnect": "Salva e accedi", "oauthReconfigure": "Riconfigura OAuth", "oauthCurrent": "Istanza:", "oauthFillInstance": "Inserisci prima l'URL in «Connessione al gruppo».",
       "prereq": "Prerequisito",
       "prereqText": "Solo le etichette Prod:: vengono prese in considerazione. Personalizza le tue fasi (nome, colore, aggiungi/rimuovi), quindi collega le tue etichette ad esse.",
       "phases": "Fasi",
@@ -735,27 +744,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "Fases de produção",
       "ht4": "Equipes",
       "ht5": "Tudo pronto",
-      "hs1": "Introduza a instância e um token de serviço para permitir a extração de dados.",
+      "hs1": "Conecte o grupo a acompanhar e inicie sessão como administrador.",
       "hs2": "Escolha os projetos a acompanhar por padrão. A lista provém da ligação testada.",
       "hs3": "Mapeie os rótulos que representam uma fase de produção; deixe \"Não rastreado\" para os restantes.",
       "hs4": "Analise as equipes importadas (grupos GitLab) e ajuste se necessário.",
       "hs5": "Analise a configuração. Pode alterar tudo depois em Opções.",
       "baseUrl": "URL Base",
       "serviceToken": "Token de serviço",
-      "tokenHint": "Token de grupo, de projeto ou pessoal (scope read_api). Armazenado no servidor, nunca mostrado aos utilizadores.",
+      "tokenHint": "Group access token (scope read_api), criado no grupo a acompanhar. Já associado a esse grupo — dá acesso a todos os seus projetos. Nunca é mostrado aos utilizadores.",
       "timeout": "Timeout (s)",
-      "timeoutHint": "Atraso máximo para um pedido de API.",
+      "timeoutHint": "Tempo máx. de espera por uma resposta da API antes de desistir. Aumente se a instância for lenta ou os projetos forem grandes.",
       "selfSigned": "Certificados auto-assinados",
-      "selfSignedSub": "Para instâncias internas",
+      "selfSignedSub": "Ative se o seu GitLab interno usar um certificado HTTPS não reconhecido (autoassinado). Caso contrário, a ligação falhará.",
       "testConn": "Testar ligação",
       "testing": "A testar…",
       "connected": "Ligado · ",
-      "accessibleProjects": " projetos acessíveis",
-      "testFailed": "Falha · verifique URL e token",
+      "accessibleProjects": " projetos visíveis no grupo",
+      "testFailed": "Falha · verifique o URL, o grupo e o token",
       "notTested": "Não testado",
       "requiredField": "campo obrigatório · uma ligação bem-sucedida é obrigatória para continuar.",
       "projSelectedOf": " projeto(s) selecionado(s) de ",
-      "accessible": " acessíveis.",
+      "accessible": " acessíveis. Poderá adicionar mais depois.",
       "loadingLabels": "A carregar rótulos…",
       "selectAll": "Selecionar tudo",
       "deselectAll": "Desmarcar tudo",
@@ -764,7 +773,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Selecione pelo menos um projeto (passo Projetos) para carregar os seus rótulos.",
       "noLabelsFetched": "Nenhum rótulo obtido para este projeto. Verifique se o token tem o scope read_api e acesso ao projeto.",
       "labelsNonProd": "rótulos obtidos, mas nenhum no scope « Prod:: ». As fases baseiam-se em rótulos « Prod::Xxx ». Os seus rótulos:",
-      "groupConn": "Ligação ao GitLab", "groupToken": "Token", "advanced": "Opções avançadas",
+      "groupConn": "Ligação ao grupo", "groupToken": "Token de grupo", "advanced": "Opções avançadas",
       "advancedHint": "A ajustar apenas para instâncias GitLab auto-alojadas. Os valores predefinidos são adequados para gitlab.com.",
       "adminSec": "Administrador", "adminNone": "Não identificado", "adminOk": "Administrador", "connecting": "A ligar ao GitLab…",
       "withGitlab": "Iniciar sessão com o GitLab", "connectedShort": "Ligado",
@@ -773,8 +782,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Mesmas fases e associações para todos os projetos importados.",
       "scopeHintPer": "Fases e associações distintas para cada projeto.",
       "member": "membro", "members": "membros", "perProjectRecap": "por projeto · fases e rótulos distintos",
-      "oauthStep1": "Crie uma aplicação OAuth no GitLab (Redirect URI abaixo, scope read_user) e cole as credenciais.",
-      "oauthOpenApps": "Abrir Aplicações GitLab", "oauthSaveConnect": "Guardar e iniciar sessão", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instância:", "oauthFillInstance": "Indique primeiro o URL em «Ligação ao GitLab».",
+      "oauthScopeHint": "A aplicação precisa de <b>pelo menos</b> o scope <code>read_user</code>.",
+      "oauthOpenApps": "Abrir Aplicações GitLab", "appId": "ID da aplicação", "secret": "Segredo", "oauthSaveConnect": "Guardar e iniciar sessão", "oauthReconfigure": "Reconfigurar OAuth", "oauthCurrent": "Instância:", "oauthFillInstance": "Indique primeiro o URL em «Ligação ao grupo».",
       "prereq": "Pré-requisito",
       "prereqText": "Apenas rótulos Prod:: são considerados. Personalize as suas fases (nome, cor, adicionar/remover), depois associe os seus rótulos a elas.",
       "phases": "Fases",
@@ -830,27 +839,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "Фазы производства",
       "ht4": "Команды",
       "ht5": "Все готово",
-      "hs1": "Введите инстанцию и токен обслуживания для разрешения извлечения данных.",
+      "hs1": "Подключите отслеживаемую группу, затем войдите как администратор.",
       "hs2": "Выберите проекты для отслеживания по умолчанию. Список поступает из проверенного соединения.",
       "hs3": "Сопоставьте метки, которые представляют фазу производства; оставьте «Не отслеживается» для остальных.",
       "hs4": "Проверьте импортированные команды (группы GitLab) и при необходимости отрегулируйте.",
       "hs5": "Проверьте конфигурацию. Вы можете все изменить позже в параметрах.",
       "baseUrl": "Base URL",
       "serviceToken": "Токен обслуживания",
-      "tokenHint": "Токен группы, проекта или персональный (scope read_api). Хранится на сервере, не показывается пользователям.",
+      "tokenHint": "Group access token (scope read_api), созданный для отслеживаемой группы. Уже привязан к этой группе — даёт доступ ко всем её проектам. Никогда не показывается пользователям.",
       "timeout": "Таймаут (сек)",
-      "timeoutHint": "Максимальная задержка для запроса API.",
+      "timeoutHint": "Максимальное ожидание ответа API перед прекращением. Увеличьте, если экземпляр медленный или проекты большие.",
       "selfSigned": "Самоподписанные сертификаты",
-      "selfSignedSub": "Для внутренних инстанций",
+      "selfSignedSub": "Включите, если ваш внутренний GitLab использует недоверенный (самоподписанный) HTTPS-сертификат. Иначе подключение не удастся.",
       "testConn": "Проверить соединение",
       "testing": "Проверка…",
       "connected": "Подключено · ",
-      "accessibleProjects": " доступные проекты",
-      "testFailed": "Не удалось · проверьте URL и токен",
+      "accessibleProjects": " видимых в группе проектов",
+      "testFailed": "Ошибка · проверьте URL, группу и токен",
       "notTested": "Не проверено",
       "requiredField": "обязательное поле · для продолжения требуется успешное соединение.",
       "projSelectedOf": " проект(ов) выбрано из ",
-      "accessible": " доступные.",
+      "accessible": " доступные. Позже можно добавить ещё.",
       "loadingLabels": "Загрузка меток…",
       "selectAll": "Выбрать все",
       "deselectAll": "Снять выбор",
@@ -859,7 +868,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "Выберите хотя бы один проект (шаг «Проекты»), чтобы загрузить его метки.",
       "noLabelsFetched": "Для этого проекта не получено ни одной метки. Убедитесь, что у токена есть scope read_api и доступ к проекту.",
       "labelsNonProd": "меток получено, но ни одной в области « Prod:: ». Этапы основаны на метках « Prod::Xxx ». Ваши метки:",
-      "groupConn": "Подключение к GitLab", "groupToken": "Токен", "advanced": "Дополнительные параметры",
+      "groupConn": "Подключение к группе", "groupToken": "Групповой токен", "advanced": "Дополнительные параметры",
       "advancedHint": "Изменяйте только для самостоятельно размещённых экземпляров GitLab. Значения по умолчанию подходят для gitlab.com.",
       "adminSec": "Администратор", "adminNone": "Не определён", "adminOk": "Администратор", "connecting": "Подключение к GitLab…",
       "withGitlab": "Войти через GitLab", "connectedShort": "Подключено",
@@ -868,8 +877,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "Одинаковые фазы и связи для всех импортированных проектов.",
       "scopeHintPer": "Отдельные фазы и связи для каждого проекта.",
       "member": "участник", "members": "участники", "perProjectRecap": "по проекту · отдельные фазы и метки",
-      "oauthStep1": "Создайте OAuth-приложение в GitLab (Redirect URI ниже, scope read_user), затем вставьте учётные данные.",
-      "oauthOpenApps": "Открыть приложения GitLab", "oauthSaveConnect": "Сохранить и войти", "oauthReconfigure": "Перенастроить OAuth", "oauthCurrent": "Экземпляр:", "oauthFillInstance": "Сначала укажите URL в «Подключение к GitLab».",
+      "oauthScopeHint": "Приложению нужен <b>как минимум</b> scope <code>read_user</code>.",
+      "oauthOpenApps": "Открыть приложения GitLab", "appId": "ID приложения", "secret": "Секрет", "oauthSaveConnect": "Сохранить и войти", "oauthReconfigure": "Перенастроить OAuth", "oauthCurrent": "Экземпляр:", "oauthFillInstance": "Сначала укажите URL в «Подключение к группе».",
       "prereq": "Предварительное условие",
       "prereqText": "Учитываются только метки Prod::. Настройте ваши фазы (название, цвет, добавление/удаление), затем свяжите с ними ваши метки.",
       "phases": "Фазы",
@@ -925,27 +934,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "مراحل الإنتاج",
       "ht4": "الفرق",
       "ht5": "كل شيء جاهز",
-      "hs1": "أدخل المثيل ورمز خدمة للسماح باستخراج البيانات.",
+      "hs1": "اربط المجموعة المراد متابعتها، ثم سجّل الدخول كمسؤول.",
       "hs2": "اختر المشاريع المراد تتبعها بشكل افتراضي. تأتي القائمة من الاتصال المختبر.",
       "hs3": "عيّن التسميات التي تمثل مرحلة إنتاج؛ اترك \"غير مُتابعة\" للآخرين.",
       "hs4": "راجع الفرق المستوردة (مجموعات GitLab) وأجرِ التعديلات إذا لزم الأمر.",
       "hs5": "راجع الإعدادات. يمكنك تغيير كل شيء لاحقاً في الخيارات.",
       "baseUrl": "عنوان URL الأساسي",
       "serviceToken": "رمز الخدمة",
-      "tokenHint": "رمز المجموعة أو المشروع أو شخصي (نطاق read_api). مخزن على الخادم، لا يُعرض أبداً للمستخدمين.",
+      "tokenHint": "رمز وصول للمجموعة (scope read_api)، أُنشئ على المجموعة المراد متابعتها. مرتبط بها بالفعل — يتيح الوصول إلى كل مشاريعها. لا يُعرض للمستخدمين أبداً.",
       "timeout": "انتظار (ثانية)",
-      "timeoutHint": "أقصى تأخير لطلب API.",
+      "timeoutHint": "أقصى مدة انتظار لاستجابة الـ API قبل التخلي. زِدها إذا كان الخادم بطيئاً أو المشاريع كبيرة.",
       "selfSigned": "شهادات موقعة ذاتياً",
-      "selfSignedSub": "للمثيلات الداخلية",
+      "selfSignedSub": "فعّله إذا كان GitLab الداخلي يستخدم شهادة HTTPS غير موثوقة (موقّعة ذاتياً). وإلا سيفشل الاتصال.",
       "testConn": "اختبار الاتصال",
       "testing": "جاري الاختبار…",
       "connected": "متصل · ",
-      "accessibleProjects": "مشاريع متاحة",
-      "testFailed": "فشل · تحقق من عنوان URL والرمز",
+      "accessibleProjects": " مشاريع ظاهرة في المجموعة",
+      "testFailed": "فشل · تحقق من العنوان والمجموعة والرمز",
       "notTested": "لم يتم اختباره",
       "requiredField": "حقل مطلوب · يجب أن يكون الاتصال ناجحاً للمتابعة.",
       "projSelectedOf": " مشروع (مشاريع) مختار (مختارة) من",
-      "accessible": " متاح (متاحة).",
+      "accessible": " متاح (متاحة). يمكنك إضافة المزيد لاحقاً.",
       "loadingLabels": "جاري تحميل التسميات…",
       "selectAll": "تحديد الكل",
       "deselectAll": "إلغاء تحديد الكل",
@@ -954,7 +963,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "اختر مشروعاً واحداً على الأقل (خطوة المشاريع) لتحميل تسمياته.",
       "noLabelsFetched": "لم يتم جلب أي تسمية لهذا المشروع. تأكد من أن الرمز يملك نطاق read_api والوصول إلى المشروع.",
       "labelsNonProd": "تسمية تم جلبها، لكن لا شيء في نطاق « Prod:: ». تعتمد المراحل على تسميات « Prod::Xxx ». تسمياتك:",
-      "groupConn": "الاتصال بـ GitLab", "groupToken": "الرمز", "advanced": "خيارات متقدمة",
+      "groupConn": "الاتصال بالمجموعة", "groupToken": "رمز المجموعة", "advanced": "خيارات متقدمة",
       "advancedHint": "للتعديل فقط في حالة مثيلات GitLab المستضافة ذاتيًا. القيم الافتراضية مناسبة لـ gitlab.com.",
       "adminSec": "مسؤول", "adminNone": "غير محدَّد", "adminOk": "مسؤول محدَّد", "connecting": "جارٍ الاتصال بـ GitLab…",
       "withGitlab": "الاتصال عبر GitLab", "connectedShort": "متصل",
@@ -963,8 +972,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "نفس المراحل والارتباطات لجميع المشاريع المستوردة.",
       "scopeHintPer": "مراحل وارتباطات مستقلة لكل مشروع.",
       "member": "عضو", "members": "أعضاء", "perProjectRecap": "حسب المشروع · مراحل وتسميات مستقلة",
-      "oauthStep1": "أنشئ تطبيق OAuth في GitLab (Redirect URI أدناه، scope read_user)، ثم الصق بيانات الاعتماد.",
-      "oauthOpenApps": "فتح تطبيقات GitLab", "oauthSaveConnect": "حفظ وتسجيل الدخول", "oauthReconfigure": "إعادة تكوين OAuth", "oauthCurrent": "المثيل:", "oauthFillInstance": "أدخل عنوان URL أولاً في «الاتصال بـ GitLab».",
+      "oauthScopeHint": "يجب أن يملك التطبيق <b>على الأقل</b> النطاق <code>read_user</code>.",
+      "oauthOpenApps": "فتح تطبيقات GitLab", "appId": "معرّف التطبيق", "secret": "السرّ", "oauthSaveConnect": "حفظ وتسجيل الدخول", "oauthReconfigure": "إعادة تكوين OAuth", "oauthCurrent": "المثيل:", "oauthFillInstance": "أدخل عنوان URL أولاً في «الاتصال بالمجموعة».",
       "prereq": "المتطلب الأساسي",
       "prereqText": "فقط تسميات Prod:: يتم أخذها بعين الاعتبار. قم بتخصيص مراحلك (الاسم واللون والإضافة/الحذف)، ثم ربط تسمياتك بها.",
       "phases": "المراحل",
@@ -1020,27 +1029,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "生产阶段",
       "ht4": "团队",
       "ht5": "一切就绪",
-      "hs1": "输入实例和服务令牌以允许数据提取。",
+      "hs1": "连接要跟踪的群组，然后以管理员身份登录。",
       "hs2": "选择默认跟踪的项目。该列表来自测试的连接。",
       "hs3": "映射代表生产阶段的标签；对于其他标签，保留\"未跟踪\"。",
       "hs4": "审查导入的团队（GitLab组）并根据需要调整。",
       "hs5": "审查配置。之后可以在选项中更改所有内容。",
       "baseUrl": "基础URL",
       "serviceToken": "服务令牌",
-      "tokenHint": "群组、项目或个人令牌（read_api 范围）。存储在服务器端，绝不向用户显示。",
+      "tokenHint": "群组访问令牌（scope read_api），在要跟踪的群组上创建。已绑定到该群组——可访问其所有项目。绝不向用户显示。",
       "timeout": "超时（秒）",
-      "timeoutHint": "API请求的最大延迟。",
+      "timeoutHint": "放弃前等待 API 响应的最长时间。如果实例较慢或项目较大，请增大。",
       "selfSigned": "自签名证书",
-      "selfSignedSub": "用于内部实例",
+      "selfSignedSub": "如果你的内部 GitLab 使用不受信任的（自签名）HTTPS 证书，请启用。否则连接将失败。",
       "testConn": "测试连接",
       "testing": "测试中…",
       "connected": "已连接 · ",
-      "accessibleProjects": " 个可访问的项目",
-      "testFailed": "失败 · 检查URL和令牌",
+      "accessibleProjects": " 个群组内可见的项目",
+      "testFailed": "失败 · 请检查 URL、群组和令牌",
       "notTested": "未测试",
       "requiredField": "必填字段 · 需要成功的连接才能继续。",
       "projSelectedOf": " 个项目已选择（共 ",
-      "accessible": " 个可访问的）。",
+      "accessible": " 个可访问的）。之后还可以添加更多。",
       "loadingLabels": "正在加载标签…",
       "selectAll": "全选",
       "deselectAll": "取消全选",
@@ -1049,7 +1058,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "请至少选择一个项目（项目步骤）以加载其标签。",
       "noLabelsFetched": "未获取到该项目的任何标签。请检查令牌是否具有 read_api 范围及项目访问权限。",
       "labelsNonProd": "个标签已获取，但没有任何属于 « Prod:: » 范围。阶段基于 « Prod::Xxx » 标签。您的标签：",
-      "groupConn": "连接到 GitLab", "groupToken": "令牌", "advanced": "高级选项",
+      "groupConn": "群组连接", "groupToken": "群组令牌", "advanced": "高级选项",
       "advancedHint": "仅需为自托管的 GitLab 实例调整。默认值适用于 gitlab.com。",
       "adminSec": "管理员", "adminNone": "未识别", "adminOk": "管理员", "connecting": "正在连接到 GitLab…",
       "withGitlab": "使用 GitLab 登录", "connectedShort": "已连接",
@@ -1058,8 +1067,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "所有导入的项目使用相同的阶段和关联。",
       "scopeHintPer": "每个项目使用各自不同的阶段和关联。",
       "member": "名成员", "members": "名成员", "perProjectRecap": "按项目 · 各自独立的阶段和标签",
-      "oauthStep1": "在 GitLab 上创建一个 OAuth 应用（下方的 Redirect URI，scope read_user），然后粘贴凭据。",
-      "oauthOpenApps": "打开 GitLab 应用", "oauthSaveConnect": "保存并登录", "oauthReconfigure": "重新配置 OAuth", "oauthCurrent": "实例：", "oauthFillInstance": "请先在「连接到 GitLab」中填写实例 URL。",
+      "oauthScopeHint": "应用<b>至少</b>需要 <code>read_user</code> 权限范围。",
+      "oauthOpenApps": "打开 GitLab 应用", "appId": "应用 ID", "secret": "密钥", "oauthSaveConnect": "保存并登录", "oauthReconfigure": "重新配置 OAuth", "oauthCurrent": "实例：", "oauthFillInstance": "请先在「群组连接」中填写实例 URL。",
       "prereq": "先决条件",
       "prereqText": "仅考虑Prod:: 标签。自定义您的阶段（名称、颜色、添加/移除），然后将您的标签链接到它们。",
       "phases": "阶段",
@@ -1115,27 +1124,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "ht3": "本番フェーズ",
       "ht4": "チーム",
       "ht5": "準備完了",
-      "hs1": "インスタンスとサービストークンを入力してデータ抽出を許可。",
+      "hs1": "追跡するグループを接続し、管理者としてサインインしてください。",
       "hs2": "デフォルトで追跡するプロジェクトを選択。リストは確認済み接続から。",
       "hs3": "本番フェーズを表す ラベルをマッピング。その他は「未追跡」に設定。",
       "hs4": "インポート済みチーム（GitLabグループ）を確認し、必要に応じて調整。",
       "hs5": "設定を確認。後でオプションで すべて変更可能。",
       "baseUrl": "ベースURL",
       "serviceToken": "サービストークン",
-      "tokenHint": "グループ、プロジェクト、または個人トークン（read_api スコープ）。サーバー側に保存され、ユーザーには表示されません。",
+      "tokenHint": "グループアクセストークン（scope read_api）。追跡するグループ上で作成し、そのグループに紐付け済み — 全プロジェクトにアクセスできます。ユーザーには表示されません。",
       "timeout": "タイムアウト（秒）",
-      "timeoutHint": "APIリクエストの最大遅延。",
+      "timeoutHint": "API 応答を諦めるまでの最大待機時間。インスタンスが遅い、またはプロジェクトが大きい場合は増やしてください。",
       "selfSigned": "自己署名証明書",
-      "selfSignedSub": "内部インスタンス向け",
+      "selfSignedSub": "社内 GitLab が信頼されない（自己署名）HTTPS 証明書を使う場合は有効化してください。そうでないと接続に失敗します。",
       "testConn": "接続をテスト",
       "testing": "テスト中…",
       "connected": "接続済み · ",
-      "accessibleProjects": "アクセス可能なプロジェクト",
-      "testFailed": "失敗 · URLとトークンを確認",
+      "accessibleProjects": " 件のグループ内プロジェクト",
+      "testFailed": "失敗 · URL・グループ・トークンを確認",
       "notTested": "未テスト",
       "requiredField": "必須フィールド · 続行するには接続成功が必要。",
       "projSelectedOf": "プロジェクト選択 / ",
-      "accessible": "アクセス可能。",
+      "accessible": "アクセス可能。後で追加できます。",
       "loadingLabels": "ラベルを読み込み中…",
       "selectAll": "すべて選択",
       "deselectAll": "すべて選択解除",
@@ -1144,7 +1153,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "noProjForLabels": "ラベルを読み込むには、少なくとも1つのプロジェクトを選択してください（プロジェクト手順）。",
       "noLabelsFetched": "このプロジェクトのラベルを取得できませんでした。トークンに read_api スコープとプロジェクトへのアクセス権があるか確認してください。",
       "labelsNonProd": "個のラベルを取得しましたが、« Prod:: » スコープのものはありません。フェーズは « Prod::Xxx » ラベルに基づきます。あなたのラベル：",
-      "groupConn": "GitLab への接続", "groupToken": "トークン", "advanced": "詳細オプション",
+      "groupConn": "グループ接続", "groupToken": "グループトークン", "advanced": "詳細オプション",
       "advancedHint": "セルフホスト型のGitLabインスタンスの場合のみ調整してください。デフォルト値は gitlab.com に適しています。",
       "adminSec": "管理者", "adminNone": "未確認", "adminOk": "管理者", "connecting": "GitLabに接続中…",
       "withGitlab": "GitLabで接続", "connectedShort": "接続済み",
@@ -1153,8 +1162,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "scopeHintAll": "インポートしたすべてのプロジェクトに同じフェーズと関連付けを適用します。",
       "scopeHintPer": "プロジェクトごとに個別のフェーズと関連付け。",
       "member": "メンバー", "members": "メンバー", "perProjectRecap": "プロジェクトごと · フェーズ &amp; ラベルを個別に",
-      "oauthStep1": "GitLab で OAuth アプリを作成し（下記の Redirect URI、scope read_user）、認証情報を貼り付けてください。",
-      "oauthOpenApps": "GitLab アプリを開く", "oauthSaveConnect": "保存してサインイン", "oauthReconfigure": "OAuthを再設定", "oauthCurrent": "インスタンス：", "oauthFillInstance": "先に「GitLab への接続」でインスタンス URL を入力してください。",
+      "oauthScopeHint": "アプリには<b>少なくとも</b> <code>read_user</code> スコープが必要です。",
+      "oauthOpenApps": "GitLab アプリを開く", "appId": "アプリケーション ID", "secret": "シークレット", "oauthSaveConnect": "保存してサインイン", "oauthReconfigure": "OAuthを再設定", "oauthCurrent": "インスタンス：", "oauthFillInstance": "先に「グループ接続」でインスタンス URL を入力してください。",
       "prereq": "前提条件",
       "prereqText": "Prod::ラベルのみが対象。フェーズをカスタマイズ（名前、色、追加/削除）してからラベルをリンク。",
       "phases": "フェーズ",
@@ -1197,7 +1206,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
-    acc1:['group','admin'],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',oauthEdit:false,adminErr:'',
+    acc1:[],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',oauthEdit:false,adminErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1205,8 +1214,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 
   // Persistance localStorage : l'identification admin se fait par OAuth (aller-retour PLEINE PAGE) → on
   // restaure l'état du wizard au retour. Effacé après une mise en service réussie. (clé unique, même origine)
-  // NB : 'acc1'/'acc'/'teamOpen' (états d'accordéon, UI) NON persistés → l'ouverture par défaut s'applique
-  // toujours (sinon un ancien localStorage rouvrirait l'ancien état et masquerait le bouton admin).
+  // NB : 'acc1'/'acc'/'teamOpen' (états d'accordéon, UI) NON persistés → l'état par défaut s'applique
+  // toujours (étape 1 : accordéons fermés, aperçu d'état « Non testé / Non identifié » dans l'en-tête).
   // NB : 'baseUrl' VOLONTAIREMENT non persisté → le champ instance est TOUJOURS vide par défaut (placeholder
   // gitlab.com), même si une instance est déjà configurée. Le SSO passant en popup, le wizard ne se recharge
   // plus → pas besoin de le restaurer. L'instance configurée n'est exposée NULLE PART dans la page par défaut.
@@ -1291,16 +1300,16 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
           +'<div class="suA-adminmeta"><div class="suA-adminname">'+esc(au.name)+(au.role?' <span class="suA-adminrole">'+esc(au.role)+'</span>':'')+'</div><div class="suA-adminhandle">'+esc(au.handle)+'</div></div>'
           +'<span class="suA-adminok">'+ic('check',14)+' '+T.adminOk+'</span><button class="suA-adminchange" data-act="adminchange">'+T.edit+'</button></div>';
       } else if(!OAUTHOK || ST.oauthEdit){
-        var redir=location.origin+'/signin-gitlab';
         var bu=(ST.baseUrl||'').replace(/\/+$/,'');
         var appsUrl=bu+'/-/profile/applications';
         var reconf=OAUTHOK&&ST.oauthEdit; // reconfiguration : secret optionnel (conservé si vide)
         h+='<div class="suA-oauthsetup">'
           // L'instance OAuth est CELLE de « Connexion à GitLab » (ST.baseUrl partagé) — pas de champ dupliqué ici.
           // Si l'instance n'est pas encore renseignée, on invite à le faire dans l'accordéon du dessus.
-          +'<div class="suA-oauthstep"><span class="suA-oauthnum">1</span><div>'+T.oauthStep1+'<div class="suA-oauthredir">Redirect URI : <code>'+esc(redir)+'</code> · scope <code>read_user</code></div>'+(bu?'<a class="suA-oauthlink" href="'+esc(appsUrl)+'" target="_blank" rel="noopener">'+T.oauthOpenApps+' '+ic('arrow',13)+'</a>':'<span class="suA-oauthlink" style="opacity:.6;cursor:default">'+T.oauthFillInstance+'</span>')+'</div></div>'
-          +'<div class="field"><div class="flabel">Application ID <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthClientId" value="'+esc(ST.oauthClientId)+'"></div></div>'
-          +'<div class="field"><div class="flabel">Secret '+(reconf?'':'<span class="req">*</span>')+'</div><div class="box">'+sic('key')+'<input data-field="oauthSecret" type="password"'+(reconf?' placeholder="••••••••"':'')+' value="'+esc(ST.oauthSecret)+'"></div></div>';
+          +'<div class="suA-oauthstep">'+(bu?'<a class="suA-oauthlink" href="'+esc(appsUrl)+'" target="_blank" rel="noopener">'+T.oauthOpenApps+' '+ic('arrow',13)+'</a>':'<span class="suA-oauthlink" style="opacity:.6;cursor:default">'+T.oauthFillInstance+'</span>')+'</div>'
+          +'<div class="suA-oauthhint">'+T.oauthScopeHint+'</div>'
+          +'<div class="field"><div class="flabel">'+T.appId+' <span class="req">*</span></div><div class="box">'+sic('key')+'<input data-field="oauthClientId" value="'+esc(ST.oauthClientId)+'"></div></div>'
+          +'<div class="field"><div class="flabel">'+T.secret+' '+(reconf?'':'<span class="req">*</span>')+'</div><div class="box">'+sic('key')+'<input data-field="oauthSecret" type="password"'+(reconf?' placeholder="••••••••"':'')+' value="'+esc(ST.oauthSecret)+'"></div></div>';
         if(ST.adminErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.adminErr)+'</div></div>';
         h+='<button class="suA-glbtn'+(ST.adminState==='connecting'?' busy':'')+'" data-act="oauthsave"'+(ST.adminState==='connecting'?' disabled':'')+'>'+(ST.adminState==='connecting'?'<span class="spin"></span>'+T.connecting:'<span class="suA-glmark">'+GITLAB_MARK+'</span>'+T.oauthSaveConnect)+'</button>';
         if(reconf)h+='<button class="btn ghost sm" data-act="oauthcancel" style="margin-top:6px">'+T.cancel+'</button>';
@@ -1350,7 +1359,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
         if(ST.openColor===p.id){h+='<div class="pop">';for(var c=0;c<PALETTE.length;c++)h+='<button class="pc'+(PALETTE[c]===p.color?' on':'')+'" style="background:'+PALETTE[c]+'" data-act="phpick:'+esc(p.id)+'~'+PALETTE[c]+'"></button>';h+='</div>';}
         h+='</div><input class="phname" data-phname="'+esc(p.id)+'" value="'+esc(p.name)+'"><button class="phx" data-act="phrm:'+esc(p.id)+'" title="'+esc(T.deletePhase)+'">×</button></div>';
       }
-      h+='</div><button class="btn outline sm" style="align-self:flex-start" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button></div>';
+      h+='<button class="phadd" data-act="phadd">'+ic('plus',16)+T.addPhase+'</button></div></div>';
     }
     h+='</div>';
     // Accordéon 2 — Association des labels (scope Prod::). Aperçu = compteur N/M liés.
@@ -1537,18 +1546,20 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function launchHtml(){
     var pr=ST.progress||{status:'running',percent:0,message:T.starting};
     var done=pr.status==='done',err=pr.status==='error',pct=Math.max(0,Math.min(100,pr.percent||0));
-    var heights=[40,62,52,86,66,96],cols=['#2b7fff','#1f9d6b','#fc6d26','#4d97ff','#1f9d6b','#2b7fff'],bars='';
-    for(var i=0;i<heights.length;i++)bars+='<i><b style="height:'+Math.round(pct*heights[i]/100)+'%;background:'+cols[i]+'"></b></i>';
-    var eta=(pr.etaSeconds!=null&&!done&&!err)?' · ~ '+fmtClock(pr.etaSeconds)+T.left:'';
+    var factors=[62,90,72,98,68],bars='';
+    for(var i=0;i<factors.length;i++)bars+='<i><b style="height:'+Math.round(pct*factors[i]/100)+'%"></b></i>';
+    var eta=(pr.etaSeconds!=null&&!done&&!err)?fmtClock(pr.etaSeconds)+T.left:'';
     var status=done?('<span class="okic">'+ic('check',17)+'</span> '+T.done)
       :err?(T.failed+esc(pr.error||pr.message||''))
       :('<span class="spin"></span> '+esc(pr.message||T.extractingShort)+'<span class="ld-dots"><b></b><b></b><b></b></span>');
+    var meta=err?'':(T.extracting+(eta?(' <span class="dot">·</span> '+eta):''));
     return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright">'+LANG_SWITCH+'</div></div>'
-      +'<div class="ld-wrap"><div class="ld-bars">'+bars+'</div>'
+      +'<div class="ld-launch"><div class="ld-logo">'+MARK+'</div>'
+      +'<div class="ld-bars">'+bars+'</div>'
       +'<div class="ld-pct">'+pct+'<span>%</span></div>'
       +'<div class="ld-status'+(err?' err':'')+'">'+status+'</div>'
-      +'<div class="ld-meta">'+(err?'':T.extracting+eta)+'</div>'
-      +(done?'':'<button class="btn '+(err?'outline':'ghost')+' sm" data-act="cancelLaunch">'+(err?T.backToConfig:ic('chevL',15)+T.cancel)+'</button>')
+      +'<div class="ld-meta">'+meta+'</div>'
+      +(done?'':'<button class="ld-cancel" data-act="cancelLaunch">'+(err?T.backToConfig:T.cancel)+'</button>')
       +'</div></div>';
   }
   function toTop(){var b=document.getElementById('body');if(b)b.scrollTop=0;}
