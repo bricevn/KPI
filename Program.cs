@@ -16,6 +16,9 @@ var builder = new ConfigurationBuilder()
 var configRoot = builder.Build();
 var appConfig = new AppConfig();
 configRoot.Bind(appConfig);
+// IConfiguration découpe les clés sur « : » → les maps à clés de labels (« Prod::… ») sont corrompues
+// par Bind. On les relit telles quelles depuis le JSON (sinon cycle = 0 j + associations perdues).
+AppConfig.RepairColonKeyedMaps(appConfig, AppContext.BaseDirectory);
 // 1c-D : plus de bloc GitLab global → on dérive une config client du 1er serveur pour les chemins mono-serveur.
 var gl = appConfig.PrimaryGitLab();
 

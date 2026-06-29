@@ -1803,6 +1803,9 @@ public sealed class WebDashboard
             .AddEnvironmentVariables(prefix: "KPI_");
         var cfg = new AppConfig();
         b.Build().Bind(cfg);
+        // IConfiguration découpe les clés sur « : » → LabelPhases (clés « Prod::… ») est corrompu par Bind.
+        // On relit ces maps telles quelles depuis le JSON, sinon le dashboard perd le mapping → cycle = 0 j.
+        AppConfig.RepairColonKeyedMaps(cfg, AppContext.BaseDirectory);
         return cfg;
     }
 

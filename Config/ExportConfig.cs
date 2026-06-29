@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text.Json;
 
 namespace Kpi.Config;
 
@@ -32,6 +33,70 @@ public sealed class AppConfig
             AllowSelfSignedCertificates = s.AllowSelfSignedCertificates,
             RequestTimeoutSeconds = s.RequestTimeoutSeconds,
         };
+    }
+
+    /// <summary>
+    /// Répare les dictionnaires dont les CLÉS contiennent « : » (labels GitLab type « Prod::Code In Progress »).
+    /// <para>
+    /// IConfiguration emploie « : » comme séparateur de SECTION : un <c>.Bind()</c> découpe donc ces clés et
+    /// corrompt silencieusement le mapping — <see cref="ExportConfig.LabelPhases"/> se retrouve vidé (seules
+    /// les clés sans « : » survivent), d'où « le cycle moyen affiche 0 j » et « les associations label→phase
+    /// ne sont pas conservées entre /setup et le dashboard ». On relit donc ces maps directement dans les
+    /// fichiers JSON (System.Text.Json préserve les clés telles quelles), en superposant <c>appsettings.json</c>
+    /// puis <c>appsettings.Development.json</c> comme le fait IConfiguration.
+    /// </para>
+    /// À appeler IMMÉDIATEMENT après <c>configRoot.Bind(appConfig)</c>, avec <c>AppContext.BaseDirectory</c>.
+    /// </summary>
+    public static void RepairColonKeyedMaps(AppConfig cfg, string baseDir)
+    {
+        if (cfg?.Export == null || string.IsNullOrEmpty(baseDir)) return;
+        var lp = new Dictionary<string, string>();
+        var lbp = new Dictionary<int, Dictionary<string, string>>();
+        bool sawLp = false, sawLbp = false;
+
+        foreach (var file in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var path = Path.Combine(baseDir, file);
+            if (!File.Exists(path)) continue;
+            JsonDocument? doc;
+            try { doc = JsonDocument.Parse(File.ReadAllText(path)); }
+            catch { continue; } // fichier illisible/invalide : on garde ce qu'a produit Bind
+            using (doc)
+            {
+                var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("Export", out var ex) || ex.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                // LabelPhases : { "label": "phaseKey" }
+                if (ex.TryGetProperty("LabelPhases", out var lpEl) && lpEl.ValueKind == JsonValueKind.Object)
+                {
+                    sawLp = true;
+                    foreach (var kv in lpEl.EnumerateObject())
+                        if (kv.Value.ValueKind == JsonValueKind.String)
+                            lp[kv.Name] = kv.Value.GetString() ?? "none";
+                }
+
+                // LabelPhasesByProject : { "projectId": { "label": "phaseKey" } }
+                if (ex.TryGetProperty("LabelPhasesByProject", out var lbpEl) && lbpEl.ValueKind == JsonValueKind.Object)
+                {
+                    sawLbp = true;
+                    foreach (var proj in lbpEl.EnumerateObject())
+                    {
+                        if (!int.TryParse(proj.Name, out var pid) || proj.Value.ValueKind != JsonValueKind.Object) continue;
+                        if (!lbp.TryGetValue(pid, out var m)) { m = new(); lbp[pid] = m; }
+                        foreach (var kv in proj.Value.EnumerateObject())
+                            if (kv.Value.ValueKind == JsonValueKind.String)
+                                m[kv.Name] = kv.Value.GetString() ?? "none";
+                    }
+                }
+            }
+        }
+
+        // On ne remplace que si un fichier portait réellement la map (sinon on conserve la sortie de Bind,
+        // p. ex. un override par variable d'environnement KPI_).
+        if (sawLp) cfg.Export.LabelPhases = lp;
+        if (sawLbp) cfg.Export.LabelPhasesByProject = lbp;
     }
 }
 
