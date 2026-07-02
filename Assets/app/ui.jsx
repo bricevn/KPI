@@ -241,12 +241,13 @@
   // colour a duration badge by magnitude (short = good, long = risk)
   const cycleTone = (days) => days >= 24 ? 'var(--c-bad)' : days >= 16 ? 'var(--c-warn)' : 'var(--c-good)';
 
-  // Export the live Graphiques tab to a self-contained HTML file.
-  // Captures whatever is currently rendered in .charts + all stylesheets + theme,
-  // so "tout ce qui sera dans l'onglet Graphiques fonctionne en export".
-  function exportChartsHTML() {
-    const node = document.querySelector('.charts');
-    if (!node) return;
+  // Export the live Graphiques tab to a self-contained INTERACTIVE HTML file.
+  // Plutôt qu'un instantané DOM figé, on recompose une mini-app React autonome : mêmes sources
+  // inline que la page (react, react-dom, i18n, ui.jsx, tab-charts.jsx — repérées par data-asset),
+  // données = le window.APP COURANT (filtres appliqués) sérialisé, JSX transpilé ICI via le Babel
+  // déjà chargé (rien à télécharger, pas de Babel embarqué). Résultat : les cartes du récap ouvrent
+  // leur popup et les sélecteurs Barres/Colonnes & Empilé/Par phase fonctionnent dans l'export.
+  function buildChartsExportDoc(tweaks) {
     const appEl = document.querySelector('.app');
     const theme = appEl ? appEl.getAttribute('data-theme') : 'light';
     const appStyle = appEl ? appEl.getAttribute('style') || '' : '';
@@ -256,12 +257,51 @@
     }
     const A = window.APP;
     const stamp = new Date().toLocaleString('fr-FR');
-    const doc = `<!doctype html>
-<html lang="fr" data-theme="${theme}">
+    // ⚠ Ce fichier est lui-même INLINÉ dans un script de la page : son source ne doit JAMAIS
+    // contenir la séquence de fermeture de script (le parseur HTML tronquerait la balise).
+    // D'où les balises composées dynamiquement (SO/SC) + neutralisation dans les sources embarqués.
+    const noClose = (s) => String(s).replace(/<\/script/gi, '<\\/script');
+    const SO = '<scr' + 'ipt>',SC = '</scr' + 'ipt>';
+    const tag = (code) => SO + noClose(code) + SC;
+    // Échappement HTML des valeurs GitLab interpolées dans le MARKUP (titre de milestone…) :
+    // React les échappe dans l'app vivante, l'export composé à la main doit le faire lui-même.
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const src = (name) => {
+      const el = document.querySelector('script[data-asset="' + name + '"]');
+      return el ? el.textContent : '';
+    };
+    // Données : window.APP courant SANS les fonctions (cal) ni les gros blocs inutiles aux
+    // graphiques (detail/vel/anomalies). Tout ce que TabCharts + ses modales lisent y est.
+    const KEYS = ['types', 'typeByKey', 'phases', 'periods', 'people', 'peopleById', 'pivot', 'pivotByKey',
+    'superGroups', 'weightMatrix', 'transversal', 'phaseAvg', 'weightBuckets', 'totals', 'kpis',
+    'milestone', 'meta', 'FIB', 'labelColors', 'filterOptions'];
+    const app = {};
+    KEYS.forEach((k) => {if (A[k] !== undefined) app[k] = A[k];});
+    // Défense XSS (titres/labels contrôlés côté GitLab) : mêmes remplacements que le serveur.
+    const appJson = JSON.stringify(app).
+    replace(/</g, '\\u003C').replace(/>/g, '\\u003E').replace(/&/g, '\\u0026').
+    replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+    const t = tweaks || {};
+    const tw = JSON.stringify({ recapStyle: t.recapStyle || 'cartes', poidsStyle: t.poidsStyle || 'barres', tempsStyle: t.tempsStyle || 'empile' });
+    const lang = JSON.stringify(window.__LANG__ || 'fr');
+    // Bootstrap : rend l'en-tête + TabCharts avec les tweaks courants (modales en layout modal).
+    const boot = `
+(function(){
+  window.__drillLayout = 'modal';
+  var TW = ${tw};
+  ReactDOM.createRoot(document.getElementById('root')).render(<window.TabCharts tweaks={TW} />);
+})();`;
+    // Transpile ui.jsx + tab-charts.jsx + bootstrap MAINTENANT (Babel est chargé dans la page) :
+    // l'export n'embarque que du JS prêt à exécuter.
+    const js = Babel.transform(src('ui.jsx') + '\n' + src('tab-charts.jsx') + '\n' + boot, { presets: ['react'] }).code;
+    // RTL (ar) : recopie l'attribut dir de la page vivante (posé côté serveur, Loc.IsRtl).
+    const dirAttr = document.documentElement.getAttribute('dir') === 'rtl' ? ' dir="rtl"' : '';
+    return `<!doctype html>
+<html lang="${(window.__LANG__ || 'fr').slice(0, 2)}"${dirAttr} data-theme="${theme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Graphiques — Release ${A.milestone.name}</title>
+<title>Graphiques — Release ${esc(A.milestone.name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -275,17 +315,29 @@
 </style>
 </head>
 <body>
-<div class="app kpi-root" data-theme="${theme}" style="${appStyle}; display:block; min-height:0;">
+<div class="app kpi-root" data-theme="${theme}" style="${esc(appStyle)}; display:block; min-height:0;">
   <div class="export-wrap">
     <div class="export-head">
-      <h1 class="disp">Graphiques — Release ${A.milestone.name}</h1>
-      <div class="sub">${A.meta.project} · ${A.totals.issues} issues · export du ${stamp}</div>
+      <h1 class="disp">Graphiques — Release ${esc(A.milestone.name)}</h1>
+      <div class="sub">${esc(A.meta.project)} · ${A.totals.issues} issues · export du ${stamp}</div>
     </div>
-    ${node.outerHTML}
+    <div id="root"></div>
   </div>
 </div>
+${tag(src('react'))}
+${tag(src('react-dom'))}
+${tag('window.__LANG__ = ' + lang + ';')}
+${tag(src('i18n'))}
+${tag('window.APP = ' + appJson + ';')}
+${tag(js)}
 </body>
 </html>`;
+  }
+
+  function exportChartsHTML(tweaks) {
+    const A = window.APP;
+    let doc;
+    try {doc = buildChartsExportDoc(tweaks);} catch (e) {console.error('export charts:', e);return;}
     const blob = new Blob([doc], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -418,5 +470,5 @@
       </Modal>);
   }
 
-  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML });
+  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, buildChartsExportDoc });
 })();

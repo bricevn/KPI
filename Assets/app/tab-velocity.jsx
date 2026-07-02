@@ -2,12 +2,12 @@
 // Click a week cell for its detail.
 (function () {
   const { useState } = React;
-  const A = window.APP,WEEKS = A.cal.WEEKS;
+  const A = window.APP;
   const TYPES = A.types.map((t) => t.key);
   const FIB = [1, 2, 3, 5, 8, 13];
-  const CUR_WEEK = Math.floor(A.cal.TODAY / 7);
   const weekLabel = (i) => {
-    const a = A.cal.fmtDay(i * 7),b = A.cal.fmtDay(Math.min(A.cal.DAYS, i * 7 + 6));
+    // borne DAYS-1 : le dernier jour AFFICHÉ de la fenêtre (l'axe rend les offsets 0..DAYS-1).
+    const a = A.cal.fmtDay(i * 7),b = A.cal.fmtDay(Math.min(A.cal.DAYS - 1, i * 7 + 6));
     return a + ' – ' + b;
   };
   const issuesFor = (pid, wk) => A.detail.filter((d) => d.validated && (d.seg.dev || []).some(([a, b, who]) =>
@@ -19,6 +19,12 @@
   const INFO = () => window.t('vel.tip');
 
   window.TabVelocity = function TabVelocity() {
+    // WEEKS/CUR_WEEK lus À CHAQUE RENDU : les filtres reconstruisent window.APP (fenêtre temporelle
+    // incluse) — un module-scope figé désalignerait les colonnes sur A.vel[..].weeks fraîchement calé.
+    const WEEKS = A.cal.WEEKS;
+    // clamp : TODAY est borné INCLUSIVEMENT à DAYS (milestone terminée) → floor(TODAY/7) peut
+    // valoir WEEKS quand DAYS % 7 === 0, et le marqueur « maintenant » sortirait de l'axe.
+    const CUR_WEEK = Math.min(WEEKS - 1, Math.floor(A.cal.TODAY / 7));
     const { s, onSort, arrow } = window.useSort('', 'desc');
     const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(900);
     const [drill, setDrill] = useState(null);

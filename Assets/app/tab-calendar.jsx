@@ -1,15 +1,28 @@
 // Calendrier tab — horizontal Gantt of phases per issue.
 (function () {
   const { useState } = React;
-  const A = window.APP,DAYS = A.cal.DAYS,TODAY = A.cal.TODAY;
+  const A = window.APP;
   // TOUTES les phases (segments Gantt) — y compris non chronométrées (uiux) — depuis la config ; repli standard.
   const PHASES = (A.periods && A.periods.length) ? A.periods.map((p) => p.key) : ['uiux', 'dev', 'review', 'qawait', 'qa', 'tofix', 'po'];
-  const pos = (d) => d / DAYS * 100;
 
   window.TabCalendar = function TabCalendar() {
+    // DAYS/TODAY lus À CHAQUE RENDU (pas au chargement du module) : les filtres (milestone…)
+    // reconstruisent window.APP en place → la fenêtre temporelle doit suivre, sinon axe désaligné.
+    const DAYS = A.cal.DAYS,TODAY = A.cal.TODAY;
+    const pos = (d) => d / DAYS * 100;
     const [hidden, setHidden] = useState(() => new Set());
     const { s, onSort, arrow } = window.useSort('', 'desc');
-    const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(900);
+    // Axe en JOURS : ~26 px par jour mini pour garder les dates lisibles (zoom/drag au-delà).
+    const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(Math.max(900, DAYS * 26));
+    // Densité des étiquettes : tous les jours si la fenêtre est courte, sinon lundis + 1ers du mois.
+    const labelStep = DAYS <= 62 ? 1 : 7;
+    const dayLabel = (i) => {
+      const dd = A.cal.dayDate(i);
+      const dom = dd.getDate();
+      if (labelStep !== 1 && !(i === 0 || dom === 1 || dd.getDay() === 1)) return null;
+      if (i === 0 || dom === 1) {try {return dd.toLocaleDateString(window.__LANG__ || 'fr', { day: 'numeric', month: 'short' });} catch (e) {return String(dom);}}
+      return String(dom);
+    };
     const toggle = (k) => setHidden((s) => {const n = new Set(s);n.has(k) ? n.delete(k) : n.add(k);return n;});
     const phaseDate = (d, k) => {const segs = d.seg[k];return segs && segs.length ? segs[0][0] : 1e9;};
     let rows = [...A.detail];
@@ -39,7 +52,11 @@
             <div className="gantt-grid" style={gridStyle}>
               <div className="gantt-axis">
                 <div className="gantt-axis-corner">{window.t('cal.issue')}</div>
-                {Array.from({ length: A.cal.WEEKS }, (_, i) => <span key={i} className="wk">{window.t('common.weekShort')}{i + 1}</span>)}
+                {Array.from({ length: DAYS }, (_, i) => {
+                const dd = A.cal.dayDate(i);
+                const we = dd.getDay() === 0 || dd.getDay() === 6;
+                return <span key={i} className={'wk dy' + (we ? ' we' : '') + (dd.getDate() === 1 ? ' m1' : '')} title={A.cal.fmtDay(i)}>{dayLabel(i)}</span>;
+              })}
               </div>
               {rows.map((d) =>
               <div key={d.iid} className="grow">

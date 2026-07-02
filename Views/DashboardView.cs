@@ -214,8 +214,10 @@ public sealed class DashboardView
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
         sb.AppendLine("  <div id=\"root\"></div>");
-        sb.AppendLine("  <script>" + A("vendor", "react.js") + "</script>");
-        sb.AppendLine("  <script>" + A("vendor", "react-dom.js") + "</script>");
+        // data-asset : identifie les sources inline pour l'export HTML interactif (exportChartsHTML
+        // recompose un mini-app autonome à partir des scripts de la page — voir ui.jsx).
+        sb.AppendLine("  <script data-asset=\"react\">" + A("vendor", "react.js") + "</script>");
+        sb.AppendLine("  <script data-asset=\"react-dom\">" + A("vendor", "react-dom.js") + "</script>");
         sb.AppendLine("  <script>" + A("vendor", "babel.js") + "</script>");
         // Données : si payload réel fourni → window.__DATA__ + mapper, exécutés SYNCHRONEMENT
         // (window.APP doit exister AVANT l'éval des .jsx qui font `const A = window.APP`).
@@ -236,9 +238,9 @@ public sealed class DashboardView
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
             + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
-        sb.AppendLine("  <script>" + A("app", "i18n.js") + "</script>");
+        sb.AppendLine("  <script data-asset=\"i18n\">" + A("app", "i18n.js") + "</script>");
         foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
-            sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("app", f) + "</script>");
+            sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");

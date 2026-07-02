@@ -112,7 +112,9 @@ window.buildAPP = function (D) {
   var DAYS = Math.max(1, Math.round((END - START) / MS_DAY));
   var WEEKS = Math.max(1, Math.ceil(DAYS / 7));
   var NOW = Date.now();
-  var TODAY = Math.max(0, Math.min(DAYS, Math.round((NOW - START) / MS_DAY)));
+  // floor (pas round) : l'offset du jour COURANT — avec round, dès midi le marqueur « aujourd'hui »
+  // sautait au lendemain (visible depuis que l'axe Calendrier est à la journée).
+  var TODAY = Math.max(0, Math.min(DAYS, Math.floor((NOW - START) / MS_DAY)));
   var dayOff = function (ms) { return (ms - START) / MS_DAY; };
 
   // ---------- types ----------
@@ -314,7 +316,14 @@ window.buildAPP = function (D) {
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.
     labelColors: (function () { var m = {}, lc = D.labelColors || {}; for (var k in lc) { var v = lc[k]; m[k] = (v && (typeof v === 'string' ? v : v.color)) || ''; } return m; })(),
-    cal: { START: new Date(START), DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, dayDate: function (d) { return new Date(START + d * MS_DAY); }, fmtDay: function (d) { return fmtFr(START + d * MS_DAY); } },
+    // dayDate/fmtDay : arithmétique CALENDAIRE (composants y/m/d) et non START + d*24h — sinon, au
+    // passage à l'heure d'hiver, chaque instant retombe à 23h de la veille et getDate()/getDay()
+    // décalent d'un jour tout l'axe (labels, week-ends, 1ers du mois) après la transition.
+    cal: (function () {
+      var S0 = new Date(START);
+      var dayDate = function (d) { return new Date(S0.getFullYear(), S0.getMonth(), S0.getDate() + d); };
+      return { START: S0, DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, dayDate: dayDate, fmtDay: function (d) { return fmtFr(dayDate(d).getTime()); } };
+    })(),
     tabs: [
       { id: 'dashboard', label: 'Dashboard' }, { id: 'charts', label: 'Graphiques' },
       { id: 'anomalies', label: 'Anomalies', count: anomCount }, { id: 'issues', label: 'Issues', count: totals.issues },
