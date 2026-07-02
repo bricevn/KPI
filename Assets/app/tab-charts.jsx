@@ -17,7 +17,7 @@
     PH.forEach(({ k }) => {o[k] = sum((r) => r[k] * r.issues) / issues;});
     return {
       issues, open: sum((r) => r.open), closed: sum((r) => r.closed),
-      appr: sum((r) => r.appr), wV: sum((r) => r.wV), wNV: sum((r) => r.wNV),
+      appr: sum((r) => r.appr), mr: sum((r) => r.mr), wV: sum((r) => r.wV), wNV: sum((r) => r.wNV),
       ret: sum((r) => r.ret), comm: sum((r) => r.comm), times: o,
       lead: PH.reduce((s, { k }) => s + o[k], 0)
     };
@@ -53,7 +53,8 @@
                 <td><span className="type"><span className="dot" style={{ background: window.typeColor(k) }}></span>{A.typeByKey[k].short}</span></td>
                 <td><span className="oc"><span className="o">{r.open}</span><s>/</s><span className="c">{r.closed}</span></span></td>
                 <td><span className="oc"><span className="c">{r.wV}</span><s>/</s><span className="o">{r.wV + r.wNV}</span></span></td>
-                <td><span className="oc"><span className="c">{r.appr}</span><s>/</s><span className="o">{r.issues - r.appr}</span></span></td>
+                {/* approbations rapportées aux issues AVEC MR */}
+                <td><span className="oc"><span className="c">{r.appr}</span><s>/</s><span className="o">{r.mr - r.appr}</span></span></td>
                 <td>{leadOf(r).toFixed(1)} {window.t('unit_day')}</td>
               </tr>);
           })}
@@ -73,7 +74,7 @@
     <div className="gm-list">
         <MetricBar label={window.t('dash.advancement')} value={d.closed} total={d.issues} color="var(--c-done)" />
         <MetricBar label={window.t('dash.weightValidated')} value={d.wV} total={d.wV + d.wNV} color="var(--c-good)" />
-        <MetricBar label={window.t('dash.approvals')} value={d.appr} total={d.issues} color="var(--c-regression)" />
+        <MetricBar label={window.t('dash.approvals')} value={d.appr} total={d.mr} color="var(--c-regression)" />
         <MetricBar label={window.t('charts.timeLead')} pct={Math.min(100, d.lead / 18 * 100)} suffix={d.lead.toFixed(1) + ' ' + window.t('unit_day')} color="var(--p-qawait)" />
       </div>;
 
@@ -101,7 +102,7 @@
                   <td><span className="type"><span className="dot" style={{ background: g.color }}></span><b>{g.name}</b></span></td>
                   <td><span className="oc"><span className="o">{g.d.open}</span><s>/</s><span className="c">{g.d.closed}</span></span></td>
                   <td><span className="oc"><span className="c">{g.d.wV}</span><s>/</s><span className="o">{g.d.wV + g.d.wNV}</span></span></td>
-                  <td><span className="oc"><span className="c">{g.d.appr}</span><s>/</s><span className="o">{g.d.issues - g.d.appr}</span></span></td>
+                  <td><span className="oc"><span className="c">{g.d.appr}</span><s>/</s><span className="o">{g.d.mr - g.d.appr}</span></span></td>
                   <td>{g.d.lead.toFixed(1)} {window.t('unit_day')}</td>
                   <td className="num"><b>{shareOf(g.d)}%</b></td>
                   <td><span className="sg-go">{window.ICONS.expand}</span></td>
@@ -115,7 +116,7 @@
           <div className="dm-metrics">
             <div className="dm-kpi"><span className="dm-v" style={{ color: 'var(--c-done)' }}>{window.pctOf(drill.d.closed, drill.d.issues)}%</span><span className="dm-l">{window.t('charts.advancementLc')}</span></div>
             <div className="dm-kpi"><span className="dm-v" style={{ color: 'var(--c-good)' }}>{window.pctOf(drill.d.wV, drill.d.wV + drill.d.wNV)}%</span><span className="dm-l">{window.t('charts.weightValidatedLc')}</span></div>
-            <div className="dm-kpi"><span className="dm-v" style={{ color: 'var(--c-regression)' }}>{window.pctOf(drill.d.appr, drill.d.issues)}%</span><span className="dm-l">{window.t('charts.approvalsLc')}</span></div>
+            <div className="dm-kpi"><span className="dm-v" style={{ color: 'var(--c-regression)' }}>{window.pctOf(drill.d.appr, drill.d.mr)}%</span><span className="dm-l">{window.t('charts.approvalsLc')}</span></div>
             <div className="dm-kpi"><span className="dm-v" style={{ color: 'var(--p-qawait)' }}>{drill.d.lead.toFixed(1)} {window.t('unit_day')}</span><span className="dm-l">{window.t('charts.timeLeadLc')}</span></div>
           </div>
           <TypeBreakdown typeKeys={drill.types} />

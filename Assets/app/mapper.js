@@ -189,9 +189,12 @@ window.buildAPP = function (D) {
 
   // ---------- agrégats par type (pivot) ----------
   // Agrégats par groupe : moyennes de phase indexées par CLÉ DYNAMIQUE (g[phaseKey]). Plus d'alias « rev ».
-  function blankAgg() { var g = { issues: 0, open: 0, closed: 0, appr: 0, wV: 0, wNV: 0, ret: 0, comm: 0, _n: {} }; PHASE_KEYS.forEach(function (k) { g[k] = 0; g._n[k] = 0; }); return g; }
+  // mr = issues AVEC au moins une MR : dénominateur des approbations (une issue sans MR ne peut
+  // pas être approuvée — la compter « non approuvée » fausserait le taux).
+  function blankAgg() { var g = { issues: 0, open: 0, closed: 0, appr: 0, mr: 0, wV: 0, wNV: 0, ret: 0, comm: 0, _n: {} }; PHASE_KEYS.forEach(function (k) { g[k] = 0; g._n[k] = 0; }); return g; }
   function addToAgg(g, d) {
     g.issues++; if (d.state === 'closed') g.closed++; else g.open++;
+    if (d.mrCount > 0) g.mr++;
     if (d.approval) g.appr++;
     if (d.validated) g.wV += d.weight; else g.wNV += d.weight;
     g.ret += d.retours; g.comm += d.comments;
@@ -214,7 +217,8 @@ window.buildAPP = function (D) {
   var kpis = {
     progress: { closed: totals.closed, total: totals.issues, pct: pct(totals.closed, totals.issues) },
     weight: { v: totals.wV, total: totals.weight, pct: pct(totals.wV, totals.weight) },
-    approvals: { with: totG.appr, total: totals.issues, pct: pct(totG.appr, totals.issues) },
+    // Approbations rapportées aux issues AVEC MR (une issue sans MR ne peut pas être approuvée).
+    approvals: { with: totG.appr, total: totG.mr, pct: pct(totG.appr, totG.mr) },
     cycle: { days: cycDays }
   };
 

@@ -67,7 +67,7 @@
             value={K.approvals.pct + '%'} pct={K.approvals.pct} color={window.pctColor(K.approvals.pct)}
             cap={[{ v: K.approvals.with, label: t('dash.done'), color: 'var(--c-regression)' }, { v: K.approvals.total - K.approvals.with, label: t('dash.notDone') }]}
             cue={t('dash.seeApproved')}
-            onClick={() => setDrill({ title: t('dash.approvals'), headline: K.approvals.pct + '%', subtitle: t('dash.subApprovals', { done: approved.length, notDone: A.detail.length - approved.length }), issues: approved, recap: 'issues' })} />
+            onClick={() => setDrill({ title: t('dash.approvals'), headline: K.approvals.pct + '%', subtitle: t('dash.subApprovals', { done: K.approvals.with, notDone: K.approvals.total - K.approvals.with }), issues: approved, recap: 'issues' })} />
           <Kard chip={window.ICONS.clock} chipBg="var(--p-qawait)" label={t('dash.avgCycle')}
             value={K.cycle.days} suffix={t('unit_day')}
             cue={t('dash.seeLongest')}
@@ -98,7 +98,8 @@
                     <td><span className="type"><span className="dot" style={{ background: window.typeColor(r.key) }}></span>{A.typeByKey[r.key].short}</span></td>
                     <td><span className="oc"><span className="o">{r.open}</span><s>/</s><span className="c">{r.closed}</span></span></td>
                     <td><span className="oc"><span className="c">{r.wV}</span><s>/</s><span className="o">{r.wV + r.wNV}</span></span></td>
-                    <td><span className="oc"><span className="c">{r.appr}</span><s>/</s><span className="o">{r.issues - r.appr}</span></span></td>
+                    {/* approbations rapportées aux issues AVEC MR (r.mr), pas au total */}
+                    <td><span className="oc"><span className="c">{r.appr}</span><s>/</s><span className="o">{r.mr - r.appr}</span></span></td>
                     {A.phases.map((ph) => <td key={ph.key}>{(r[ph.key] || 0).toFixed(1)}</td>)}
                     <td>{r.ret}</td><td>{r.comm}</td>
                   </tr>
@@ -107,7 +108,7 @@
                   <td>{t('tbl.total')}</td>
                   <td><span className="oc"><span className="o">{T.open}</span><s>/</s><span className="c">{T.closed}</span></span></td>
                   <td><span className="oc"><span className="c">{T.wV}</span><s>/</s><span className="o">{T.weight}</span></span></td>
-                  <td><span className="oc"><span className="c">{K.approvals.with}</span><s>/</s><span className="o">{T.issues - K.approvals.with}</span></span></td>
+                  <td><span className="oc"><span className="c">{K.approvals.with}</span><s>/</s><span className="o">{K.approvals.total - K.approvals.with}</span></span></td>
                   {A.phases.map((ph) => <td key={ph.key}>{(pa[ph.key] || 0).toFixed(1)}</td>)}
                   <td>{T.ret}</td><td>{tComm}</td>
                 </tr>
