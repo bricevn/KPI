@@ -341,15 +341,25 @@ ${tag(js)}
 </html>`;
   }
 
-  function exportChartsHTML(tweaks) {
+  // Nom de fichier PARLANT : graphiques_<projet>_<milestone>[_<équipes>][_<utilisateurs>].html
+  // (sel = sélection des filtres Équipe/Utilisateur, passée par le shell au clic Exporter).
+  function chartsExportName(sel) {
     const A = window.APP;
+    const slug = (s) => String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    const parts = ['graphiques', A.meta.project, A.milestone.name];
+    if (sel && sel.teams && sel.teams.length) parts.push(sel.teams.join('+'));
+    if (sel && sel.users && sel.users.length) parts.push(sel.users.join('+'));
+    return parts.map(slug).filter(Boolean).join('_') + '.html';
+  }
+
+  function exportChartsHTML(tweaks, sel) {
     let doc;
     try {doc = buildChartsExportDoc(tweaks);} catch (e) {console.error('export charts:', e);return;}
     const blob = new Blob([doc], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `graphiques-${A.milestone.name}.html`;
+    a.download = chartsExportName(sel);
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
@@ -477,5 +487,5 @@ ${tag(js)}
       </Modal>);
   }
 
-  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, buildChartsExportDoc });
+  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, buildChartsExportDoc, chartsExportName });
 })();

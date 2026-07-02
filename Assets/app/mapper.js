@@ -295,11 +295,15 @@ window.buildAPP = function (D) {
     noWeight: detail.filter(function (d) { return d.weight === 0; }),
     noType: detail.filter(function (d) { return d.noType; }),
     noPrio: detail.filter(function (d) { return d.noPrio; }),
-    noApproval: detail.filter(function (d) { return !d.approval; }),
+    // « Sans approbation » = une MR EXISTE mais aucune n'est approuvée. Une issue sans MR ne peut
+    // pas avoir d'approbation : elle relève de « fermée sans MR », pas d'un double signalement ici.
+    noApproval: detail.filter(function (d) { return !d.approval && d.mrCount > 0; }),
     stale: detail.filter(function (d) { return d.state === 'open' && (TODAY - d.start) >= 30; }),
     multiType: detail.filter(function (d) { return d.multiType; }),
     closedNoMR: detail.filter(function (d) { return d.state === 'closed' && d.mrCount === 0; }),
-    closedOpenMR: detail.filter(function (d) { return d.closedOpenMR; })
+    closedOpenMR: detail.filter(function (d) { return d.closedOpenMR; }),
+    // Issues marquées « Surcharge QA » : signal de débordement du circuit QA.
+    surchargeQa: detail.filter(function (d) { return d.labels.some(function (l) { return l.toLowerCase() === 'surcharge qa'; }); })
   };
 
   // ---------- divers ----------

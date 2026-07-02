@@ -6,7 +6,7 @@
   { key: 'noAssignee', tone: 'warn' }, { key: 'noMilestone', tone: 'warn' }, { key: 'noWeight', tone: 'warn' },
   { key: 'noType', tone: 'warn' }, { key: 'noPrio', tone: 'warn' }, { key: 'noApproval', tone: 'bad' },
   { key: 'stale', tone: 'bad' }, { key: 'multiType', tone: 'warn' },
-  { key: 'closedNoMR', tone: 'bad' }, { key: 'closedOpenMR', tone: 'bad' }];
+  { key: 'closedNoMR', tone: 'bad' }, { key: 'closedOpenMR', tone: 'bad' }, { key: 'surchargeQa', tone: 'bad' }];
 
   const toneVar = (t) => t === 'bad' ? 'var(--c-bad)' : 'var(--c-warn)';
   const catColor = (c, n) => n ? toneVar(c.tone) : 'var(--c-good)';

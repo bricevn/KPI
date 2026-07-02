@@ -8,9 +8,11 @@
 
   // Construit { MILESTONES (triés chrono), METRICS:[{k,label,unit,hb,vals:{ms:val}}] } depuis le payload réel.
   // hb = higherBetter (false → une baisse est positive : cycle, anomalies, retours).
-  function buildEvolution(D) {
+  // selU = sélection Équipe/Utilisateur active (usernames minuscules, null = tout) : l'Évolution suit
+  // les mêmes filtres que le reste du dashboard (le filtre Milestone, lui, est piloté par l'onglet).
+  function buildEvolution(D, selU) {
     D = D || {};
-    const all = D.issues || [];
+    const all = (D.issues || []).filter((i) => !selU || (i.assignees || []).some((a) => selU.indexOf(String(a).toLowerCase()) >= 0));
     const dates = D.milestoneDates || {};
     let ms = (D.availableMilestones || []).slice();
     // Tri chronologique : jalons DATÉS d'abord (date de début, sinon échéance), triés par date ISO ; puis les
@@ -48,9 +50,13 @@
   }
 
   // Cache HORS-React : window.__DATA__ est immuable pour la page ; le calcul (mapper par jalon) est coûteux.
-  // useMemo([]) ne survit pas au démontage/remontage de l'onglet → on mémorise par identité du payload.
+  // useMemo([]) ne survit pas au démontage/remontage de l'onglet → on mémorise par (payload, sélection).
   let _evoCache = null, _evoKey = null;
-  function evolutionFor(D) { if (_evoKey === D && _evoCache) return _evoCache; _evoKey = D; _evoCache = buildEvolution(D); return _evoCache; }
+  function evolutionFor(D, selU) {
+    const key = (selU ? selU.slice().sort().join('|') : '') + '§';
+    if (_evoKey && _evoKey.d === D && _evoKey.k === key && _evoCache) return _evoCache;
+    _evoKey = { d: D, k: key }; _evoCache = buildEvolution(D, selU); return _evoCache;
+  }
 
   const fmt = (v, u) => Math.round(v * 10) / 10 + (u || '');
   const round1 = (v) => Math.round(v * 10) / 10;
@@ -129,7 +135,10 @@
 
   window.TabComparison = function TabComparison() {
     const t = window.t;
-    const ev = useMemo(() => evolutionFor(window.__DATA__), []);
+    // Sélection Équipe/Utilisateur courante (posée par __applyFilters) → recalcul quand elle change.
+    const selU = window.APP.selectedUsers;
+    const selSig = selU ? selU.slice().sort().join('|') : '';
+    const ev = useMemo(() => evolutionFor(window.__DATA__, selU), [selSig]);
     const MILESTONES = ev.MILESTONES, METRICS = ev.METRICS;
     // Hooks AVANT tout retour conditionnel (ordre des hooks stable).
     const [sel, setSel] = useState(() => MILESTONES.slice(-Math.min(4, MILESTONES.length || 1)));

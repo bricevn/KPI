@@ -140,7 +140,7 @@
               <window.MultiSelect label={window.t('f_user')} value={fUser} onChange={setFUser}
             options={(A.filterOptions || {}).users || A.people.map((p) => p.name)} />
               <div className="fl-actions">
-                {isCharts && <button className="btn btn-sm btn-outline-accent export" onClick={() => window.exportChartsHTML(t)}>{window.ICONS.download} {window.t('export')}</button>}
+                {isCharts && <button className="btn btn-sm btn-outline-accent export" onClick={() => window.exportChartsHTML(t, { teams: fTeam, users: fUser })}>{window.ICONS.download} {window.t('export')}</button>}
                 <button className="btn btn-sm" onClick={clearFilters} disabled={!filtersActive} title={window.t('clearT')}>{window.ICONS.eraser} {window.t('clear')}</button>
               </div>
             </div>
