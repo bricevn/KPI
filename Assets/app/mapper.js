@@ -310,6 +310,10 @@ window.buildAPP = function (D) {
 
   return {
     types: types, typeByKey: typeByKey, phases: phases, periods: PERIODS, people: people, peopleById: peopleById,
+    // Sélection Utilisateur/Équipe active (usernames minuscules, null = pas de filtre) : consommée
+    // par les vues par personne (Vélocité) pour restreindre leurs LIGNES. A.people reste le
+    // catalogue des assignés du périmètre (l'onglet Options s'en sert pour lister les membres).
+    selectedUsers: D.selectedUsers || null,
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
     superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, weightBuckets: weightBuckets,
     milestone: milestone, meta: meta, FIB: FIB,
@@ -353,6 +357,10 @@ window.__applyFilters = (function () {
       return true;
     });
     var d = {}; for (var k in D) d[k] = D[k]; d.issues = f; d.allIssues = D.issues; d.selectedMilestones = ms;
+    // Sélection Utilisateur/Équipe (usernames en minuscules) : transmise à buildAPP pour que les
+    // vues PAR PERSONNE (Vélocité) restreignent leurs lignes à la sélection — sans elle, les
+    // co-assignés hors sélection gardent une ligne (leurs issues communes restent au périmètre).
+    d.selectedUsers = needUser ? Object.keys(uset) : null;
     var fresh = window.buildAPP(d);
     if (!window.APP) window.APP = fresh; else for (var kk in fresh) window.APP[kk] = fresh[kk];
   };

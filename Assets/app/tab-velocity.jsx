@@ -28,13 +28,17 @@
     const { s, onSort, arrow } = window.useSort('', 'desc');
     const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(900);
     const [drill, setDrill] = useState(null);
-    // global max = tallest validated+in-progress stack, for a consistent scale
-    let gmax = 1;
-    A.people.forEach((p) => A.vel[p.id].weeks.forEach((w) => {const t = w.total + w.inprog;if (t > gmax) gmax = t;}));
-    const H = 82;
     const typeWeight = (pid, k) => A.vel[pid].weeks.reduce((sum, w) => sum + (w.byType[k] || 0), 0);
-    let ppl = [...A.people];
+    // Lignes = assignés du périmètre ∩ sélection Utilisateur/Équipe (A.selectedUsers, minuscules).
+    // Sans cette restriction, les co-assignés hors sélection gardent leur ligne (leurs issues
+    // partagées avec la sélection restent au périmètre filtré).
+    const selU = A.selectedUsers;
+    let ppl = A.people.filter((p) => !selU || selU.indexOf(String(p.id).toLowerCase()) >= 0);
     if (s.key) {ppl.sort((a, b) => {const r = typeWeight(a.id, s.key) - typeWeight(b.id, s.key);return s.dir === 'desc' ? -r : r;});}
+    // global max = tallest validated+in-progress stack among DISPLAYED rows, for a consistent scale
+    let gmax = 1;
+    ppl.forEach((p) => A.vel[p.id].weeks.forEach((w) => {const t = w.total + w.inprog;if (t > gmax) gmax = t;}));
+    const H = 82;
 
     return (
       <React.Fragment>
