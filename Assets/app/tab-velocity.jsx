@@ -26,7 +26,10 @@
     // valoir WEEKS quand DAYS % 7 === 0, et le marqueur « maintenant » sortirait de l'axe.
     const CUR_WEEK = Math.min(WEEKS - 1, Math.floor(A.cal.TODAY / 7));
     const { s, onSort, arrow } = window.useSort('', 'desc');
-    const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(900);
+    // ~40 px mini par semaine : en « Tout le projet » la fenêtre peut couvrir des dizaines de
+    // semaines — à 900 px fixes les colonnes deviennent des slivers et les barres disparaissent
+    // (la donnée n'existe plus que dans les tooltips). Défilement/zoom comme le Calendrier.
+    const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(Math.max(900, WEEKS * 40));
     const [drill, setDrill] = useState(null);
     const typeWeight = (pid, k) => A.vel[pid].weeks.reduce((sum, w) => sum + (w.byType[k] || 0), 0);
     // Lignes = assignés du périmètre ∩ sélection Utilisateur/Équipe (A.selectedUsers, minuscules).
@@ -108,7 +111,10 @@
                             { label: window.t('vel.inProgressGroup'), issues: inprogFor(p.id, i), color: 'var(--ink-faint)' }]
 
                           })}>
-                            <div className="vbar" style={{ height: tot / gmax * H + 'px' }}>
+                            {/* hauteur plancher 2px : une petite semaine (0,3 pt) face à un gmax
+                                élevé donnait une barre sous-pixel — data visible au survol mais
+                                graphe vide. Plancher UNIQUEMENT si la semaine est non vide. */}
+                            <div className="vbar" style={{ height: (tot > 0 ? Math.max(2, tot / gmax * H) : 0) + 'px' }}>
                               {w.inprog > 0 && <i className="vseg-prog" style={{ height: w.inprog / tot * 100 + '%' }}></i>}
                               {TYPES.filter((k) => w.byType[k]).map((k) =>
                               <i key={k} style={{ height: w.byType[k] / tot * 100 + '%', background: window.typeColor(k) }}></i>
