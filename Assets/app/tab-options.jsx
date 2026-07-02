@@ -348,7 +348,7 @@
     // ---- Régénération des données : projet → milestone → lancement, avec progression + annulation.
     const projects = S.projects || [];
     const [regenProj, setRegenProj] = useState('');
-    const [regenMs, setRegenMs] = useState('');
+    const [regenMs, setRegenMs] = useState([]); // MULTI : plusieurs milestones ré-extraites en une course (le serveur boucle + merge)
     const [refreshState, setRefreshState] = useState('idle'); // idle | busy | done | cancelled | err
     const [prog, setProg] = useState(null); // snapshot /api/status {running,current,total,...}
     const pollRef = React.useRef(null);
@@ -375,7 +375,7 @@
       setRefreshState('busy');setProg(null);
       const body = {};
       if (regenProj) body.project = String(regenProj);
-      if (regenMs) body.milestones = [regenMs];
+      if (regenMs.length) body.milestones = regenMs;
       fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then((r) => {if (r.ok || r.status === 409) startPoll();else setRefreshState('err');}) // 409 = déjà en cours → suivre celle-là
         .catch(() => setRefreshState('err'));
@@ -437,10 +437,10 @@
           </div>
           <div className="opt-row">
             <div className="lbl">{window.t('opt.regenMs')}<span>{window.t('opt.regenMsSub')}</span></div>
-            <select style={selStyle} value={regenMs} disabled={regenBusy} onChange={(e) => setRegenMs(e.target.value)}>
-              <option value="">{window.t('opt.allMilestones')}</option>
-              {milestones.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            {/* MULTI-sélection (checkboxes + recherche) — vide = toutes les milestones. */}
+            <div style={regenBusy ? { pointerEvents: 'none', opacity: 0.55 } : null}>
+              <window.MultiSelect label={window.t('opt.regenMs')} value={regenMs} onChange={setRegenMs} options={milestones} />
+            </div>
           </div>
           {!regenBusy &&
           <div className="opt-row">
