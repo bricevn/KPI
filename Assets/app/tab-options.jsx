@@ -345,13 +345,43 @@
     const isAdmin = !!S.isAdmin;
     const milestones = (A.filterOptions || {}).milestones || [];
 
+    // ---- Régénération des données : projet → milestone → lancement, avec progression + annulation.
+    const projects = S.projects || [];
+    const [regenProj, setRegenProj] = useState('');
     const [regenMs, setRegenMs] = useState('');
-    const [refreshState, setRefreshState] = useState('idle');
-    const doRefresh = () => {
-      setRefreshState('busy');
-      fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(regenMs ? { milestones: [regenMs] } : {}) })
-        .then((r) => setRefreshState(r.ok ? 'done' : 'err')).catch(() => setRefreshState('err'));
+    const [refreshState, setRefreshState] = useState('idle'); // idle | busy | done | cancelled | err
+    const [prog, setProg] = useState(null); // snapshot /api/status {running,current,total,...}
+    const pollRef = React.useRef(null);
+    const stopPoll = () => {if (pollRef.current) {clearInterval(pollRef.current);pollRef.current = null;}};
+    const startPoll = () => {
+      stopPoll();
+      pollRef.current = setInterval(() => {
+        fetch('/api/status').then((r) => r.json()).then((s) => {
+          setProg(s);
+          if (!s.running) {
+            stopPoll();
+            // le serveur pose « Annulé par l'utilisateur. » dans lastError sur un cancel
+            setRefreshState(s.lastError ? (/annul/i.test(s.lastError) ? 'cancelled' : 'err') : 'done');
+          }
+        }).catch(() => {});
+      }, 1200);
     };
+    React.useEffect(() => {
+      // une acquisition tourne déjà (lancée ailleurs / avant l'arrivée sur l'onglet) → reprendre l'affichage
+      if (isAdmin) fetch('/api/status').then((r) => r.json()).then((s) => {if (s.running) {setRefreshState('busy');setProg(s);startPoll();}}).catch(() => {});
+      return stopPoll;
+    }, []);
+    const doRefresh = () => {
+      setRefreshState('busy');setProg(null);
+      const body = {};
+      if (regenProj) body.project = String(regenProj);
+      if (regenMs) body.milestones = [regenMs];
+      fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then((r) => {if (r.ok || r.status === 409) startPoll();else setRefreshState('err');}) // 409 = déjà en cours → suivre celle-là
+        .catch(() => setRefreshState('err'));
+    };
+    const doCancel = () => {fetch('/api/cancel', { method: 'POST' }).catch(() => {});};
+    const regenBusy = refreshState === 'busy';
 
     return (
       <div style={{ maxWidth: 860 }}>
@@ -399,15 +429,33 @@
           <h3>{window.t('opt.regen')}</h3>
           <p className="lead">{window.t('opt.regenLead', { date: (A.meta || {}).extracted || '—' })}</p>
           <div className="opt-row">
-            <div className="lbl">{window.t('opt.scope')}<span>{window.t('opt.scopeSub')}</span></div>
-            <select style={selStyle} value={regenMs} onChange={(e) => setRegenMs(e.target.value)}>
-              <option value="">{window.t('whole_project')}</option>
+            <div className="lbl">{window.t('opt.regenProject')}<span>{window.t('opt.regenProjectSub')}</span></div>
+            <select style={selStyle} value={regenProj} disabled={regenBusy} onChange={(e) => setRegenProj(e.target.value)}>
+              <option value="">{window.t('opt.allProjects')}</option>
+              {projects.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+            </select>
+          </div>
+          <div className="opt-row">
+            <div className="lbl">{window.t('opt.regenMs')}<span>{window.t('opt.regenMsSub')}</span></div>
+            <select style={selStyle} value={regenMs} disabled={regenBusy} onChange={(e) => setRegenMs(e.target.value)}>
+              <option value="">{window.t('opt.allMilestones')}</option>
               {milestones.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
-            <button className="btn btn-primary" disabled={refreshState === 'busy'} onClick={doRefresh}>{window.ICONS.refresh} {window.t('opt.refresh')}</button>
           </div>
-          {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--good,#2f9e44)' }}>{window.t('opt.refreshStarted')}</p>}
-          {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
+          {!regenBusy &&
+          <div className="opt-row">
+            <div className="lbl"></div>
+            <button className="btn btn-primary" onClick={doRefresh}>{window.ICONS.refresh} {window.t('opt.refresh')}</button>
+          </div>}
+          {regenBusy &&
+          <div className="opt-row">
+            <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
+            <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
+            <button className="btn" onClick={doCancel}>{window.t('opt.cancel')}</button>
+          </div>}
+          {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.refreshDone')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+          {refreshState === 'cancelled' && <p className="opt-note">{window.t('opt.refreshCancelled')}</p>}
+          {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
         </div>}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}

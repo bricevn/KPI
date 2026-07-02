@@ -123,9 +123,18 @@ public static class ExportPipeline
     // n'a pas basculé (1c). Réutilise GitLabClient/ExportService par (serveur, projet).
     // ====================================================================
     private static readonly JsonSerializerOptions _storeJson = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions _readJson = new() { PropertyNameCaseInsensitive = true };
 
-    public static async Task RunMultiServerExportAsync(AppConfig config, Action<int, int>? onProgress, CancellationToken ct)
+    /// <param name="projectFilter">Id GitLab d'un projet (chaîne) pour une acquisition CIBLÉE ; null = tous les projets configurés.</param>
+    /// <param name="milestoneFilter">Titre d'une milestone pour une acquisition CIBLÉE ; null = toutes les issues.
+    /// En mode ciblé, le store existant est MERGÉ : seules les issues de la portée sont remplacées.</param>
+    public static async Task RunMultiServerExportAsync(AppConfig config, Action<int, int>? onProgress, CancellationToken ct,
+        string? projectFilter = null, string? milestoneFilter = null)
     {
+        projectFilter = string.IsNullOrWhiteSpace(projectFilter) ? null : projectFilter.Trim();
+        milestoneFilter = string.IsNullOrWhiteSpace(milestoneFilter) ? null : milestoneFilter.Trim();
+        var scoped = projectFilter != null || milestoneFilter != null;
+
         var servers = config.ResolveServers();
         if (servers.Count == 0) { Console.WriteLine("Aucun serveur GitLab configuré (Servers vide)."); return; }
 
@@ -142,7 +151,12 @@ public static class ExportPipeline
             var projectIds = server.ProjectIds is { Count: > 0 }
                 ? server.ProjectIds
                 : await ListProjectsAsync(server, ct);
-            Console.WriteLine($"== Serveur '{server.Id}' ({server.BaseUrl}) : {projectIds.Count} projet(s) ==");
+            if (projectFilter != null)
+            {
+                projectIds = projectIds.Where(p => p == projectFilter).ToList();
+                if (projectIds.Count == 0) { Console.WriteLine($"  [skip] serveur '{server.Id}' : projet {projectFilter} absent de sa configuration."); continue; }
+            }
+            Console.WriteLine($"== Serveur '{server.Id}' ({server.BaseUrl}) : {projectIds.Count} projet(s){(scoped ? " · acquisition ciblée" : "")} ==");
 
             var allIssues = new List<IssueExport>();
             var labels = new Dictionary<string, GitLabLabel>(StringComparer.OrdinalIgnoreCase);
@@ -163,12 +177,39 @@ public static class ExportPipeline
                 using var client = new GitLabClient(glCfg);
                 var service = new ExportService(client, glCfg, config.Export);
                 Console.WriteLine($"  -- projet {pid} --");
-                var issues = await service.BuildIssueExportsAsync(ct, onProgress, "");
+                var issues = await service.BuildIssueExportsAsync(ct, onProgress, milestoneFilter ?? "");
                 allIssues.AddRange(issues);  // chaque IssueExport porte déjà son ProjectId (groupement)
                 try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
                 try { foreach (var m in await client.GetProjectMilestonesAsync(ct)) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
+            }
+
+            if (scoped)
+            {
+                // Acquisition CIBLÉE → merge avec le store existant : on ne remplace que la portée
+                // (projet et/ou milestone) ; le reste (autres projets/milestones) est conservé.
+                var prevTxt = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "issues.json"));
+                if (prevTxt != null)
+                {
+                    var existing = JsonSerializer.Deserialize<List<IssueExport>>(prevTxt, _readJson) ?? new();
+                    bool InScope(IssueExport e) =>
+                        (projectFilter == null || e.ProjectId.ToString() == projectFilter)
+                        && (milestoneFilter == null || string.Equals(e.Milestone, milestoneFilter, StringComparison.OrdinalIgnoreCase));
+                    var newKeys = new HashSet<(long, long)>(allIssues.Select(e => (e.ProjectId, e.Iid)));
+                    var preserved = existing.Where(e => !InScope(e) && !newKeys.Contains((e.ProjectId, e.Iid))).ToList();
+                    Console.WriteLine($"  Merge ciblé : {preserved.Count} issues conservées (hors portée) + {allIssues.Count} fraîchement extraites.");
+                    allIssues = preserved.Concat(allIssues).OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
+                }
+                // Catalogues labels/milestones : réinjecter l'existant (autres projets) — le frais gagne.
+                var prevLb = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "labels.json"));
+                if (prevLb != null)
+                    foreach (var l in JsonSerializer.Deserialize<List<GitLabLabel>>(prevLb, _readJson) ?? new())
+                        if (!string.IsNullOrEmpty(l.Name) && !labels.ContainsKey(l.Name)) labels[l.Name] = l;
+                var prevMs = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "milestones.json"));
+                if (prevMs != null)
+                    foreach (var m in JsonSerializer.Deserialize<List<GitLabMilestone>>(prevMs, _readJson) ?? new())
+                        if (!string.IsNullOrEmpty(m.Title) && !milestones.ContainsKey(m.Title)) milestones[m.Title] = m;
             }
 
             // Écriture CHIFFRÉE (sous-clé du serveur) — cloisonnée sous output/<serverId>/.

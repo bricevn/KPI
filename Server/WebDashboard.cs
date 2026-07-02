@@ -570,6 +570,7 @@ public sealed class WebDashboard
             return Results.Text("Une acquisition est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
 
         List<string> milestonesToRefresh = new();
+        string? projectFilter = null;
         try
         {
             using var reader = new StreamReader(ctx.Request.Body);
@@ -581,17 +582,19 @@ public sealed class WebDashboard
                     milestonesToRefresh.AddRange(parsed.milestones.Where(m => !string.IsNullOrWhiteSpace(m)));
                 else if (!string.IsNullOrWhiteSpace(parsed?.milestone))
                     milestonesToRefresh.Add(parsed.milestone!);
+                if (!string.IsNullOrWhiteSpace(parsed?.project))
+                    projectFilter = parsed!.project!.Trim();
             }
         }
         catch { /* body invalide → refresh complet */ }
 
         var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
         var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
-        _ = Task.Run(() => RunRefreshAsync(milestonesToRefresh, serverCt));
+        _ = Task.Run(() => RunRefreshAsync(milestonesToRefresh, projectFilter, serverCt));
         return Results.Text("Acquisition démarrée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 202);
     }
 
-    private async Task RunRefreshAsync(List<string> milestonesToRefresh, CancellationToken serverCt)
+    private async Task RunRefreshAsync(List<string> milestonesToRefresh, string? projectFilter, CancellationToken serverCt)
     {
         CancellationTokenSource localCts;
         CancellationTokenSource linked;
@@ -609,9 +612,17 @@ public sealed class WebDashboard
 
             if (_config.Servers is { Count: > 0 })
             {
-                // v2 multi-serveurs : extraction cloisonnée + chiffrée de TOUS les projets configurés
-                // (la sélection par milestone ne s'applique qu'au chemin legacy mono-serveur).
-                await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token);
+                // v2 multi-serveurs : extraction cloisonnée + chiffrée, CIBLABLE par projet et/ou
+                // milestone (merge du store : seule la portée demandée est remplacée).
+                if (milestonesToRefresh.Count == 0)
+                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, projectFilter);
+                else
+                    for (int i = 0; i < milestonesToRefresh.Count; i++)
+                    {
+                        linked.Token.ThrowIfCancellationRequested();
+                        Console.WriteLine($"[Refresh] Milestone {i + 1}/{milestonesToRefresh.Count} : {milestonesToRefresh[i]}");
+                        await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) => { _state.Current = cur; _state.Total = tot; }, linked.Token, projectFilter, milestonesToRefresh[i]);
+                    }
             }
             else if (milestonesToRefresh.Count == 0)
             {
@@ -1380,7 +1391,7 @@ public sealed class WebDashboard
         _state.StartedAt = DateTime.UtcNow;
         var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
         var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
-        _ = Task.Run(() => RunRefreshAsync(new List<string>(), serverCt));
+        _ = Task.Run(() => RunRefreshAsync(new List<string>(), null, serverCt));
     }
 
     /// <summary>Progression du scrap post-setup, mappée sur l'état du job (loader temps réel côté /setup).</summary>
@@ -1861,6 +1872,8 @@ public sealed class WebDashboard
     {
         public string? milestone { get; set; }
         public List<string>? milestones { get; set; }
+        /// <summary>Id GitLab du projet à ré-extraire (chaîne). Vide/null = tous les projets configurés.</summary>
+        public string? project { get; set; }
     }
 
     private sealed class ConfigPayload { public string content { get; set; } = ""; }
