@@ -272,11 +272,17 @@ window.buildAPP = function (D) {
     devSegs.forEach(function (seg) {
       var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
       var wPerDay = d.weight / totalDev;
-      var a = Math.max(0, Math.floor(seg[0])), b = Math.min(DAYS, Math.ceil(seg[1]));
-      for (var day = a; day < b; day++) {
+      var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
+      for (var day = Math.floor(a); day < Math.ceil(b); day++) {
+        // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour), pas le
+        // taux plein : un label Dev actif 30 s (totalDev ≈ 0,0004 j) donnait poids/0,0004 ≈ +22000
+        // pts sur la semaine. Invariant restauré : Σ contributions d'une issue = son poids.
+        var ov = Math.min(day + 1, b) - Math.max(day, a);
+        if (ov <= 0) continue;
+        var wAdd = wPerDay * ov;
         var wk = Math.min(WEEKS - 1, Math.floor(day / 7)); vel[owner].devWeeks.add(wk);
-        if (d.validated) { vel[owner].weeks[wk].total += wPerDay; vel[owner].weeks[wk].byType[d.type] = (vel[owner].weeks[wk].byType[d.type] || 0) + wPerDay; }
-        else vel[owner].weeks[wk].inprog += wPerDay;
+        if (d.validated) { vel[owner].weeks[wk].total += wAdd; vel[owner].weeks[wk].byType[d.type] = (vel[owner].weeks[wk].byType[d.type] || 0) + wAdd; }
+        else vel[owner].weeks[wk].inprog += wAdd;
       }
     });
     d.assignees.forEach(function (aid) { if (!vel[aid]) return; vel[aid].issues[d.state === 'closed' ? 'c' : 'o']++; vel[aid].fib[d.weight] = (vel[aid].fib[d.weight] || 0) + 1; });

@@ -165,10 +165,17 @@
       {ICONS.info}
     </span>;
 
-  // GitLab issue hyperlink — used wherever an issue IID appears
+  // GitLab issue hyperlink — used wherever an issue IID appears.
+  // Base d'URL RÉELLE dérivée du webUrl des issues (mapper → meta.issueBase : instance + groupe/projet
+  // exacts, ex. …/obvious/ooda/-/issues/). L'ancienne constante n'est plus qu'un repli pour la démo
+  // /ref (data.js ne pose pas meta.issueBase).
   const ISSUE_BASE = 'https://gitlab.obvious.tech/hypervisor/-/issues/';
+  const issueUrl = (iid) => {
+    try {const b = window.APP.meta.issueBase;if (b) return b + iid;} catch (e) {}
+    return ISSUE_BASE + iid;
+  };
   const IssueLink = ({ iid, className }) =>
-  <a className={'iid-link' + (className ? ' ' + className : '')} href={ISSUE_BASE + iid} target="_blank" rel="noopener noreferrer"
+  <a className={'iid-link' + (className ? ' ' + className : '')} href={issueUrl(iid)} target="_blank" rel="noopener noreferrer"
   title={'Ouvrir l’issue #' + iid + ' sur GitLab'} onClick={(e) => e.stopPropagation()}>#{iid}</a>;
 
   // progress → colour by value (colour-blind safe + glyph elsewhere)
