@@ -108,7 +108,12 @@ window.buildAPP = function (D) {
   // Timeline = TOUTE l'activité réelle des issues filtrées (événements + création), élargie aux
   // bornes de la milestone (pour que ses barres restent visibles). Rien n'est tronqué aux bornes.
   var allT = [];
-  ISSUES.forEach(function (i) { (i.labelEvents || []).forEach(function (e) { var t = new Date(e.at).getTime(); if (!isNaN(t)) allT.push(t); }); if (i.createdAt) { var c = new Date(i.createdAt).getTime(); if (!isNaN(c)) allT.push(c); } });
+  ISSUES.forEach(function (i) {
+    (i.labelEvents || []).forEach(function (e) { var t = new Date(e.at).getTime(); if (!isNaN(t)) allT.push(t); });
+    if (i.createdAt) { var c = new Date(i.createdAt).getTime(); if (!isNaN(c)) allT.push(c); }
+    // closedAt : la fermeture est de l'activité réelle (la vélocité compte le poids validé CETTE semaine-là).
+    if (i.closedAt) { var cl = new Date(i.closedAt).getTime(); if (!isNaN(cl)) allT.push(cl); }
+  });
   var START = allT.length ? Math.min.apply(null, allT) : NaN;
   var END = allT.length ? Math.max.apply(null, allT) : NaN;
   if (!isNaN(MS_START)) START = isNaN(START) ? MS_START : Math.min(START, MS_START);
@@ -182,6 +187,8 @@ window.buildAPP = function (D) {
       iid: iss.iid, title: iss.title || '', type: t ? t.key : 'untyped', weight: (iss.weight == null ? 0 : iss.weight),
       assignees: iss.assignees || [], state: closed ? 'closed' : 'open',
       validated: closed, approval: approval, retours: tm.retours, _times: tm,
+      // closeDay : offset (jours) de la FERMETURE — la semaine où la vélocité compte le poids validé.
+      closeDay: closed ? clampOff(endRef) : null,
       seg: seg, start: start, end: end, mrCount: mrs.length,
       mrs: mrs.map(function (m) { return { iid: m.iid, state: m.state }; }), comments: iss.commentsCount || 0,
       labels: iss.labels || [], approvers: approvers, closedBy: closed ? (approvers[0] || (iss.assignees || [])[0] || null) : null,
@@ -272,28 +279,49 @@ window.buildAPP = function (D) {
   var sgRest = Object.keys(typeByKey).filter(function (k) { return !sgClaimed[k]; });
   if (sgRest.length) superGroups.push({ key: 'divers', name: 'Autres types', color: 'var(--c-neutral)', types: sgRest });
 
-  // ---------- vélocité (depuis detail.seg.dev, logique data.js) ----------
+  // ---------- vélocité (depuis detail.seg.dev) ----------
+  // VALIDÉ = compté UNE SEULE FOIS, la semaine de la FERMETURE de l'issue (vélocité classique :
+  // points livrés par semaine) — réparti entre contributeurs au prorata de leur temps de dev
+  // (repli : assignés à parts égales). L'étaler sur les semaines de dev faisait apparaître la même
+  // issue « validée » plusieurs semaines d'affilée.
+  // EN COURS (hachuré) = poids des issues non fermées, étalé sur leurs jours de dev (inchangé).
   var vel = {};
   people.forEach(function (p) { vel[p.id] = { weeks: Array.from({ length: WEEKS }, function () { return { total: 0, byType: {}, inprog: 0 }; }), devWeeks: new Set(), issues: { o: 0, c: 0 }, fib: {} }; });
   detail.forEach(function (d) {
     var devSegs = d.seg.dev || [];
-    var totalDev = devSegs.reduce(function (s, seg) { return s + Math.max(0, seg[1] - seg[0]); }, 0) || 1;
-    devSegs.forEach(function (seg) {
-      var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
-      var wPerDay = d.weight / totalDev;
-      var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
-      for (var day = Math.floor(a); day < Math.ceil(b); day++) {
-        // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour), pas le
-        // taux plein : un label Dev actif 30 s (totalDev ≈ 0,0004 j) donnait poids/0,0004 ≈ +22000
-        // pts sur la semaine. Invariant restauré : Σ contributions d'une issue = son poids.
-        var ov = Math.min(day + 1, b) - Math.max(day, a);
-        if (ov <= 0) continue;
-        var wAdd = wPerDay * ov;
-        var wk = Math.min(WEEKS - 1, Math.floor(day / 7)); vel[owner].devWeeks.add(wk);
-        if (d.validated) { vel[owner].weeks[wk].total += wAdd; vel[owner].weeks[wk].byType[d.type] = (vel[owner].weeks[wk].byType[d.type] || 0) + wAdd; }
-        else vel[owner].weeks[wk].inprog += wAdd;
+    if (!d.validated) {
+      var totalDev = devSegs.reduce(function (s, seg) { return s + Math.max(0, seg[1] - seg[0]); }, 0) || 1;
+      devSegs.forEach(function (seg) {
+        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
+        var wPerDay = d.weight / totalDev;
+        var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
+        for (var day = Math.floor(a); day < Math.ceil(b); day++) {
+          // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour).
+          var ov = Math.min(day + 1, b) - Math.max(day, a);
+          if (ov <= 0) continue;
+          var wk = Math.min(WEEKS - 1, Math.floor(day / 7)); vel[owner].devWeeks.add(wk);
+          vel[owner].weeks[wk].inprog += wPerDay * ov;
+        }
+      });
+    } else {
+      // Parts par contributeur = temps de dev porté ; repli assignés si aucun segment mesurable.
+      var shares = {}, shTot = 0;
+      devSegs.forEach(function (seg) {
+        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
+        var len = Math.max(0, seg[1] - seg[0]); if (len <= 0) return;
+        shares[owner] = (shares[owner] || 0) + len; shTot += len;
+      });
+      if (!shTot) { (d.assignees || []).forEach(function (a) { if (vel[a]) { shares[a] = 1; shTot++; } }); }
+      if (shTot) {
+        var wkC = Math.min(WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
+        Object.keys(shares).forEach(function (o) {
+          var wAdd = d.weight * shares[o] / shTot;
+          vel[o].weeks[wkC].total += wAdd;
+          vel[o].weeks[wkC].byType[d.type] = (vel[o].weeks[wkC].byType[d.type] || 0) + wAdd;
+          vel[o].devWeeks.add(wkC);
+        });
       }
-    });
+    }
     d.assignees.forEach(function (aid) { if (!vel[aid]) return; vel[aid].issues[d.state === 'closed' ? 'c' : 'o']++; vel[aid].fib[d.weight] = (vel[aid].fib[d.weight] || 0) + 1; });
   });
 

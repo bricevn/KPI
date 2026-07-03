@@ -10,8 +10,16 @@
     const a = A.cal.fmtDay(i * 7),b = A.cal.fmtDay(Math.min(A.cal.DAYS - 1, i * 7 + 6));
     return a + ' – ' + b;
   };
-  const issuesFor = (pid, wk) => A.detail.filter((d) => d.validated && (d.seg.dev || []).some(([a, b, who]) =>
-  who === pid && Math.floor(a / 7) <= wk && Math.floor((b - 1) / 7) >= wk));
+  // Semaine de la FERMETURE — celle où le poids validé est compté (voir mapper : vélocité classique).
+  const closeWk = (d) => Math.min(A.cal.WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
+  // pid contribue à l'issue : porteur d'un segment de dev mesurable ; repli assigné si aucun segment.
+  const contributes = (d, pid) => {
+    const segs = d.seg.dev || [];
+    if (segs.some(([a, b, who]) => (who || d.assignees[0]) === pid && b > a)) return true;
+    return !segs.some(([a, b]) => b > a) && d.assignees.indexOf(pid) >= 0;
+  };
+  // validées de la semaine = issues FERMÉES cette semaine-là (cohérent avec les barres).
+  const issuesFor = (pid, wk) => A.detail.filter((d) => d.validated && closeWk(d) === wk && contributes(d, pid));
   // in-progress (not yet validated) issues a person worked on during a given week
   const inprogFor = (pid, wk) => A.detail.filter((d) => !d.validated && (d.seg.dev || []).some(([a, b, who]) =>
   who === pid && Math.floor(a / 7) <= wk && Math.floor((b - 1) / 7) >= wk));
