@@ -281,48 +281,46 @@ window.buildAPP = function (D) {
 
   // ---------- vélocité (depuis detail.seg.dev) ----------
   // VALIDÉ = compté UNE SEULE FOIS, la semaine de la FERMETURE de l'issue (vélocité classique :
-  // points livrés par semaine). PAS de répartition entre contributeurs : chaque personne ayant
-  // porté du dev sur l'issue (repli : chaque assigné) est créditée du POIDS ENTIER — règle simple
-  // voulue par l'équipe, quitte à ce que la somme des personnes dépasse le total des issues.
-  // EN COURS (hachuré) = poids des issues non fermées : poids PLEIN par contributeur, étalé sur
-  // SES jours de dev.
+  // points livrés par semaine). Le poids est PARTAGÉ À PARTS ÉGALES entre les ASSIGNÉS —
+  // indépendamment du temps passé par chacun (règle d'équipe : poids ÷ nb d'assignés).
+  // Repli : les porteurs de segments de dev si l'issue n'a aucun assigné.
+  // EN COURS (hachuré) = la part de chaque contributeur, étalée sur les jours de dev de l'issue.
   var vel = {};
   people.forEach(function (p) { vel[p.id] = { weeks: Array.from({ length: WEEKS }, function () { return { total: 0, byType: {}, inprog: 0 }; }), devWeeks: new Set(), issues: { o: 0, c: 0 }, fib: {} }; });
   detail.forEach(function (d) {
     var devSegs = d.seg.dev || [];
-    if (!d.validated) {
-      // Longueur de dev PAR PORTEUR : chacun étale le poids entier sur ses propres jours.
-      var ownLen = {};
-      devSegs.forEach(function (seg) {
-        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
-        ownLen[owner] = (ownLen[owner] || 0) + Math.max(0, seg[1] - seg[0]);
-      });
-      devSegs.forEach(function (seg) {
-        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner] || !ownLen[owner]) return;
-        var wPerDay = d.weight / ownLen[owner];
-        var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
-        for (var day = Math.floor(a); day < Math.ceil(b); day++) {
-          // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour).
-          var ov = Math.min(day + 1, b) - Math.max(day, a);
-          if (ov <= 0) continue;
-          var wk = Math.min(WEEKS - 1, Math.floor(day / 7)); vel[owner].devWeeks.add(wk);
-          vel[owner].weeks[wk].inprog += wPerDay * ov;
+    // Contributeurs = les assignés (parts égales) ; repli : porteurs de dev distincts.
+    var contrib = (d.assignees || []).filter(function (a) { return vel[a]; });
+    if (!contrib.length) {
+      var seen = {};
+      devSegs.forEach(function (seg) { var o = seg[2]; if (o && vel[o] && !seen[o]) { seen[o] = 1; contrib.push(o); } });
+    }
+    if (contrib.length) {
+      var share = d.weight / contrib.length;
+      if (!d.validated) {
+        // Part étalée sur les jours de dev de l'ISSUE (même chronologie pour tous les contributeurs).
+        var totalDev = devSegs.reduce(function (s, seg) { return s + Math.max(0, seg[1] - seg[0]); }, 0);
+        if (totalDev > 0 && share > 0) {
+          var wPerDay = share / totalDev;
+          devSegs.forEach(function (seg) {
+            var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
+            for (var day = Math.floor(a); day < Math.ceil(b); day++) {
+              // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour).
+              var ov = Math.min(day + 1, b) - Math.max(day, a);
+              if (ov <= 0) continue;
+              var wk = Math.min(WEEKS - 1, Math.floor(day / 7));
+              contrib.forEach(function (o) { vel[o].devWeeks.add(wk); vel[o].weeks[wk].inprog += wPerDay * ov; });
+            }
+          });
         }
-      });
-    } else {
-      // Contributeurs = porteurs d'un segment de dev mesurable ; repli : les assignés.
-      var who = {};
-      devSegs.forEach(function (seg) {
-        var owner = seg[2] || d.assignees[0];
-        if (owner && vel[owner] && seg[1] - seg[0] > 0) who[owner] = 1;
-      });
-      if (!Object.keys(who).length) (d.assignees || []).forEach(function (a) { if (vel[a]) who[a] = 1; });
-      var wkC = Math.min(WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
-      Object.keys(who).forEach(function (o) {
-        vel[o].weeks[wkC].total += d.weight;
-        vel[o].weeks[wkC].byType[d.type] = (vel[o].weeks[wkC].byType[d.type] || 0) + d.weight;
-        vel[o].devWeeks.add(wkC);
-      });
+      } else {
+        var wkC = Math.min(WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
+        contrib.forEach(function (o) {
+          vel[o].weeks[wkC].total += share;
+          vel[o].weeks[wkC].byType[d.type] = (vel[o].weeks[wkC].byType[d.type] || 0) + share;
+          vel[o].devWeeks.add(wkC);
+        });
+      }
     }
     d.assignees.forEach(function (aid) { if (!vel[aid]) return; vel[aid].issues[d.state === 'closed' ? 'c' : 'o']++; vel[aid].fib[d.weight] = (vel[aid].fib[d.weight] || 0) + 1; });
   });

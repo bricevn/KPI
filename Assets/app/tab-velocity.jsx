@@ -12,17 +12,16 @@
   };
   // Semaine de la FERMETURE — celle où le poids validé est compté (voir mapper : vélocité classique).
   const closeWk = (d) => Math.min(A.cal.WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
-  // pid contribue à l'issue : porteur d'un segment de dev mesurable ; repli assigné si aucun segment.
+  // pid contribue à l'issue : ASSIGNÉ (parts égales, voir mapper) ; repli porteur de dev si aucun assigné.
   const contributes = (d, pid) => {
-    const segs = d.seg.dev || [];
-    if (segs.some(([a, b, who]) => (who || d.assignees[0]) === pid && b > a)) return true;
-    return !segs.some(([a, b]) => b > a) && d.assignees.indexOf(pid) >= 0;
+    if (d.assignees.length) return d.assignees.indexOf(pid) >= 0;
+    return (d.seg.dev || []).some(([a, b, who]) => who === pid && b > a);
   };
   // validées de la semaine = issues FERMÉES cette semaine-là (cohérent avec les barres).
   const issuesFor = (pid, wk) => A.detail.filter((d) => d.validated && closeWk(d) === wk && contributes(d, pid));
-  // in-progress (not yet validated) issues a person worked on during a given week
-  const inprogFor = (pid, wk) => A.detail.filter((d) => !d.validated && (d.seg.dev || []).some(([a, b, who]) =>
-  who === pid && Math.floor(a / 7) <= wk && Math.floor((b - 1) / 7) >= wk));
+  // en cours = issues ouvertes du contributeur dont le dev (tous porteurs) chevauche la semaine.
+  const inprogFor = (pid, wk) => A.detail.filter((d) => !d.validated && contributes(d, pid) && (d.seg.dev || []).some(([a, b]) =>
+  Math.floor(a / 7) <= wk && Math.floor((b - 1) / 7) >= wk));
 
   const INFO = () => window.t('vel.tip');
 
