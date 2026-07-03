@@ -281,19 +281,25 @@ window.buildAPP = function (D) {
 
   // ---------- vélocité (depuis detail.seg.dev) ----------
   // VALIDÉ = compté UNE SEULE FOIS, la semaine de la FERMETURE de l'issue (vélocité classique :
-  // points livrés par semaine) — réparti entre contributeurs au prorata de leur temps de dev
-  // (repli : assignés à parts égales). L'étaler sur les semaines de dev faisait apparaître la même
-  // issue « validée » plusieurs semaines d'affilée.
-  // EN COURS (hachuré) = poids des issues non fermées, étalé sur leurs jours de dev (inchangé).
+  // points livrés par semaine). PAS de répartition entre contributeurs : chaque personne ayant
+  // porté du dev sur l'issue (repli : chaque assigné) est créditée du POIDS ENTIER — règle simple
+  // voulue par l'équipe, quitte à ce que la somme des personnes dépasse le total des issues.
+  // EN COURS (hachuré) = poids des issues non fermées : poids PLEIN par contributeur, étalé sur
+  // SES jours de dev.
   var vel = {};
   people.forEach(function (p) { vel[p.id] = { weeks: Array.from({ length: WEEKS }, function () { return { total: 0, byType: {}, inprog: 0 }; }), devWeeks: new Set(), issues: { o: 0, c: 0 }, fib: {} }; });
   detail.forEach(function (d) {
     var devSegs = d.seg.dev || [];
     if (!d.validated) {
-      var totalDev = devSegs.reduce(function (s, seg) { return s + Math.max(0, seg[1] - seg[0]); }, 0) || 1;
+      // Longueur de dev PAR PORTEUR : chacun étale le poids entier sur ses propres jours.
+      var ownLen = {};
       devSegs.forEach(function (seg) {
         var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
-        var wPerDay = d.weight / totalDev;
+        ownLen[owner] = (ownLen[owner] || 0) + Math.max(0, seg[1] - seg[0]);
+      });
+      devSegs.forEach(function (seg) {
+        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner] || !ownLen[owner]) return;
+        var wPerDay = d.weight / ownLen[owner];
         var a = Math.max(0, seg[0]), b = Math.min(DAYS, seg[1]);
         for (var day = Math.floor(a); day < Math.ceil(b); day++) {
           // Pondération par le RECOUVREMENT réel du segment sur ce jour (fraction de jour).
@@ -304,23 +310,19 @@ window.buildAPP = function (D) {
         }
       });
     } else {
-      // Parts par contributeur = temps de dev porté ; repli assignés si aucun segment mesurable.
-      var shares = {}, shTot = 0;
+      // Contributeurs = porteurs d'un segment de dev mesurable ; repli : les assignés.
+      var who = {};
       devSegs.forEach(function (seg) {
-        var owner = seg[2] || d.assignees[0]; if (!owner || !vel[owner]) return;
-        var len = Math.max(0, seg[1] - seg[0]); if (len <= 0) return;
-        shares[owner] = (shares[owner] || 0) + len; shTot += len;
+        var owner = seg[2] || d.assignees[0];
+        if (owner && vel[owner] && seg[1] - seg[0] > 0) who[owner] = 1;
       });
-      if (!shTot) { (d.assignees || []).forEach(function (a) { if (vel[a]) { shares[a] = 1; shTot++; } }); }
-      if (shTot) {
-        var wkC = Math.min(WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
-        Object.keys(shares).forEach(function (o) {
-          var wAdd = d.weight * shares[o] / shTot;
-          vel[o].weeks[wkC].total += wAdd;
-          vel[o].weeks[wkC].byType[d.type] = (vel[o].weeks[wkC].byType[d.type] || 0) + wAdd;
-          vel[o].devWeeks.add(wkC);
-        });
-      }
+      if (!Object.keys(who).length) (d.assignees || []).forEach(function (a) { if (vel[a]) who[a] = 1; });
+      var wkC = Math.min(WEEKS - 1, Math.max(0, Math.floor((d.closeDay != null ? d.closeDay : d.end) / 7)));
+      Object.keys(who).forEach(function (o) {
+        vel[o].weeks[wkC].total += d.weight;
+        vel[o].weeks[wkC].byType[d.type] = (vel[o].weeks[wkC].byType[d.type] || 0) + d.weight;
+        vel[o].devWeeks.add(wkC);
+      });
     }
     d.assignees.forEach(function (aid) { if (!vel[aid]) return; vel[aid].issues[d.state === 'closed' ? 'c' : 'o']++; vel[aid].fib[d.weight] = (vel[aid].fib[d.weight] || 0) + 1; });
   });
