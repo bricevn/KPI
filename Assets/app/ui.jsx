@@ -373,6 +373,10 @@ ${tag(js)}
   function useGanttNav(baseMin = 900) {
     const scrollRef = React.useRef(null);
     const zoomRef = React.useRef(1);
+    // baseMin peut changer entre rendus (fenêtre temporelle pilotée par les filtres) : le handler
+    // wheel (posé une seule fois) lit la valeur COURANTE via cette ref, pas celle de sa closure.
+    const baseRef = React.useRef(baseMin);
+    baseRef.current = baseMin;
     const [zoom, setZoom] = React.useState(1);
     const [dragging, setDragging] = React.useState(false);
     React.useEffect(() => {zoomRef.current = zoom;}, [zoom]);
@@ -402,7 +406,10 @@ ${tag(js)}
       const onWheel = (e) => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
-          const next = Math.min(3, Math.max(1, Math.round((zoomRef.current + (e.deltaY < 0 ? 0.25 : -0.25)) * 100) / 100));
+          // Zoom MULTIPLICATIF, dézoom autorisé sous 100 % jusqu'à « tout visible »
+          // (plancher dynamique : la grille tient exactement dans le conteneur).
+          const fit = Math.min(1, (el.clientWidth || 900) / (baseRef.current || 900));
+          const next = Math.min(3, Math.max(fit, Math.round(zoomRef.current * (e.deltaY < 0 ? 1.25 : 0.8) * 100) / 100));
           if (next === zoomRef.current) return;
           // keep the point under the cursor stable while zooming
           const rect = el.getBoundingClientRect();
@@ -435,11 +442,12 @@ ${tag(js)}
     }, []);
 
     const Nav = () =>
-    <div className="gantt-hint" title="Glissez pour défiler · molette pour parcourir · Ctrl/⌘ + molette pour zoomer · double-clic pour réinitialiser">
+    <div className="gantt-hint" title="Glissez pour défiler · molette pour parcourir · Ctrl/⌘ + molette pour zoomer/dézoomer · double-clic pour réinitialiser">
         {window.ICONS.drag}<span>glisser · molette · ⌘+molette = zoom</span>
-        {zoom > 1 && <span className="gnav-zoom">{Math.round(zoom * 100)}%</span>}
+        {zoom !== 1 && <span className="gnav-zoom">{Math.round(zoom * 100)}%</span>}
       </div>;
-    const gridStyle = { width: zoom * 100 + '%', minWidth: baseMin * zoom + 'px' };
+    // width plafonnée à 100 % en dézoom (la grille remplit le conteneur, les jours se resserrent).
+    const gridStyle = { width: Math.max(100, zoom * 100) + '%', minWidth: Math.round(baseMin * zoom) + 'px' };
     return { scrollRef, zoom, dragging, Nav, gridStyle };
   }
 

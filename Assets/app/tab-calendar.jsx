@@ -13,14 +13,17 @@
     const pos = (d) => d / DAYS * 100;
     const [hidden, setHidden] = useState(() => new Set());
     const { s, onSort, arrow } = window.useSort('', 'desc');
-    // Axe en JOURS : ~26 px par jour mini pour garder les dates lisibles (zoom/drag au-delà).
-    const { scrollRef, dragging, Nav, gridStyle } = window.useGanttNav(Math.max(900, DAYS * 26));
-    // Densité des étiquettes : tous les jours si la fenêtre est courte, sinon lundis + 1ers du mois.
-    const labelStep = DAYS <= 62 ? 1 : 7;
+    // Axe en JOURS : ~26 px par jour mini pour garder les dates lisibles (zoom/dézoom/drag au-delà).
+    const { scrollRef, zoom, dragging, Nav, gridStyle } = window.useGanttNav(Math.max(900, DAYS * 26));
+    // Densité des étiquettes selon la largeur EFFECTIVE d'un jour (~26 px × zoom) : tous les jours,
+    // lundis + 1ers du mois, ou 1ers du mois seuls en dézoom fort (« tout visible »).
+    const pxDay = 26 * zoom;
+    const labelStep = pxDay < 5 ? 31 : (DAYS <= 62 && zoom >= 1) || pxDay >= 40 ? 1 : 7;
     const dayLabel = (i) => {
       const dd = A.cal.dayDate(i);
       const dom = dd.getDate();
-      if (labelStep !== 1 && !(i === 0 || dom === 1 || dd.getDay() === 1)) return null;
+      if (labelStep === 31 && !(i === 0 || dom === 1)) return null;
+      if (labelStep === 7 && !(i === 0 || dom === 1 || dd.getDay() === 1)) return null;
       if (i === 0 || dom === 1) {try {return dd.toLocaleDateString(window.__LANG__ || 'fr', { day: 'numeric', month: 'short' });} catch (e) {return String(dom);}}
       return String(dom);
     };
