@@ -9,6 +9,7 @@
     // DAYS/TODAY lus À CHAQUE RENDU (pas au chargement du module) : les filtres (milestone…)
     // reconstruisent window.APP en place → la fenêtre temporelle doit suivre, sinon axe désaligné.
     const DAYS = A.cal.DAYS,TODAY = A.cal.TODAY;
+    const MSS = A.cal.msStart,MSE = A.cal.msEnd; // bornes milestone (null = pas de milestone datée)
     const pos = (d) => d / DAYS * 100;
     const [hidden, setHidden] = useState(() => new Set());
     const { s, onSort, arrow } = window.useSort('', 'desc');
@@ -66,8 +67,9 @@
                     <span className="av-stack">{d.assignees.map((a) => <window.Avatar key={a} pid={a} size={20} />)}</span>
                   </div>
                   <div className="gtrack">
-                    {/* milestone + today markers */}
-                    <span className="gmark ms" style={{ left: '0%' }}></span>
+                    {/* barres début/fin de milestone (timeline NON tronquée à la milestone) + aujourd'hui */}
+                    {MSS != null && <span className="gmark ms" title={window.t('cal.msBounds')} style={{ left: pos(MSS) + '%' }}></span>}
+                    {MSE != null && <span className="gmark ms" title={window.t('cal.msBounds')} style={{ left: pos(MSE) + '%' }}></span>}
                     <span className="gmark today" style={{ left: pos(TODAY) + '%' }}></span>
                     {PHASES.filter((k) => !hidden.has(k)).flatMap((k) => (d.seg[k] || []).map(([a, b, who], idx) =>
                   <span key={k + idx} className="gseg" title={`${window.PHASE_NAME[k]} · ${A.cal.fmtDay(a)}→${A.cal.fmtDay(b)}${who ? ' · ' + (A.peopleById[who] ? A.peopleById[who].name : '') : ''}`}
@@ -81,6 +83,8 @@
         </div>
         <div className="muted" style={{ fontSize: 11.5, marginTop: 8, display: 'flex', gap: 18 }}>
           <span><span style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--accent)', verticalAlign: 'middle', marginRight: 5 }}></span>{window.t('cal.today')} ({A.cal.fmtDay(TODAY)})</span>
+          {(MSS != null || MSE != null) &&
+          <span><span style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--ink-faint)', opacity: 0.7, verticalAlign: 'middle', marginRight: 5 }}></span>{window.t('cal.msBounds')}{MSS != null && MSE != null ? ' (' + A.cal.fmtDay(MSS) + ' → ' + A.cal.fmtDay(MSE) + ')' : ''}</span>}
         </div>
       </React.Fragment>);
 

@@ -80,35 +80,40 @@ window.buildAPP = function (D) {
   // Segment Gantt : même mapping label → phase que les durées (inclut uiux). phaseOf gère config + repli.
   function segKey(lo) { return phaseOf(lo); }
 
-  // ---------- fenêtre milestone ----------
+  // ---------- fenêtre milestone (MARQUEURS) + timeline (activité réelle) ----------
   function parseDay(s) { if (!s) return NaN; var p = String(s).split('-'); if (p.length !== 3) return NaN; var d = new Date(+p[0], +p[1] - 1, +p[2]); return d.getTime(); }
   var MSD = D.milestoneDates || {};
-  // Fenêtre temporelle pilotée par le filtre Milestone (pills) — prioritaire sur la milestone configurée.
+  // Bornes de la milestone (filtre pills prioritaire sur la milestone configurée). Elles ne
+  // RESTREIGNENT plus la timeline : ce sont des MARQUEURS (barres verticales Calendrier/Vélocité)
+  // + la fenêtre du bandeau d'en-tête.
   var selMs = (D.selectedMilestones || []).filter(function (m) { return m && MSD[m]; });
-  var msName, START, END;
+  var msName, MS_START, MS_END;
   if (selMs.length) {
-    // Milestone(s) sélectionnée(s) : fenêtre = union des dates connues (min start, max due).
+    // Milestone(s) sélectionnée(s) : bornes = union des dates connues (min start, max due).
     var mStarts = selMs.map(function (m) { return parseDay(MSD[m].startDate); }).filter(function (x) { return !isNaN(x); });
     var mEnds = selMs.map(function (m) { return parseDay(MSD[m].dueDate); }).filter(function (x) { return !isNaN(x); });
-    START = mStarts.length ? Math.min.apply(null, mStarts) : NaN;
-    END = mEnds.length ? Math.max.apply(null, mEnds) : NaN;
+    MS_START = mStarts.length ? Math.min.apply(null, mStarts) : NaN;
+    MS_END = mEnds.length ? Math.max.apply(null, mEnds) : NaN;
     msName = selMs.length === 1 ? selMs[0] : selMs.join(' + ');
   } else if (D.selectedMilestones && D.selectedMilestones.length === 0) {
-    // Filtre explicitement « Toutes » : fenêtre = étendue réelle des issues affichées (repli events ci-dessous).
-    msName = 'All milestones'; START = NaN; END = NaN;
+    // Filtre explicitement « Toutes » : pas de bornes de milestone à marquer.
+    msName = 'All milestones'; MS_START = NaN; MS_END = NaN;
   } else {
     // Appel initial (sans info de filtre) : milestone CONFIGURÉE du compte.
     msName = D.milestone || '';
     var msd = MSD[msName] || {};
-    START = parseDay(msd.startDate); END = parseDay(msd.dueDate);
+    MS_START = parseDay(msd.startDate); MS_END = parseDay(msd.dueDate);
   }
-  if (isNaN(START) || isNaN(END) || END <= START) {
-    // repli : borne sur les events réels
-    var allT = [];
-    ISSUES.forEach(function (i) { (i.labelEvents || []).forEach(function (e) { var t = new Date(e.at).getTime(); if (!isNaN(t)) allT.push(t); }); if (i.createdAt) { var c = new Date(i.createdAt).getTime(); if (!isNaN(c)) allT.push(c); } });
-    START = allT.length ? Math.min.apply(null, allT) : Date.now() - 84 * MS_DAY;
-    END = allT.length ? Math.max.apply(null, allT) : Date.now();
-  }
+  if (!isNaN(MS_START) && !isNaN(MS_END) && MS_END <= MS_START) { MS_START = NaN; MS_END = NaN; } // fenêtre incohérente
+  // Timeline = TOUTE l'activité réelle des issues filtrées (événements + création), élargie aux
+  // bornes de la milestone (pour que ses barres restent visibles). Rien n'est tronqué aux bornes.
+  var allT = [];
+  ISSUES.forEach(function (i) { (i.labelEvents || []).forEach(function (e) { var t = new Date(e.at).getTime(); if (!isNaN(t)) allT.push(t); }); if (i.createdAt) { var c = new Date(i.createdAt).getTime(); if (!isNaN(c)) allT.push(c); } });
+  var START = allT.length ? Math.min.apply(null, allT) : NaN;
+  var END = allT.length ? Math.max.apply(null, allT) : NaN;
+  if (!isNaN(MS_START)) START = isNaN(START) ? MS_START : Math.min(START, MS_START);
+  if (!isNaN(MS_END)) END = isNaN(END) ? MS_END : Math.max(END, MS_END);
+  if (isNaN(START) || isNaN(END)) { START = Date.now() - 84 * MS_DAY; END = Date.now(); }
   var DAYS = Math.max(1, Math.round((END - START) / MS_DAY));
   var WEEKS = Math.max(1, Math.ceil(DAYS / 7));
   var NOW = Date.now();
@@ -312,7 +317,10 @@ window.buildAPP = function (D) {
 
   // ---------- divers ----------
   var fmtFr = function (ms) { try { return new Date(ms).toLocaleDateString('en', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } };
-  var milestone = { name: msName, start: fmtFr(START), end: fmtFr(END - 1) + ' ' + new Date(END - 1).getFullYear(), dayPct: Math.max(0, Math.min(100, pct(NOW - START, END - START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
+  // Bandeau d'en-tête : dates/avancement de la MILESTONE quand ses bornes sont connues (la
+  // timeline élargie ne doit pas diluer la progression affichée) ; repli sur la timeline sinon.
+  var HD_START = isNaN(MS_START) ? START : MS_START, HD_END = isNaN(MS_END) ? END : MS_END;
+  var milestone = { name: msName, start: fmtFr(HD_START), end: fmtFr(HD_END - 1) + ' ' + new Date(HD_END - 1).getFullYear(), dayPct: Math.max(0, Math.min(100, pct(NOW - HD_START, HD_END - HD_START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
   // URL d'issue + nom de projet DÉRIVÉS du webUrl réel (générique : toute instance/projet GitLab, rien en dur).
   var sampleUrl = ''; for (var su = 0; su < CAT.length; su++) { if (CAT[su].webUrl) { sampleUrl = CAT[su].webUrl; break; } }
   var issueBase = '', projName = 'Project';
@@ -340,7 +348,10 @@ window.buildAPP = function (D) {
     cal: (function () {
       var S0 = new Date(START);
       var dayDate = function (d) { return new Date(S0.getFullYear(), S0.getMonth(), S0.getDate() + d); };
-      return { START: S0, DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, dayDate: dayDate, fmtDay: function (d) { return fmtFr(dayDate(d).getTime()); } };
+      // msStart/msEnd : offsets (jours) des bornes de la milestone sur la timeline — null si inconnues.
+      // Consommés par Calendrier/Vélocité pour tracer les barres verticales de début/fin.
+      var msOff = function (t) { return isNaN(t) ? null : Math.max(0, Math.min(DAYS, Math.round((t - START) / MS_DAY))); };
+      return { START: S0, DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, msStart: msOff(MS_START), msEnd: msOff(MS_END), dayDate: dayDate, fmtDay: function (d) { return fmtFr(dayDate(d).getTime()); } };
     })(),
     tabs: [
       { id: 'dashboard', label: 'Dashboard' }, { id: 'charts', label: 'Graphiques' },

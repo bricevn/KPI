@@ -25,6 +25,10 @@
     // clamp : TODAY est borné INCLUSIVEMENT à DAYS (milestone terminée) → floor(TODAY/7) peut
     // valoir WEEKS quand DAYS % 7 === 0, et le marqueur « maintenant » sortirait de l'axe.
     const CUR_WEEK = Math.min(WEEKS - 1, Math.floor(A.cal.TODAY / 7));
+    // Barres début/fin de milestone : position en % de la piste, qui couvre WEEKS × 7 jours
+    // (les colonnes-semaines sont de largeur égale — la timeline n'est plus bornée à la milestone).
+    const msPos = (d) => d / (WEEKS * 7) * 100;
+    const MSS = A.cal.msStart,MSE = A.cal.msEnd;
     const { s, onSort, arrow } = window.useSort('', 'desc');
     // ~40 px mini par semaine : en « Tout le projet » la fenêtre peut couvrir des dizaines de
     // semaines — à 900 px fixes les colonnes deviennent des slivers et les barres disparaissent
@@ -97,6 +101,8 @@
                       </div>
                     </div>
                     <div className="vtrack">
+                      {MSS != null && <span className="gmark ms" title={window.t('cal.msBounds')} style={{ left: msPos(MSS) + '%' }}></span>}
+                      {MSE != null && <span className="gmark ms" title={window.t('cal.msBounds')} style={{ left: msPos(MSE) + '%' }}></span>}
                       {v.weeks.map((w, i) => {
                         const tot = w.total + w.inprog;
                         return (
