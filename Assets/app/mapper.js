@@ -262,17 +262,24 @@ window.buildAPP = function (D) {
   });
 
   // ---------- super-groupes ----------
-  // Groupes curés (Features, Bugs) + un groupe « Autres types » qui ramasse TOUS les types
-  // réellement présents (typeByKey = catalogue COMPLET sur CAT) non couverts par les curés
-  // (Tooling, R&D, Refactor, Feature - Optimisation, Documentation, Performance, Sans type, etc.).
+  // Groupes curés (Features, Bugs) + un groupe « Autres types » qui ramasse les types restants
+  // (Tooling, R&D, Refactor, Documentation, Performance, Sans type, etc.).
+  // En plus des clés curées, chaque groupe ABSORBE par MOTIF les sous-types de son label
+  // (ex. « Type::Feature - Optimisation » → Features ; « Type::Bug - Xxx » → Bugs) : les
+  // sous-types dynamiques ne tombent plus à tort dans « Autres types ».
   // On filtre types/groupes vides pour ne jamais passer une clé inconnue ni un groupe sans type.
   var SG_CURATED = [
-    { key: 'features', name: 'Features', color: 'var(--c-feature)', types: ['feature', 'enh'] },
-    { key: 'bugs', name: 'Bugs & Régression', color: 'var(--c-bug)', types: ['bug', 'clientbug', 'regression'] }
+    { key: 'features', name: 'Features', color: 'var(--c-feature)', types: ['feature', 'enh'], match: /^type::\s*feature/ },
+    { key: 'bugs', name: 'Bugs & Régression', color: 'var(--c-bug)', types: ['bug', 'clientbug', 'regression'], match: /^type::\s*(client\s*)?bug|^type::\s*regression/ }
   ];
   var sgClaimed = {};
   var superGroups = SG_CURATED.map(function (g) {
     var t = g.types.filter(function (k) { return typeByKey[k]; });
+    Object.keys(typeByKey).forEach(function (k) {
+      if (sgClaimed[k] || t.indexOf(k) >= 0) return;
+      var nm = (typeByKey[k].name || '').toLowerCase();
+      if (g.match && g.match.test(nm)) t.push(k);
+    });
     t.forEach(function (k) { sgClaimed[k] = 1; });
     return { key: g.key, name: g.name, color: g.color, types: t };
   }).filter(function (g) { return g.types.length > 0; });
