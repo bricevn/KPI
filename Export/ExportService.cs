@@ -25,7 +25,8 @@ public sealed class ExportService
     public async Task<List<IssueExport>> BuildIssueExportsAsync(
         CancellationToken ct,
         Action<int, int>? onProgress = null,
-        string? milestoneOverride = null)
+        string? milestoneOverride = null,
+        Func<GitLabIssue, bool>? filter = null)
     {
         // milestoneOverride : null = utiliser _milestone (config), "" = TOUTES les issues du projet, sinon nom précis.
         var effective = milestoneOverride ?? _milestone;
@@ -33,6 +34,14 @@ public sealed class ExportService
             ? "Récupération de TOUTES les issues du projet (toutes milestones)..."
             : $"Récupération des issues (milestone={effective})...");
         var issues = await _client.GetIssuesByMilestoneAsync(effective, ct);
+        // Filtre AVANT la construction des exports : les label events sont récupérés PAR ISSUE (coûteux),
+        // autant écarter tout de suite celles hors périmètre (ex. milestones antérieures au départ configuré).
+        if (filter != null)
+        {
+            var before = issues.Count;
+            issues = issues.Where(filter).ToList();
+            if (issues.Count != before) Console.WriteLine($"  -> filtre de périmètre : {issues.Count}/{before} issues conservées.");
+        }
         Console.WriteLine($"  -> {issues.Count} issues récupérées.");
         onProgress?.Invoke(0, issues.Count);
 

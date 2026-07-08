@@ -224,6 +224,14 @@ public sealed class ExportConfig
     /// Options en portée « par projet ». Vide pour un projet ⇒ repli sur <see cref="Teams"/> global.
     /// </summary>
     public Dictionary<int, Dictionary<string, List<string>>> TeamsByProject { get; set; } = new();
+
+    /// <summary>
+    /// Milestone de DÉPART de l'export par projet (clé = id de projet GitLab ; valeur = titre de milestone).
+    /// Écrit par /setup : l'extraction IGNORE les issues des milestones antérieures (comparaison par date
+    /// due/start du catalogue du projet ; issues sans milestone conservées). Absent ⇒ tout l'historique.
+    /// NB : clés numériques ⇒ pas concerné par la corruption « : » de IConfiguration (RepairColonKeyedMaps).
+    /// </summary>
+    public Dictionary<int, string> StartMilestones { get; set; } = new();
 }
 
 /// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>

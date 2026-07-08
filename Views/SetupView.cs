@@ -135,10 +135,40 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .chkl{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ink);}
 .chkl b{font-family:var(--mono);font-weight:600;color:var(--ink-faint);font-size:11.5px;margin-left:6px;}
 .grp{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);background:var(--panel-3);padding:3px 7px;border-radius:999px;flex:none;}
-.mini{position:relative;display:inline-flex;align-items:center;height:34px;padding:0 7px 0 11px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:9px;}
-.mini select{appearance:none;border:0;background:none;outline:none;color:var(--ink);font-family:var(--sans);font-size:12.5px;cursor:pointer;padding-right:3px;}
-.mini select option{background:var(--panel-2);color:var(--ink);}
-.mini .ic{color:var(--ink-faint);display:flex;pointer-events:none;}
+/* dropdown custom (popover) — remplace les <select> natifs du mapping/rôles/milestones */
+.dd{position:relative;flex:none;}
+.ddbtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 11px;background:var(--panel);border:1px solid var(--line);border-radius:9px;color:var(--ink);font-family:var(--sans);font-size:12.5px;cursor:pointer;transition:border-color .13s;}
+.ddbtn:hover{border-color:var(--ink-faint);}
+.ddbtn.open{border-color:var(--accent);}
+.ddbtn .ic{color:var(--ink-faint);display:flex;transition:transform .15s;}
+.ddbtn.open .ic{transform:rotate(180deg);}
+.ddlabel{white-space:nowrap;}
+.dddot{width:9px;height:9px;border-radius:50%;flex:none;}
+.ddmenu{position:absolute;z-index:40;top:calc(100% + 5px);min-width:100%;max-height:260px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:5px;box-shadow:0 16px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:1px;}
+.ddmenu.right{right:0;}
+.ddopt{display:flex;align-items:center;gap:8px;width:100%;height:34px;padding:0 9px;border:0;border-radius:7px;background:none;color:var(--ink-dim);font-family:var(--sans);font-size:12.5px;text-align:left;cursor:pointer;white-space:nowrap;}
+.ddopt:hover{background:var(--panel-3);color:var(--ink);}
+.ddopt.on{color:var(--ink);}
+.ddopt .ddlabel{flex:1;}
+.ddcheck{color:var(--accent);display:flex;flex:none;}
+/* accordéon OUVERT : overflow visible, sinon le popover .ddmenu serait coupé (overflow:hidden) */
+.suA-acc.open,.suA-teamacc.open{overflow:visible;}
+/* barre de recherche (étape Projets) */
+.search{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;margin-bottom:11px;background:var(--panel);border:1px solid var(--line);border-radius:11px;transition:border-color .13s;}
+.search:focus-within{border-color:var(--accent);}
+.search .ic{color:var(--ink-faint);display:flex;flex:none;}
+.search input{flex:1;min-width:0;border:0;background:none;outline:none;color:var(--ink);font-family:var(--sans);font-size:13.5px;}
+.search input::placeholder{color:var(--ink-faint);}
+.searchx{display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;border:0;border-radius:6px;background:var(--panel-3);color:var(--ink-dim);cursor:pointer;}
+.searchx:hover{color:var(--ink);}
+/* récap : milestone de départ de l'export, par projet */
+.mstones{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px 0;}
+.msecthead{display:flex;align-items:center;gap:6px;padding:11px 16px 7px;}
+.msectlabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);}
+.msrow{display:flex;align-items:center;gap:12px;padding:10px 16px;}
+.msrow+.msrow{border-top:1px solid var(--line-2);}
+.msdot{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);}
+.msname{flex:1;font-size:13.5px;font-weight:600;color:var(--ink);}
 .map{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel-2);}
 .maprow{display:flex;align-items:center;gap:11px;padding:9px 14px;}
 .maprow+.maprow{border-top:1px solid var(--line-2);}
@@ -319,7 +349,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var NONE_COLOR='#5f6b7a';
   // Couleur d'une phase par sa clé, depuis la liste ÉDITABLE (ST.phases). 'none' = gris.
   var phaseColor=function(k){if(k==='none')return NONE_COLOR;var ps=curPhases();for(var i=0;i<ps.length;i++)if(ps[i].id===k)return ps[i].color;return NONE_COLOR;};
-  var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>'};
+  var P={link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13 21 2M18 5l2.5 2.5M15.5 7.5L18 10"/>',eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/>',layers:'<path d="m12 2 9 5-9 5-9-5z"/><path d="m21 12-9 5-9-5"/><path d="m21 17-9 5-9-5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>',check:'<path d="M20 6 9 17l-5-5"/>',chevR:'<path d="m9 18 6-6-6-6"/>',chevL:'<path d="m15 18-6-6 6-6"/>',chevD:'<path d="m6 9 6 6 6-6"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',plus:'<path d="M12 5v14M5 12h14"/>',rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'};
   function ic(n,s){s=s||18;return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>';}
   var MARK='<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="13" width="4.2" height="7" rx="1.4" fill="#fff" opacity="0.82"/><rect x="9.9" y="9" width="4.2" height="11" rx="1.4" fill="#fff" opacity="0.92"/><rect x="16.8" y="4.5" width="4.2" height="15.5" rx="1.4" fill="#fff"/><path d="M4 8.5 L11 6 L19 2.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><circle cx="19" cy="2.5" r="1.7" fill="#fff"/></svg>';
   var GITLAB_MARK='<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#E24329" d="m12 21.5 3.3-10.2H8.7z"/><path fill="#FC6D26" d="M12 21.5 8.7 11.3H4.1z"/><path fill="#FCA326" d="M4.1 11.3 3.1 14.4a.7.7 0 0 0 .25.78L12 21.5z"/><path fill="#E24329" d="M4.1 11.3h4.6L6.7 5.2a.35.35 0 0 0-.66 0z"/><path fill="#FC6D26" d="M12 21.5l3.3-10.2h4.6z"/><path fill="#FCA326" d="M19.9 11.3l1 3.1a.7.7 0 0 1-.25.78L12 21.5z"/><path fill="#E24329" d="M19.9 11.3h-4.6l2-6.1a.35.35 0 0 1 .66 0z"/></svg>';
@@ -383,7 +413,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       left:" restant", done:"Terminé — ouverture du dashboard…", failed:"Échec : ", cancel:"Annuler",
       backToConfig:"Revenir à la configuration",
       saveImpossible:"Enregistrement impossible.", serverUnreachable:"Serveur injoignable.",
-      newPhase:"Nouvelle phase", extractingShort:"Extraction…"
+      newPhase:"Nouvelle phase", extractingShort:"Extraction…",
+      searchProjects:"Rechercher un projet…", noProjMatch:"Aucun projet ne correspond à « {q} »",
+      msStart:"Milestone de départ de l’export", noProjSelected:"Aucun projet sélectionné"
     },
     en:{
       bs:"Setup", stepOf:"Step {n} of 5",
@@ -435,7 +467,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       left:" left", done:"Done — opening dashboard…", failed:"Failed: ", cancel:"Cancel",
       backToConfig:"Back to configuration",
       saveImpossible:"Could not save.", serverUnreachable:"Server unreachable.",
-      newPhase:"New phase", extractingShort:"Extracting…"
+      newPhase:"New phase", extractingShort:"Extracting…",
+      searchProjects:"Search a project…", noProjMatch:"No project matches “{q}”",
+      msStart:"Export start milestone", noProjSelected:"No project selected"
     },
     es:{
       "bs": "Configuración",
@@ -531,6 +565,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "Servidor no disponible.",
       "newPhase": "Nueva fase",
       "extractingShort": "Extrayendo…",
+      "searchProjects": "Buscar un proyecto…", "noProjMatch": "Ningún proyecto coincide con «{q}»",
+      "msStart": "Hito de inicio de la exportación", "noProjSelected": "Ningún proyecto seleccionado",
     },
     de:{
       "bs": "Einrichtung",
@@ -626,6 +662,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "Server nicht erreichbar.",
       "newPhase": "Neue Phase",
       "extractingShort": "Extraktion…",
+      "searchProjects": "Projekt suchen…", "noProjMatch": "Kein Projekt entspricht „{q}“",
+      "msStart": "Start-Milestone des Exports", "noProjSelected": "Kein Projekt ausgewählt",
     },
     it:{
       "bs": "Configurazione",
@@ -721,6 +759,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "Server non raggiungibile.",
       "newPhase": "Nuova fase",
       "extractingShort": "Estrazione…",
+      "searchProjects": "Cerca un progetto…", "noProjMatch": "Nessun progetto corrisponde a «{q}»",
+      "msStart": "Milestone di partenza dell’export", "noProjSelected": "Nessun progetto selezionato",
     },
     pt:{
       "bs": "Implementação",
@@ -816,6 +856,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "Servidor inacessível.",
       "newPhase": "Nova fase",
       "extractingShort": "A extrair…",
+      "searchProjects": "Pesquisar um projeto…", "noProjMatch": "Nenhum projeto corresponde a «{q}»",
+      "msStart": "Milestone de início da exportação", "noProjSelected": "Nenhum projeto selecionado",
     },
     ru:{
       "bs": "Конфигурация",
@@ -911,6 +953,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "Сервер недоступен.",
       "newPhase": "Новая фаза",
       "extractingShort": "Извлечение…",
+      "searchProjects": "Поиск проекта…", "noProjMatch": "Ни один проект не соответствует «{q}»",
+      "msStart": "Начальная веха выгрузки", "noProjSelected": "Проект не выбран",
     },
     ar:{
       "bs": "الإعداد",
@@ -1006,6 +1050,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "الخادم غير متاح.",
       "newPhase": "مرحلة جديدة",
       "extractingShort": "جاري الاستخراج…",
+      "searchProjects": "البحث عن مشروع…", "noProjMatch": "لا يوجد مشروع يطابق «{q}»",
+      "msStart": "إصدار بداية التصدير", "noProjSelected": "لم يتم اختيار أي مشروع",
     },
     zh:{
       "bs": "设置",
@@ -1101,6 +1147,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "服务器无法访问。",
       "newPhase": "新阶段",
       "extractingShort": "提取中…",
+      "searchProjects": "搜索项目…", "noProjMatch": "没有项目匹配“{q}”",
+      "msStart": "导出起始里程碑", "noProjSelected": "未选择项目",
     },
     ja:{
       "bs": "セットアップ",
@@ -1196,6 +1244,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "serverUnreachable": "サーバーに接続できません。",
       "newPhase": "新しいフェーズ",
       "extractingShort": "抽出中…",
+      "searchProjects": "プロジェクトを検索…", "noProjMatch": "「{q}」に一致するプロジェクトはありません",
+      "msStart": "エクスポート開始マイルストーン", "noProjSelected": "プロジェクト未選択",
     },
   };
   var T=I18N[SLANG]||I18N.en;
@@ -1203,10 +1253,11 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   var LANG_SWITCH='<div class="lang-switch"><select class="lang-sel" data-setlang>__LANG_OPTIONS__</select></div>';
 
   var ST={step:0,baseUrl:'__DEFAULT_INSTANCE__',token:'',timeout:'60',selfSigned:false,showTok:false,
-    test:'idle',projects:[],groups:[],importIds:[],labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
+    test:'idle',projects:[],groups:[],importIds:[],projSearch:'',labels:[],labelsDiag:[],labelsLoaded:false,labelPhase:{},
     phases:DEFAULT_PHASES.map(function(p){return {id:p.id,name:p.name,color:p.color};}),openColor:null,acc:'phases',
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
     acc1:[],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',oauthEdit:false,adminErr:'',
+    openDd:'',exportMilestone:{},
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -1221,7 +1272,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // plus → pas besoin de le restaurer. L'instance configurée n'est exposée NULLE PART dans la page par défaut.
   var PKEYS=['step','token','timeout','selfSigned','test','projects','groups','importIds','labels',
     'labelsDiag','labelsLoaded','labelPhase','phases','phaseScope','phaseProj','phasesByProject',
-    'labelPhaseByProject','teams','memberships'];
+    'labelPhaseByProject','teams','memberships','exportMilestone'];
   function persistST(){try{var o={};PKEYS.forEach(function(k){o[k]=ST[k];});localStorage.setItem('kpi-setup',JSON.stringify(o));}catch(e){}}
   function clearST(){try{localStorage.removeItem('kpi-setup');}catch(e){}}
   (function(){try{var v=localStorage.getItem('kpi-setup');if(!v)return;var o=JSON.parse(v);PKEYS.forEach(function(k){if(o[k]!==undefined)ST[k]=o[k];});
@@ -1326,13 +1377,24 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     h+='</div><div class="req" style="margin-top:8px"><span class="r">*</span> '+T.requiredBoth+'</div>';
     return h;
   }
+  // Liste des projets (filtrée par la recherche) — extraite de s1() pour une mise à jour CIBLÉE
+  // au fil de la frappe (#checklist), car un render() global ferait perdre le focus du champ.
+  function checklistHtml(){
+    var q=(ST.projSearch||'').trim().toLowerCase();
+    var shown=q?ST.projects.filter(function(p){return (p.name||'').toLowerCase().indexOf(q)>=0||String(p.id).indexOf(q)>=0;}):ST.projects;
+    if(!shown.length)return '<div class="empty" style="padding:8px 2px">'+T.noProjMatch.replace('{q}',esc(ST.projSearch))+'</div>';
+    var h='<div class="checklist">';
+    for(var i=0;i<shown.length;i++){var p=shown[i];var on=ST.importIds.indexOf(p.id)>=0;h+='<button class="chk'+(on?' on':'')+'" data-act="proj:'+p.id+'"><span class="chkbox">'+(on?ic('check',13):'')+'</span><span class="chkl">'+esc(p.name)+'<b>#'+p.id+'</b></span><span class="grp">'+esc(p.group||'')+'</span></button>';}
+    return h+'</div>';
+  }
   function s1(){
     var allOn=ST.projects.length>0&&ST.importIds.length===ST.projects.length;
     var h='<div class="note">'+sic('info')+'<div><b>'+ST.importIds.length+'</b>'+T.projSelectedOf+ST.projects.length+T.accessible+'</div></div>';
     if(ST.projects.length)h+='<div class="suA-selall"><button class="suA-selallbtn" data-act="toggleall">'+ic(allOn?'x':'check',14)+(allOn?T.deselectAll:T.selectAll)+'</button><span class="suA-selcount">'+ST.importIds.length+' / '+ST.projects.length+'</span></div>';
-    h+='<div class="checklist">';
-    for(var i=0;i<ST.projects.length;i++){var p=ST.projects[i];var on=ST.importIds.indexOf(p.id)>=0;h+='<button class="chk'+(on?' on':'')+'" data-act="proj:'+p.id+'"><span class="chkbox">'+(on?ic('check',13):'')+'</span><span class="chkl">'+esc(p.name)+'<b>#'+p.id+'</b></span><span class="grp">'+esc(p.group||'')+'</span></button>';}
-    return h+'</div>';
+    if(ST.projects.length)h+='<div class="search'+(ST.projSearch?' filled':'')+'">'+sic('search')
+      +'<input data-field="projSearch" value="'+esc(ST.projSearch)+'" placeholder="'+esc(T.searchProjects)+'">'
+      +(ST.projSearch?'<button class="searchx" data-act="clrsearch">'+ic('x',14)+'</button>':'')+'</div>';
+    return h+'<div id="checklist">'+checklistHtml()+'</div>';
   }
   function s2(){
     if(!ST.labelsLoaded)return '<div class="note">'+sic('info')+'<div>'+T.loadingLabels+'</div></div>';
@@ -1382,7 +1444,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       } else {
         h+='<div class="map">';
         for(var j=0;j<prod.length;j++){var ll=prod[j];var phv=mp[ll]||'none';
-          h+='<div class="maprow'+(phv==='none'?' unset':'')+'"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+miniSel('phase:'+ST.labels.indexOf(ll),phv,phOpts)+'</div>';}
+          h+='<div class="maprow'+(phv==='none'?' unset':'')+'"><span class="dot2" style="background:'+phaseColor(phv)+'"></span><span class="mlabel">'+esc(ll)+'</span><span class="arrow">'+ic('arrow',15)+'</span>'+menuSel('phase:'+ST.labels.indexOf(ll),phv,phOpts,phaseColor)+'</div>';}
         h+='</div>';
       }
       if(ST.importIds.length)h+='<button class="btn outline sm" style="align-self:flex-start" data-act="reloadlabels">'+ic('zap',15)+T.refreshLabels+'</button>';
@@ -1402,7 +1464,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       h+='</span><button class="teamx" data-act="rmteam:'+tm.id+'">×</button></div>';
       if(open){h+='<div class="mlist">';
         if(mem.length===0)h+='<div class="empty">'+T.noMembers+'</div>';
-        for(var j=0;j<mem.length;j++){var m=mem[j];var nm=POOLname(m.pid);h+='<div class="mrow">'+av(m.pid,nm,24)+'<span class="mname">'+esc(nm)+'</span>'+miniSel('role:'+m.pid+'~'+tm.id,m.role,roleOpts)+'<button class="mx" data-act="rmmem:'+m.pid+'~'+tm.id+'">×</button></div>';}
+        for(var j=0;j<mem.length;j++){var m=mem[j];var nm=POOLname(m.pid);h+='<div class="mrow">'+av(m.pid,nm,24)+'<span class="mname">'+esc(nm)+'</span>'+menuSel('role:'+m.pid+'~'+tm.id,m.role,roleOpts,null)+'<button class="mx" data-act="rmmem:'+m.pid+'~'+tm.id+'">×</button></div>';}
         var avail=allPeople().filter(function(pid){return !mem.some(function(m){return m.pid===pid;});});
         if(avail.length){h+='<div class="addsel">'+ic('plus',14)+'<select data-add="'+tm.id+'"><option value="">'+T.addMember+'</option>';for(var a=0;a<avail.length;a++)h+='<option value="'+esc(avail[a])+'">'+esc(POOLname(avail[a]))+'</option>';h+='</select></div>';}
         h+='</div>';
@@ -1411,6 +1473,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     }
     return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+T.newTeamName+'</button>';
   }
+  // Milestone de DÉPART de l'export pour un projet : choix explicite, sinon la plus récente.
+  function msFor(p){return ST.exportMilestone[p.id]||((p.milestones&&p.milestones[0])||'');}
   function s4(){
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
     var mapped=0;for(var k in ST.labelPhase)if(ST.labelPhase[k]&&ST.labelPhase[k]!=='none')mapped++;
@@ -1420,6 +1484,13 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,_vt.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
     var h='<div class="recap">';
     for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
+    h+='</div>';
+    // Milestone de départ de l'export, PAR PROJET sélectionné (l'extraction ignore les antérieures).
+    var imported=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;});
+    h+='<div class="mstones"><div class="msecthead"><span class="msectlabel">'+T.msStart+'</span></div>';
+    if(!imported.length)h+='<div class="empty" style="padding:10px 16px">'+T.noProjSelected+'</div>';
+    else for(var mi=0;mi<imported.length;mi++){var mp2=imported[mi];var opts=(mp2.milestones||[]).map(function(m){return [m,m];});
+      h+='<div class="msrow"><span class="msdot">'+ic('flag',14)+'</span><span class="msname">'+esc(mp2.name)+'</span>'+(opts.length?menuSel('ms:'+mp2.id,msFor(mp2),opts,null):'<span class="empty">—</span>')+'</div>';}
     h+='</div>';
     if(ST.saveErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.saveErr)+'</div></div>';
     return h;
@@ -1440,7 +1511,27 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function repositionActiveInfo(){var a=document.activeElement;if(a&&a.closest){var h=a.closest('.su-info');if(h)positionInfo(h);}}
   app.addEventListener('scroll',repositionActiveInfo,true);
   window.addEventListener('resize',repositionActiveInfo);
-  function miniSel(act,val,opts){var h='<div class="mini"><select data-sel="'+act+'">';for(var i=0;i<opts.length;i++)h+='<option value="'+esc(opts[i][0])+'"'+(opts[i][0]===val?' selected':'')+'>'+esc(opts[i][1])+'</option>';return h+'</select><span class="ic">'+ic('chevD',13)+'</span></div>';}
+  // Dropdown CUSTOM (popover) — remplace le <select> natif (options stylées par l'OS, hors DA).
+  // act : identifiant d'action (ex "phase:3", "role:brice~g-qa", "ms:4"). dotFn(valeur)→couleur ou null.
+  // Un seul ouvert à la fois (ST.openDd) ; sélection via [data-opt], fermeture au clic extérieur.
+  function menuSel(act,val,opts,dotFn){
+    var sel=null;for(var i=0;i<opts.length;i++)if(opts[i][0]===val)sel=opts[i];
+    var open=ST.openDd===act;
+    var dot=function(v){return dotFn?('<span class="dddot" style="background:'+dotFn(v)+'"></span>'):'';};
+    var h='<div class="dd"><button class="ddbtn'+(open?' open':'')+'" data-dd="'+esc(act)+'">'
+      +dot(val)+'<span class="ddlabel">'+esc(sel?sel[1]:'')+'</span><span class="ic">'+ic('chevD',13)+'</span></button>';
+    if(open){h+='<div class="ddmenu right">';
+      for(var j=0;j<opts.length;j++){var o=opts[j];h+='<button class="ddopt'+(o[0]===val?' on':'')+'" data-opt="'+esc(act)+'~~'+esc(o[0])+'">'
+        +dot(o[0])+'<span class="ddlabel">'+esc(o[1])+'</span>'+(o[0]===val?'<span class="ddcheck">'+ic('check',13)+'</span>':'')+'</button>';}
+      h+='</div>';}
+    return h+'</div>';
+  }
+  // Affectation d'une sélection de dropdown (phase d'un label, rôle d'un membre, milestone de départ).
+  function applySel(act,val){
+    if(act.indexOf('phase:')===0){var i=+act.slice(6);setMapVal(ST.labels[i],val);}
+    else if(act.indexOf('role:')===0){var pr=act.slice(5).split('~');ST.memberships.forEach(function(m){if(m.pid===pr[0]&&m.teamId===pr[1])m.role=val;});}
+    else if(act.indexOf('ms:')===0){ST.exportMilestone[act.slice(3)]=val;}
+  }
 
   // PEOPLE (username→nom) déclaré plus haut + reconstruit dans doTest / au restore localStorage.
   function POOLname(id){return PEOPLE[id]||id;}
@@ -1517,6 +1608,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       admins:[],
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
+      // Milestone de DÉPART de l'export par projet (l'extraction ignore les milestones antérieures).
+      startMilestones:ST.importIds.reduce(function(o,id){var p=ST.projects.filter(function(x){return x.id===id;})[0];var m=p?msFor(p):'';if(m)o[id]=m;return o;},{}),
       // Projets importés AVEC nom + namespace (pour l'onglet Options du dashboard, qui ne peut pas dériver les noms).
       projects:ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return {id:p.id,name:p.name,group:p.groupFull||''};}),
       teams:visibleTeams().map(function(t){return {name:t.name,groupPath:t.groupPath||'',members:ST.memberships.filter(function(m){return m.teamId===t.id;}).map(function(m){return {username:m.pid,role:m.role};})};})};
@@ -1566,6 +1659,12 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   function go(n){ if(n>ST.step && !canNext())return; if(n===2 && !ST.labelsLoaded){ST.step=2;render();toTop();loadLabels(function(){render();toTop();});return;} ST.step=n; render(); toTop(); }
 
   app.addEventListener('click',function(e){
+    // Dropdowns custom : toggle ([data-dd]), sélection ([data-opt]), fermeture au clic extérieur.
+    var ddBtn=e.target.closest('[data-dd]');
+    if(ddBtn){var kdd=ddBtn.dataset.dd;ST.openDd=(ST.openDd===kdd?'':kdd);render();return;}
+    var opt=e.target.closest('[data-opt]');
+    if(opt){var parts=opt.dataset.opt.split('~~');applySel(parts[0],parts[1]);ST.openDd='';render();return;}
+    if(ST.openDd){ST.openDd='';render();}
     var b=e.target.closest('[data-act]');if(!b)return;var a=b.dataset.act;
     if(a==='eye'){ST.showTok=!ST.showTok;render();}
     else if(a==='self'){ST.selfSigned=!ST.selfSigned;render();}
@@ -1589,6 +1688,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     else if(a==='phadd'){ensurePer();var np={id:'ph-'+Date.now(),name:T.newPhase,color:PALETTE[curPhases().length%PALETTE.length]};if(ST.phaseScope==='all')ST.phases.push(np);else ST.phasesByProject[activeProj()].push(np);render();}
     else if(a.indexOf('acc:')===0){var ak=a.slice(4);ST.acc=(ST.acc===ak?'':ak);render();}
     else if(a==='reloadlabels'){ST.labelsLoaded=false;render();loadLabels(render);}
+    else if(a==='clrsearch'){ST.projSearch='';render();}
     else if(a.indexOf('acc1:')===0){var k1=a.slice(5);var i1=ST.acc1.indexOf(k1);if(i1>=0)ST.acc1.splice(i1,1);else ST.acc1.push(k1);render();}
     else if(a.indexOf('scope:')===0){switchScope(a.slice(6));}
     else if(a.indexOf('projtab:')===0){ST.phaseProj=+a.slice(8);render();}
@@ -1602,16 +1702,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   app.addEventListener('input',function(e){
     var f=e.target.closest('[data-field]');if(f){ST[f.dataset.field]=f.value;if(f.dataset.field==='baseUrl'||f.dataset.field==='token')ST.test='idle';
       if(f.dataset.field==='baseUrl'){var ci=document.getElementById('curInst');if(ci)ci.textContent=oauthInst()||'—';} // « Instance : … » suit la base url en direct
+      if(f.dataset.field==='projSearch'){var cl=document.getElementById('checklist');if(cl)cl.innerHTML=checklistHtml();} // MAJ ciblée : un render() global ferait perdre le focus
       return;}
     var tn=e.target.closest('[data-team]');if(tn){var _t=ST.teams.filter(function(x){return x.id===tn.dataset.team;})[0];if(_t)_t.name=tn.value;return;}
     var pn=e.target.closest('[data-phname]');if(pn){var pid=pn.dataset.phname;ensurePer();curPhases().forEach(function(p){if(p.id===pid)p.name=pn.value;});}
   });
   app.addEventListener('change',function(e){
     var sl=e.target.closest('[data-setlang]');if(sl){location.href='/set-lang?lang='+encodeURIComponent(sl.value)+'&return=/setup';return;}
-    var s=e.target.closest('[data-sel]');if(s){var a=s.dataset.sel;
-      if(a.indexOf('phase:')===0){var i=+a.slice(6);setMapVal(ST.labels[i],s.value);render();}
-      else if(a.indexOf('role:')===0){var pr=a.slice(5).split('~');ST.memberships.forEach(function(m){if(m.pid===pr[0]&&m.teamId===pr[1])m.role=s.value;});render();}
-      return;}
+    // (phase:/role: passés au dropdown custom → gérés au clic via applySel ; il ne reste que l'ajout de membre.)
     var ad=e.target.closest('[data-add]');if(ad&&ad.value){var tid=ad.dataset.add;if(!ST.memberships.some(function(m){return m.pid===ad.value&&m.teamId===tid;}))ST.memberships.push({pid:ad.value,teamId:tid,role:'member'});render();}
   });
   render();

@@ -177,12 +177,39 @@ public static class ExportPipeline
                 using var client = new GitLabClient(glCfg);
                 var service = new ExportService(client, glCfg, config.Export);
                 Console.WriteLine($"  -- projet {pid} --");
-                var issues = await service.BuildIssueExportsAsync(ct, onProgress, milestoneFilter ?? "");
+                // Catalogue des milestones AVANT les issues : alimente milestones.json ET sert de référence
+                // de dates au filtre « milestone de départ » ci-dessous.
+                var projMs = new List<GitLabMilestone>();
+                try { projMs = await client.GetProjectMilestonesAsync(ct); foreach (var m in projMs) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
+                catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
+                // Milestone de DÉPART (config /setup) : les issues des milestones ANTÉRIEURES (date due/start
+                // strictement plus ancienne) sont exclues. Sans milestone, ou milestone inconnue du catalogue
+                // (pas de date comparable) → conservées.
+                Func<GitLabIssue, bool>? startFilter = null;
+                if (int.TryParse(pid, out var pidInt)
+                    && (config.Export.StartMilestones ?? new()).TryGetValue(pidInt, out var startMsTitle)
+                    && !string.IsNullOrWhiteSpace(startMsTitle))
+                {
+                    var boundary = projMs.FirstOrDefault(m => string.Equals(m.Title, startMsTitle, StringComparison.OrdinalIgnoreCase));
+                    var boundaryDate = boundary?.DueDate ?? boundary?.StartDate; // ISO yyyy-MM-dd → comparaison ordinale
+                    if (!string.IsNullOrEmpty(boundaryDate))
+                    {
+                        var msDates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var m in projMs) if (!string.IsNullOrEmpty(m.Title) && !msDates.ContainsKey(m.Title)) msDates[m.Title] = m.DueDate ?? m.StartDate;
+                        Console.WriteLine($"     départ de l'export : milestone « {startMsTitle} » (≥ {boundaryDate})");
+                        startFilter = iss =>
+                        {
+                            var t = iss.Milestone?.Title;
+                            if (string.IsNullOrEmpty(t) || string.Equals(t, startMsTitle, StringComparison.OrdinalIgnoreCase)) return true;
+                            return !(msDates.TryGetValue(t, out var d) && !string.IsNullOrEmpty(d) && string.CompareOrdinal(d, boundaryDate) < 0);
+                        };
+                    }
+                    else Console.WriteLine($"     [warn] milestone de départ « {startMsTitle} » introuvable/sans date → historique complet.");
+                }
+                var issues = await service.BuildIssueExportsAsync(ct, onProgress, milestoneFilter ?? "", startFilter);
                 allIssues.AddRange(issues);  // chaque IssueExport porte déjà son ProjectId (groupement)
                 try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
-                try { foreach (var m in await client.GetProjectMilestonesAsync(ct)) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
-                catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
             }
 
             if (scoped)

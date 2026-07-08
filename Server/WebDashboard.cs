@@ -831,10 +831,29 @@ public sealed class WebDashboard
         var projects = new List<object>();
         var pj = await GlGet(http, baseUri, "/api/v4/projects?membership=true&simple=true&per_page=100&order_by=name&sort=asc", token, ctx.RequestAborted);
         foreach (var p in pj?.AsArray() ?? new JsonArray())
-            projects.Add(new { id = p!["id"]!.GetValue<int>(), name = p["name"]!.GetValue<string>(),
+        {
+            var pid = p!["id"]!.GetValue<int>();
+            // Milestones du projet (récentes d'abord) : alimentent le sélecteur « Milestone de départ
+            // de l'export » du récap. Tri par date due/start décroissante (sans date → en dernier).
+            var milestones = new List<string>();
+            var mj = await GlGet(http, baseUri, $"/api/v4/projects/{pid}/milestones?per_page=100&state=all", token, ctx.RequestAborted);
+            milestones = (mj?.AsArray() ?? new JsonArray())
+                .Select(m => new
+                {
+                    title = m?["title"]?.GetValue<string>() ?? "",
+                    date  = m?["due_date"]?.GetValue<string>() ?? m?["start_date"]?.GetValue<string>() ?? ""
+                })
+                .Where(m => !string.IsNullOrWhiteSpace(m.title))
+                .OrderByDescending(m => m.date, StringComparer.Ordinal)   // ISO yyyy-MM-dd → tri lexical OK
+                .ThenByDescending(m => m.title, StringComparer.OrdinalIgnoreCase)
+                .Select(m => m.title)
+                .ToList();
+            projects.Add(new { id = pid, name = p["name"]!.GetValue<string>(),
                 group = p["namespace"]?["path"]?.GetValue<string>() ?? "",
                 // full_path du namespace : clé STABLE pour rattacher un projet à son groupe (= group.name = full_path).
-                groupFull = p["namespace"]?["full_path"]?.GetValue<string>() ?? "" });
+                groupFull = p["namespace"]?["full_path"]?.GetValue<string>() ?? "",
+                milestones });
+        }
 
         var groups = new List<object>();
         var gj = await GlGet(http, baseUri, "/api/v4/groups?per_page=100&order_by=name", token, ctx.RequestAborted);
@@ -1289,6 +1308,19 @@ public sealed class WebDashboard
         ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
         // Projets importés (nom + namespace) — n'écrit que si le client les transmet (sinon préserve l'existant).
         if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
+        // v4 — milestone de DÉPART de l'export par projet : l'extraction ignore les milestones antérieures.
+        // Clés = ids de projets SÉLECTIONNÉS uniquement ; valeurs vides ignorées (= tout l'historique).
+        if (b?["startMilestones"] is JsonObject smIn)
+        {
+            var outSm = new JsonObject();
+            foreach (var kv in smIn)
+            {
+                if (!int.TryParse(kv.Key, out var smPid) || !projectIds.Contains(smPid)) continue;
+                var smTitle = (Str(kv.Value) ?? "").Trim();
+                if (smTitle.Length > 0) outSm[smPid.ToString()] = smTitle;
+            }
+            ex["StartMilestones"] = outSm;
+        }
         // Catalogue des périodes : on n'écrit QUE si le wizard a transmis le champ (même vide = volonté
         // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
         if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
