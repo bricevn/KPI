@@ -417,7 +417,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       saveImpossible:"Enregistrement impossible.", serverUnreachable:"Serveur injoignable.",
       newPhase:"Nouvelle phase", extractingShort:"Extraction…",
       searchProjects:"Rechercher un projet…", noProjMatch:"Aucun projet ne correspond à « {q} »",
-      msStart:"Milestone de départ de l’export", noProjSelected:"Aucun projet sélectionné"
+      msStart:"Milestone de départ de l’export", noProjSelected:"Aucun projet sélectionné",
+      msNone:"Aucune — ne pas extraire", msAll:"Tout l’historique"
     },
     en:{
       bs:"Setup", stepOf:"Step {n} of 5",
@@ -471,7 +472,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       saveImpossible:"Could not save.", serverUnreachable:"Server unreachable.",
       newPhase:"New phase", extractingShort:"Extracting…",
       searchProjects:"Search a project…", noProjMatch:"No project matches “{q}”",
-      msStart:"Export start milestone", noProjSelected:"No project selected"
+      msStart:"Export start milestone", noProjSelected:"No project selected",
+      msNone:"None — do not extract", msAll:"Full history"
     },
     es:{
       "bs": "Configuración",
@@ -569,6 +571,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "Extrayendo…",
       "searchProjects": "Buscar un proyecto…", "noProjMatch": "Ningún proyecto coincide con «{q}»",
       "msStart": "Hito de inicio de la exportación", "noProjSelected": "Ningún proyecto seleccionado",
+      "msNone": "Ninguno — no extraer", "msAll": "Todo el historial",
     },
     de:{
       "bs": "Einrichtung",
@@ -666,6 +669,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "Extraktion…",
       "searchProjects": "Projekt suchen…", "noProjMatch": "Kein Projekt entspricht „{q}“",
       "msStart": "Start-Milestone des Exports", "noProjSelected": "Kein Projekt ausgewählt",
+      "msNone": "Keine — nicht extrahieren", "msAll": "Gesamter Verlauf",
     },
     it:{
       "bs": "Configurazione",
@@ -763,6 +767,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "Estrazione…",
       "searchProjects": "Cerca un progetto…", "noProjMatch": "Nessun progetto corrisponde a «{q}»",
       "msStart": "Milestone di partenza dell’export", "noProjSelected": "Nessun progetto selezionato",
+      "msNone": "Nessuna — non estrarre", "msAll": "Tutto lo storico",
     },
     pt:{
       "bs": "Implementação",
@@ -860,6 +865,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "A extrair…",
       "searchProjects": "Pesquisar um projeto…", "noProjMatch": "Nenhum projeto corresponde a «{q}»",
       "msStart": "Milestone de início da exportação", "noProjSelected": "Nenhum projeto selecionado",
+      "msNone": "Nenhum — não extrair", "msAll": "Todo o histórico",
     },
     ru:{
       "bs": "Конфигурация",
@@ -957,6 +963,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "Извлечение…",
       "searchProjects": "Поиск проекта…", "noProjMatch": "Ни один проект не соответствует «{q}»",
       "msStart": "Начальная веха выгрузки", "noProjSelected": "Проект не выбран",
+      "msNone": "Нет — не извлекать", "msAll": "Вся история",
     },
     ar:{
       "bs": "الإعداد",
@@ -1054,6 +1061,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "جاري الاستخراج…",
       "searchProjects": "البحث عن مشروع…", "noProjMatch": "لا يوجد مشروع يطابق «{q}»",
       "msStart": "إصدار بداية التصدير", "noProjSelected": "لم يتم اختيار أي مشروع",
+      "msNone": "لا شيء — عدم الاستخراج", "msAll": "كل السجل",
     },
     zh:{
       "bs": "设置",
@@ -1151,6 +1159,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "提取中…",
       "searchProjects": "搜索项目…", "noProjMatch": "没有项目匹配“{q}”",
       "msStart": "导出起始里程碑", "noProjSelected": "未选择项目",
+      "msNone": "无 — 不提取", "msAll": "全部历史",
     },
     ja:{
       "bs": "セットアップ",
@@ -1248,6 +1257,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "extractingShort": "抽出中…",
       "searchProjects": "プロジェクトを検索…", "noProjMatch": "「{q}」に一致するプロジェクトはありません",
       "msStart": "エクスポート開始マイルストーン", "noProjSelected": "プロジェクト未選択",
+      "msNone": "なし — 抽出しない", "msAll": "全履歴",
     },
   };
   var T=I18N[SLANG]||I18N.en;
@@ -1475,8 +1485,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     }
     return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+T.newTeamName+'</button>';
   }
-  // Milestone de DÉPART de l'export pour un projet : choix explicite, sinon la plus récente.
-  function msFor(p){return ST.exportMilestone[p.id]||((p.milestones&&p.milestones[0])||'');}
+  // Milestone de DÉPART de l'export pour un projet : choix explicite (y compris '' = tout
+  // l'historique et '__skip__' = ne pas extraire), sinon défaut = la plus récente.
+  function msFor(p){var v=ST.exportMilestone[p.id];if(v!==undefined&&v!==null)return v;return (p.milestones&&p.milestones[0])||'';}
   function s4(){
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
     var mapped=0;for(var k in ST.labelPhase)if(ST.labelPhase[k]&&ST.labelPhase[k]!=='none')mapped++;
@@ -1491,8 +1502,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var imported=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;});
     h+='<div class="mstones"><div class="msecthead"><span class="msectlabel">'+T.msStart+'</span></div>';
     if(!imported.length)h+='<div class="empty" style="padding:10px 16px">'+T.noProjSelected+'</div>';
-    else for(var mi=0;mi<imported.length;mi++){var mp2=imported[mi];var opts=(mp2.milestones||[]).map(function(m){return [m,m];});
-      h+='<div class="msrow"><span class="msdot">'+ic('flag',14)+'</span><span class="msname">'+esc(mp2.name)+'</span>'+(opts.length?menuSel('ms:'+mp2.id,msFor(mp2),opts,null):'<span class="empty">—</span>')+'</div>';}
+    else for(var mi=0;mi<imported.length;mi++){var mp2=imported[mi];
+      // « Aucune » = ne pas extraire ce projet (sauté aux runs globaux) ; « Tout l'historique » = sans borne.
+      var opts=[['__skip__',T.msNone],['',T.msAll]].concat((mp2.milestones||[]).map(function(m){return [m,m];}));
+      h+='<div class="msrow"><span class="msdot">'+ic('flag',14)+'</span><span class="msname">'+esc(mp2.name)+'</span>'+menuSel('ms:'+mp2.id,msFor(mp2),opts,null)+'</div>';}
     h+='</div>';
     if(ST.saveErr)h+='<div class="note" style="background:var(--bad-soft);border-left-color:var(--bad)"><span class="ic" style="color:var(--bad)">'+ic('info',16)+'</span><div>'+esc(ST.saveErr)+'</div></div>';
     return h;

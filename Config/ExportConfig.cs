@@ -238,10 +238,16 @@ public sealed class ExportConfig
     /// </summary>
     public Dictionary<int, Dictionary<string, List<string>>> TeamsByProject { get; set; } = new();
 
+    /// <summary>Valeur sentinelle de <see cref="StartMilestones"/> : « Aucune » — le projet est SAUTÉ
+    /// lors des extractions globales (données existantes préservées). Une régénération CIBLÉE sur ce
+    /// projet (Options → projet précis) l'extrait quand même : la demande explicite prime.</summary>
+    public const string SkipExtractionSentinel = "__skip__";
+
     /// <summary>
     /// Milestone de DÉPART de l'export par projet (clé = id de projet GitLab ; valeur = titre de milestone).
     /// Écrit par /setup : l'extraction IGNORE les issues des milestones antérieures (comparaison par date
     /// due/start du catalogue du projet ; issues sans milestone conservées). Absent ⇒ tout l'historique.
+    /// Valeur <see cref="SkipExtractionSentinel"/> ⇒ projet sauté (pas d'extraction).
     /// NB : clés numériques ⇒ pas concerné par la corruption « : » de IConfiguration (RepairColonKeyedMaps).
     /// </summary>
     public Dictionary<int, string> StartMilestones { get; set; } = new();

@@ -161,10 +161,23 @@ public static class ExportPipeline
             var allIssues = new List<IssueExport>();
             var labels = new Dictionary<string, GitLabLabel>(StringComparer.OrdinalIgnoreCase);
             var milestones = new Dictionary<string, GitLabMilestone>(StringComparer.OrdinalIgnoreCase);
+            var skippedPids = new HashSet<string>(); // projets « Aucune » sautés CE run (données existantes à préserver)
 
             foreach (var pid in projectIds)
             {
                 ct.ThrowIfCancellationRequested();
+                // « Aucune » (sentinelle __skip__) : le projet est SAUTÉ lors des runs globaux — sauf si
+                // la régénération le CIBLE explicitement (projectFilter) : la demande explicite prime,
+                // il est alors extrait sans borne de départ.
+                var skipCfg = int.TryParse(pid, out var pidPre)
+                    && (config.Export.StartMilestones ?? new()).TryGetValue(pidPre, out var preTitle)
+                    && preTitle == ExportConfig.SkipExtractionSentinel;
+                if (skipCfg && projectFilter == null)
+                {
+                    skippedPids.Add(pid);
+                    Console.WriteLine($"  -- projet {pid} : extraction SAUTÉE (« Aucune » au setup) — données existantes conservées --");
+                    continue;
+                }
                 var glCfg = new GitLabConfig
                 {
                     BaseUrl = server.BaseUrl,
@@ -188,7 +201,8 @@ public static class ExportPipeline
                 Func<GitLabIssue, bool>? startFilter = null;
                 if (int.TryParse(pid, out var pidInt)
                     && (config.Export.StartMilestones ?? new()).TryGetValue(pidInt, out var startMsTitle)
-                    && !string.IsNullOrWhiteSpace(startMsTitle))
+                    && !string.IsNullOrWhiteSpace(startMsTitle)
+                    && startMsTitle != ExportConfig.SkipExtractionSentinel) // ciblage explicite d'un projet « Aucune » → sans borne
                 {
                     var boundary = projMs.FirstOrDefault(m => string.Equals(m.Title, startMsTitle, StringComparison.OrdinalIgnoreCase));
                     var boundaryDate = boundary?.DueDate ?? boundary?.StartDate; // ISO yyyy-MM-dd → comparaison ordinale
@@ -212,10 +226,11 @@ public static class ExportPipeline
                 catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
             }
 
-            if (scoped)
+            if (scoped || skippedPids.Count > 0)
             {
-                // Acquisition CIBLÉE → merge avec le store existant : on ne remplace que la portée
-                // (projet et/ou milestone) ; le reste (autres projets/milestones) est conservé.
+                // Acquisition CIBLÉE et/ou projets SAUTÉS (« Aucune ») → merge avec le store existant :
+                // on ne remplace que la portée réellement extraite ; le reste (autres projets/milestones,
+                // projets sautés) est conservé — un run global réécrivant tout les effacerait sinon.
                 var prevTxt = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "issues.json"));
                 if (prevTxt != null)
                 {
@@ -223,9 +238,10 @@ public static class ExportPipeline
                     bool InScope(IssueExport e) =>
                         (projectFilter == null || e.ProjectId.ToString() == projectFilter)
                         && (milestoneFilter == null || string.Equals(e.Milestone, milestoneFilter, StringComparison.OrdinalIgnoreCase));
+                    bool Keep(IssueExport e) => skippedPids.Contains(e.ProjectId.ToString()) || (scoped && !InScope(e));
                     var newKeys = new HashSet<(long, long)>(allIssues.Select(e => (e.ProjectId, e.Iid)));
-                    var preserved = existing.Where(e => !InScope(e) && !newKeys.Contains((e.ProjectId, e.Iid))).ToList();
-                    Console.WriteLine($"  Merge ciblé : {preserved.Count} issues conservées (hors portée) + {allIssues.Count} fraîchement extraites.");
+                    var preserved = existing.Where(e => Keep(e) && !newKeys.Contains((e.ProjectId, e.Iid))).ToList();
+                    Console.WriteLine($"  Merge : {preserved.Count} issues conservées (hors portée / projets sautés) + {allIssues.Count} fraîchement extraites.");
                     allIssues = preserved.Concat(allIssues).OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
                 }
                 // Catalogues labels/milestones : réinjecter l'existant (autres projets) — le frais gagne.
