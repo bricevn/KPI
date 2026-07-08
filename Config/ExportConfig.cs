@@ -52,7 +52,8 @@ public sealed class AppConfig
         if (cfg?.Export == null || string.IsNullOrEmpty(baseDir)) return;
         var lp = new Dictionary<string, string>();
         var lbp = new Dictionary<int, Dictionary<string, string>>();
-        bool sawLp = false, sawLbp = false;
+        var sm = new Dictionary<int, string>();
+        bool sawLp = false, sawLbp = false, sawSm = false;
 
         foreach (var file in new[] { "appsettings.json", "appsettings.Development.json" })
         {
@@ -90,6 +91,17 @@ public sealed class AppConfig
                                 m[kv.Name] = kv.Value.GetString() ?? "none";
                     }
                 }
+
+                // StartMilestones : { "projectId": "titre" } — clés numériques (pas de « : ») mais le
+                // binder IConfiguration est capricieux avec les Dictionary à clé non-string selon les
+                // versions (échec SILENCIEUX) → on la relit ici aussi, elle pilote l'extraction.
+                if (ex.TryGetProperty("StartMilestones", out var smEl) && smEl.ValueKind == JsonValueKind.Object)
+                {
+                    sawSm = true;
+                    foreach (var kv in smEl.EnumerateObject())
+                        if (kv.Value.ValueKind == JsonValueKind.String && int.TryParse(kv.Name, out var smPid))
+                            sm[smPid] = kv.Value.GetString() ?? "";
+                }
             }
         }
 
@@ -97,6 +109,7 @@ public sealed class AppConfig
         // p. ex. un override par variable d'environnement KPI_).
         if (sawLp) cfg.Export.LabelPhases = lp;
         if (sawLbp) cfg.Export.LabelPhasesByProject = lbp;
+        if (sawSm) cfg.Export.StartMilestones = sm;
     }
 }
 

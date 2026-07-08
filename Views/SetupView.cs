@@ -232,7 +232,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .suA-accchev{margin-left:auto;display:flex;color:var(--ink-faint);transition:transform .2s var(--ease);}
 .suA-acc.open .suA-accchev{transform:rotate(90deg);}
 .suA-accbody{padding:4px 15px 16px;display:flex;flex-direction:column;gap:12px;}
-.suA-accbody .map{border:0;border-radius:0;background:none;}
+/* overflow:visible : sans lui, le popover .ddmenu d'une ligne du bas est CLIPPÉ par
+   l'overflow:hidden hérité de .map → il « passe sous » la zone Rafraîchir les labels. */
+.suA-accbody .map{border:0;border-radius:0;background:none;overflow:visible;}
 .suA-accbody .maprow:first-child{padding-top:0;}
 /* étape Projets : tout cocher / décocher + compteur */
 .suA-selall{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
@@ -333,7 +335,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
 .ld-status.err{color:var(--bad);}
 .ld-status .okic{color:var(--good);display:flex;}
 .ld-meta{display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
-.ld-meta .dot{opacity:.5;}
+.ld-meta .ld-sep{opacity:.5;}
 .ld-cancel{position:absolute;bottom:26px;right:28px;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-dim);font-family:var(--sans);font-size:13px;cursor:pointer;transition:border-color .14s,color .14s;}
 .ld-cancel:hover{border-color:var(--bad);color:var(--bad);}
 @media(max-width:720px){.checklist{grid-template-columns:1fr;}.suA-top,.foot{padding-left:20px;padding-right:20px;}.bodyinner{padding:14px 20px 24px;}}
@@ -1645,7 +1647,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var status=done?('<span class="okic">'+ic('check',17)+'</span> '+T.done)
       :err?(T.failed+esc(pr.error||pr.message||''))
       :('<span class="spin"></span> '+esc(pr.message||T.extractingShort)+'<span class="ld-dots"><b></b><b></b><b></b></span>');
-    var meta=err?'':(T.extracting+(eta?(' <span class="dot">·</span> '+eta):''));
+    // ld-sep (classe dédiée) : « dot » entrait en collision avec le .dot du STEPPER (rond de 34 px)
+    // et rendait le séparateur illisible au milieu du texte.
+    var meta=err?'':(T.extracting+(eta?(' <span class="ld-sep">·</span> '+eta):''));
     return '<div class="suA"><div class="suA-top"><div class="brand"><div class="mark">'+MARK+'</div><div><div class="bn">KPI</div><div class="bs">'+T.bs+'</div></div></div><div class="topright">'+LANG_SWITCH+'</div></div>'
       +'<div class="ld-launch"><div class="ld-logo">'+MARK+'</div>'
       +'<div class="ld-bars">'+bars+'</div>'
