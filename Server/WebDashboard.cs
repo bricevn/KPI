@@ -309,6 +309,7 @@ public sealed class WebDashboard
         // (via le token de groupe STOCKÉ) + sauvegarde des sections Export.* (projets/phases/labels).
         app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
         app.MapGet("/api/options/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsLabelsAsync(ctx)));
+        app.MapGet("/api/options/milestones", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsMilestonesAsync(ctx)));
         app.MapPost("/api/options", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveOptionsAsync(ctx)));
         // Identité résolue de l'utilisateur courant (rôle/périmètre/vue).
         app.MapGet("/api/me", (HttpContext ctx) => Results.Json(self.ResolveMe(ctx)));
@@ -975,6 +976,41 @@ public sealed class WebDashboard
             }
         }
         return Results.Json(new { ok = true, labels = set });
+    }
+
+    // GET /api/options/milestones?projectIds=4,11 → milestones (triées, récentes d'abord) des projets
+    // choisis, récupérées EN DIRECT sur GitLab. Indispensable AVANT la 1re extraction : le catalogue
+    // local (availableMilestones du payload) est encore vide, or la régénération se cible par milestone.
+    private async Task<IResult> OptionsMilestonesAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var server = CurrentServer(ctx);
+        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
+            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
+            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
+        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
+        // projectIds absent/vide → tous les projets configurés du serveur.
+        var pids = (ctx.Request.Query["projectIds"].ToString() ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (pids.Count == 0) pids = (server.ProjectIds ?? new()).ToList();
+        var items = new List<(string title, string date)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pid in pids)
+        {
+            var enc = Uri.EscapeDataString(pid);
+            var mj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/milestones?per_page=100&state=all", server.GroupToken, ctx.RequestAborted);
+            foreach (var m in mj?.AsArray() ?? new JsonArray())
+            {
+                var title = m?["title"]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(title) || !seen.Add(title)) continue;
+                items.Add((title, m?["due_date"]?.GetValue<string>() ?? m?["start_date"]?.GetValue<string>() ?? ""));
+            }
+        }
+        var milestones = items
+            .OrderByDescending(x => x.date, StringComparer.Ordinal)   // ISO yyyy-MM-dd → tri lexical OK
+            .ThenByDescending(x => x.title, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.title).ToList();
+        return Results.Json(new { ok = true, milestones });
     }
 
     // POST /api/options → sauvegarde des sections Export (projets/phases/labels/équipes, global + par projet) ET

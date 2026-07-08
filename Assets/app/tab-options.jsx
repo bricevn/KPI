@@ -343,12 +343,22 @@
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
     const S = (window.__DATA__ || {}).setup || {};
     const isAdmin = !!S.isAdmin;
-    const milestones = (A.filterOptions || {}).milestones || [];
 
     // ---- Régénération des données : projet → milestone → lancement, avec progression + annulation.
     const projects = S.projects || [];
     const [regenProj, setRegenProj] = useState('');
     const [regenMs, setRegenMs] = useState([]); // MULTI : plusieurs milestones ré-extraites en une course (le serveur boucle + merge)
+    // Milestones du sélecteur : récupérées EN DIRECT sur GitLab (/api/options/milestones) — le
+    // catalogue extrait (availableMilestones) est VIDE avant la 1re extraction (œuf et poule).
+    // Repli initial : catalogue du payload. Rechargées quand le projet ciblé change.
+    const [msOpts, setMsOpts] = useState(() => (A.filterOptions || {}).milestones || []);
+    React.useEffect(() => {
+      if (!isAdmin) return;
+      let dead = false;
+      fetch('/api/options/milestones' + (regenProj ? '?projectIds=' + encodeURIComponent(regenProj) : ''))
+        .then((r) => r.json()).then((j) => {if (!dead && j.ok && j.milestones) setMsOpts(j.milestones);}).catch(() => {});
+      return () => {dead = true;};
+    }, [regenProj]);
     const [refreshState, setRefreshState] = useState('idle'); // idle | busy | done | cancelled | err
     const [prog, setProg] = useState(null); // snapshot /api/status {running,current,total,...}
     const pollRef = React.useRef(null);
@@ -430,7 +440,8 @@
           <p className="lead">{window.t('opt.regenLead', { date: (A.meta || {}).extracted || '—' })}</p>
           <div className="opt-row">
             <div className="lbl">{window.t('opt.regenProject')}<span>{window.t('opt.regenProjectSub')}</span></div>
-            <select style={selStyle} value={regenProj} disabled={regenBusy} onChange={(e) => setRegenProj(e.target.value)}>
+            {/* changer de projet vide la sélection de milestones (elles peuvent ne pas exister ailleurs) */}
+            <select style={selStyle} value={regenProj} disabled={regenBusy} onChange={(e) => {setRegenProj(e.target.value);setRegenMs([]);}}>
               <option value="">{window.t('opt.allProjects')}</option>
               {projects.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
             </select>
@@ -439,7 +450,7 @@
             <div className="lbl">{window.t('opt.regenMs')}<span>{window.t('opt.regenMsSub')}</span></div>
             {/* MULTI-sélection (checkboxes + recherche) — vide = toutes les milestones. */}
             <div style={regenBusy ? { pointerEvents: 'none', opacity: 0.55 } : null}>
-              <window.MultiSelect label={window.t('opt.regenMs')} value={regenMs} onChange={setRegenMs} options={milestones} />
+              <window.MultiSelect label={window.t('opt.regenMs')} value={regenMs} onChange={setRegenMs} options={msOpts} />
             </div>
           </div>
           {!regenBusy &&
