@@ -71,6 +71,24 @@
     const filtersActive = fLabel.length > 0 || fTeam.length > 0 || fUser.length > 0;
     const clearFilters = () => {setFLabel([]);setFTeam([]);setFUser([]);};
 
+    // Filtre Équipe SYNCHRONISÉ avec le filtre Utilisateur : cocher une équipe coche ses membres ;
+    // la décocher les retire, SAUF ceux couverts par une autre équipe encore sélectionnée.
+    // Les membres sont mappés sur les entrées CANONIQUES du filtre Utilisateur (casse des usernames).
+    const onTeamChange = (next) => {
+      const teams = (window.__DATA__ || {}).teams || {}; // nom d'équipe → [usernames]
+      const userOpts = (A.filterOptions || {}).users || A.people.map((p) => p.name);
+      const canon = (u) => userOpts.find((x) => String(x).toLowerCase() === String(u).toLowerCase()) || u;
+      const added = next.filter((tn) => fTeam.indexOf(tn) < 0);
+      const removed = fTeam.filter((tn) => next.indexOf(tn) < 0);
+      let users = fUser.slice();
+      added.forEach((tn) => (teams[tn] || []).forEach((u) => {const c = canon(u);if (users.indexOf(c) < 0) users.push(c);}));
+      const still = {};
+      next.forEach((tn) => (teams[tn] || []).forEach((u) => {still[canon(u)] = 1;}));
+      removed.forEach((tn) => (teams[tn] || []).forEach((u) => {const c = canon(u);if (!still[c]) users = users.filter((x) => x !== c);}));
+      setFTeam(next);
+      setFUser(users);
+    };
+
     const rootStyle = {
       '--accent': accent, '--accent-2': accent,
       '--accent-soft': `color-mix(in srgb, ${accent} 15%, transparent)`,
@@ -135,7 +153,7 @@
             options={[window.t('whole_project')].concat((A.filterOptions || {}).milestones || [])} />
               <window.MultiSelect label={window.t('f_label')} value={fLabel} onChange={setFLabel}
             options={(A.filterOptions || {}).labels || []} />
-              <window.MultiSelect label={window.t('f_team')} value={fTeam} onChange={setFTeam}
+              <window.MultiSelect label={window.t('f_team')} value={fTeam} onChange={onTeamChange}
             options={(A.filterOptions || {}).teams || []} />
               <window.MultiSelect label={window.t('f_user')} value={fUser} onChange={setFUser}
             options={(A.filterOptions || {}).users || A.people.map((p) => p.name)} />
