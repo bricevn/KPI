@@ -263,7 +263,8 @@
       try {for (const rule of sheet.cssRules) css += rule.cssText + '\n';} catch (e) {/* cross-origin font sheet */}
     }
     const A = window.APP;
-    const stamp = new Date().toLocaleString('fr-FR');
+    // horodatage ISO aaaa-mm-jj hh:mm (format de date unifié de l'app)
+    const stamp = (function () {const d = new Date();const p = (n) => ('0' + n).slice(-2);return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());})();
     // ⚠ Ce fichier est lui-même INLINÉ dans un script de la page : son source ne doit JAMAIS
     // contenir la séquence de fermeture de script (le parseur HTML tronquerait la balise).
     // D'où les balises composées dynamiquement (SO/SC) + neutralisation dans les sources embarqués.
@@ -451,6 +452,29 @@ ${tag(js)}
     return { scrollRef, zoom, dragging, Nav, gridStyle };
   }
 
+  // carte « temps passé par type » du drill Cycle : temps MOYEN par type (même métrique cyc que
+  // les badges du drill), barre proportionnelle au max, nombre d'issues par type.
+  function CycleTypeRecap({ issues, cyc }) {
+    const A = window.APP;
+    const by = {};
+    issues.forEach((d) => {const b = by[d.type] = by[d.type] || { sum: 0, n: 0 };b.sum += cyc(d);b.n++;});
+    const rows = A.types.map((t) => {const b = by[t.key];return b ? { key: t.key, name: t.short, n: b.n, avg: b.sum / b.n } : null;}).
+    filter(Boolean).sort((a, b) => b.avg - a.avg);
+    if (!rows.length) return null;
+    const max = Math.max(...rows.map((r) => r.avg), 0.1);
+    return (
+      <div className="recap" style={{ '--name-col': 'calc(' + Math.min(30, Math.max(0, ...rows.map((r) => (r.name || '').length))) + 'ch + 18px)' }}>
+        <div className="recap-h">{window.t('drill.timeByType')}<span className="recap-tot">{issues.length} {window.t('issues')}</span></div>
+        {rows.map((r) =>
+        <div key={r.key} className="recap-row">
+            <span className="recap-nm"><span className="dot" style={{ background: window.typeColor(r.key) }}></span>{r.name}</span>
+            <span className="recap-bar"><i style={{ width: r.avg / max * 100 + '%', background: window.typeColor(r.key) }}></i></span>
+            <span className="recap-v">{window.fmt1(r.avg)} {window.t('unit_day')} · {r.n}</span>
+          </div>
+        )}
+      </div>);
+  }
+
   // drill-down modal: issues list (+ optional recap). recap: false | 'weight' | 'issues'.
   // mode 'cycle' shows a lead-time badge per row + a duration summary instead of a type recap.
   // groups (optional): [{label, issues, recap}] renders labelled sections instead of a flat list.
@@ -484,6 +508,7 @@ ${tag(js)}
             <div className="cycstat-item"><span className="cv">{cycSummary.min.toFixed(1)} j</span><span className="cl">le plus court</span></div>
             <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max.toFixed(1)} j</span><span className="cl">le plus long</span></div>
           </div>}
+        {mode === 'cycle' && issues && issues.length > 0 && <CycleTypeRecap issues={issues} cyc={cyc} />}
         {groups ?
         groups.map((g, i) =>
         <div key={i} className="drill-group">

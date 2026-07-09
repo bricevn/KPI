@@ -369,13 +369,18 @@ public sealed class WebDashboard
         // Cible de retour du SSO en POPUP (cf. setup). Après le callback OAuth, le navigateur (dans la popup)
         // atterrit ici : on prévient la fenêtre parente (postMessage same-origin) puis on ferme la popup. Si la
         // page n'est PAS une popup (ouverture plein écran / repli), on revient au /setup au bout d'un court délai.
+        // Page volontairement MUETTE (fond sombre, aucun texte visible) : elle ne vit que quelques
+        // dizaines de ms avant fermeture — un message affiché d'emblée donnait un rendu peu
+        // professionnel. Le texte n'apparaît qu'en dernier recours, si la fenêtre n'a pas pu se
+        // fermer après ~900 ms (fermeture bloquée par le navigateur).
         app.MapGet("/auth/popup-done", () => Results.Content(
             "<!doctype html><html><head><meta charset=\"utf-8\"><title>GitLab</title></head>" +
             "<body style=\"margin:0;background:#0a0e13;color:#9aa6b6;font:14px system-ui,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh\">" +
-            "<div>Connexion GitLab terminée — vous pouvez fermer cette fenêtre.</div>" +
+            "<div id=\"m\" style=\"opacity:0;transition:opacity .25s\">Connexion GitLab terminée — vous pouvez fermer cette fenêtre.</div>" +
             "<script>(function(){try{if(window.opener&&!window.opener.closed){window.opener.postMessage({kpiOauth:'done'},window.location.origin);}}catch(e){}" +
             "try{window.close();}catch(e){}" +
-            "setTimeout(function(){try{window.close();}catch(e){}try{if(!window.opener){window.location.replace('/setup');}}catch(e){window.location.replace('/setup');}},600);})();</script>" +
+            "setTimeout(function(){try{window.close();}catch(e){}try{if(!window.opener){window.location.replace('/setup');return;}}catch(e){window.location.replace('/setup');return;}" +
+            "var m=document.getElementById('m');if(m)m.style.opacity='1';},900);})();</script>" +
             "</body></html>", "text/html; charset=utf-8")).AllowAnonymous();
 
         Console.WriteLine("=== Dashboard server (ASP.NET Core) prêt ===");

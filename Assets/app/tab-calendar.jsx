@@ -24,7 +24,10 @@
       const dom = dd.getDate();
       if (labelStep === 31 && !(i === 0 || dom === 1)) return null;
       if (labelStep === 7 && !(i === 0 || dom === 1 || dd.getDay() === 1)) return null;
-      if (i === 0 || dom === 1) {try {return dd.toLocaleDateString(window.__LANG__ || 'fr', { day: 'numeric', month: 'short' });} catch (e) {return String(dom);}}
+      // Dates ISO : « aaaa-mm » en dézoom fort (seuls les 1ers du mois sont étiquetés),
+      // « mm-jj » aux 1ers du mois / 1re cellule, numéro de jour sinon (tooltips = ISO complet).
+      if (labelStep === 31) return A.cal.fmtDay(i).slice(0, 7);
+      if (i === 0 || dom === 1) return A.cal.fmtDay(i).slice(5);
       return String(dom);
     };
     const toggle = (k) => setHidden((s) => {const n = new Set(s);n.has(k) ? n.delete(k) : n.add(k);return n;});

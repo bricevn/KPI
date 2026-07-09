@@ -14,8 +14,8 @@ window.APP = (function () {
   const WEEKS = 12;
   const MS_DAY = 86400000;
   const dayDate = (d) => new Date(START.getTime() + d * MS_DAY);
-  const FR = { day: '2-digit', month: 'short' };
-  const fmtDay = (d) => dayDate(d).toLocaleDateString('fr-FR', FR);
+  // format de date unifié de l'app : ISO aaaa-mm-jj (composants locaux)
+  const fmtDay = (d) => { const x = dayDate(d); const p = (n) => ('0' + n).slice(-2); return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()); };
 
   // ---- types (GitLab-synced colours via CSS vars) ----
   const types = [
@@ -234,8 +234,8 @@ window.APP = (function () {
     });
   });
 
-  const milestone = { name: '2026-R2', start: '08 mars', end: '31 mai 2026', dayPct: 71, startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
-  const meta = { generated: '8 juin 2026 · 15:04', extracted: '4 juin', project: 'Hypervisor' };
+  const milestone = { name: '2026-R2', start: '2026-03-08', end: '2026-05-31', dayPct: 71, startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
+  const meta = { generated: '2026-06-08 15:04', extracted: '2026-06-04', project: 'Hypervisor' };
 
   return {
     types, typeByKey, phases, people, peopleById: Object.fromEntries(people.map(p => [p.id, p])),

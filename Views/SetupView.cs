@@ -1598,7 +1598,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // SSO en POPUP : on ne quitte plus le wizard (fini la page blanche qui clignote). La popup est ouverte dans le
   // geste de clic (ssoOpen) puis dirigée vers /auth/oauth (ssoTrack). Au retour, /auth/popup-done poste un message
   // et se ferme → on relit /api/me (loadMe). Repli plein écran si la popup est bloquée.
-  function ssoOpen(){var w=520,h=680,sw=(typeof screen!=='undefined'&&screen.width)||1200,sh=(typeof screen!=='undefined'&&screen.height)||800;try{return window.open('about:blank','kpi_sso','width='+w+',height='+h+',left='+Math.max(0,(sw-w)/2)+',top='+Math.max(0,(sh-h)/2));}catch(e){return null;}}
+  function ssoOpen(){var w=520,h=680,sw=(typeof screen!=='undefined'&&screen.width)||1200,sh=(typeof screen!=='undefined'&&screen.height)||800;try{var p=window.open('about:blank','kpi_sso','width='+w+',height='+h+',left='+Math.max(0,(sw-w)/2)+',top='+Math.max(0,(sh-h)/2));
+    // Peint la popup en SOMBRE immédiatement — sinon about:blank flashe en blanc avant la navigation.
+    try{p.document.write('<!doctype html><html><head><meta charset="utf-8"><title>GitLab</title></head><body style="margin:0;background:#0a0e13"></body></html>');p.document.close();}catch(e){}
+    return p;}catch(e){return null;}}
   function ssoTrack(p){
     try{p.location.replace('/auth/oauth?return=/auth/popup-done');}catch(e){window.location.href='/auth/oauth?return=/setup';return;}
     ST.adminState='connecting';render();

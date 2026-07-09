@@ -351,11 +351,14 @@ window.buildAPP = function (D) {
   };
 
   // ---------- divers ----------
-  var fmtFr = function (ms) { try { return new Date(ms).toLocaleDateString('en', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } };
+  // Format de date UNIFIÉ de l'app : ISO aaaa-mm-jj — composants LOCAUX (pas de toISOString UTC,
+  // qui décalerait d'un jour selon le fuseau).
+  var fmtFr = function (ms) { try { var d = new Date(ms); var p = function (n) { return ('0' + n).slice(-2); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); } catch (e) { return ''; } };
   // Bandeau d'en-tête : dates/avancement de la MILESTONE quand ses bornes sont connues (la
   // timeline élargie ne doit pas diluer la progression affichée) ; repli sur la timeline sinon.
   var HD_START = isNaN(MS_START) ? START : MS_START, HD_END = isNaN(MS_END) ? END : MS_END;
-  var milestone = { name: msName, start: fmtFr(HD_START), end: fmtFr(HD_END - 1) + ' ' + new Date(HD_END - 1).getFullYear(), dayPct: Math.max(0, Math.min(100, pct(NOW - HD_START, HD_END - HD_START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
+  // end : plus de suffixe d'année — le format ISO aaaa-mm-jj la porte déjà.
+  var milestone = { name: msName, start: fmtFr(HD_START), end: fmtFr(HD_END - 1), dayPct: Math.max(0, Math.min(100, pct(NOW - HD_START, HD_END - HD_START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
   // URL d'issue + nom de projet DÉRIVÉS du webUrl réel (générique : toute instance/projet GitLab, rien en dur).
   var sampleUrl = ''; for (var su = 0; su < CAT.length; su++) { if (CAT[su].webUrl) { sampleUrl = CAT[su].webUrl; break; } }
   var issueBase = '', projName = 'Project';
