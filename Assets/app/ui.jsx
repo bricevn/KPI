@@ -366,10 +366,10 @@ ${tag(js)}
   }
 
   // shared Gantt navigation — DIRECT MOUSE control:
-  //   • drag (click-hold) to pan horizontally
-  //   • wheel to scroll along the timeline
-  //   • Ctrl / ⌘ + wheel to zoom (change the time range)
-  //   • double-click to reset zoom
+  //   • clic gauche maintenu : déplace le graphe sur les DEUX axes (horizontal dans le Gantt,
+  //     vertical dans son conteneur de défilement)
+  //   • molette : zoom / dézoom (sans modificateur ; plancher = « tout visible »)
+  //   • double-clic : retour à 100 %
   // returns a ref for .gantt-scroll, a style for .gantt-grid, and a small zoom indicator.
   function useGanttNav(baseMin = 900) {
     const scrollRef = React.useRef(null);
@@ -385,19 +385,32 @@ ${tag(js)}
     React.useEffect(() => {
       const el = scrollRef.current;
       if (!el) return;
-      let down = false,startX = 0,startScroll = 0,moved = false;
+      let down = false,startX = 0,startY = 0,startScroll = 0,startVTop = 0,vEl = null,moved = false;
+
+      // Conteneur de défilement VERTICAL le plus proche (le Gantt ne défile qu'horizontalement ;
+      // les lignes défilent dans un ancêtre — .main, ou la page). Repli : document.
+      const vScrollParent = (node) => {
+        for (let p = node && node.parentElement; p; p = p.parentElement) {
+          const s = getComputedStyle(p);
+          if (p.scrollHeight > p.clientHeight + 2 && /(auto|scroll)/.test(s.overflowY)) return p;
+        }
+        return document.scrollingElement || document.documentElement;
+      };
 
       const onDown = (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0) return; // clic GAUCHE uniquement
         down = true;moved = false;
-        startX = e.clientX;startScroll = el.scrollLeft;
+        startX = e.clientX;startY = e.clientY;startScroll = el.scrollLeft;
+        vEl = vScrollParent(el);startVTop = vEl ? vEl.scrollTop : 0;
         setDragging(true);
       };
       const onMove = (e) => {
         if (!down) return;
-        const dx = e.clientX - startX;
-        if (Math.abs(dx) > 3) moved = true;
+        const dx = e.clientX - startX,dy = e.clientY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+        // déplacement sur les DEUX axes : horizontal dans le Gantt, vertical dans son conteneur.
         el.scrollLeft = startScroll - dx;
+        if (vEl) vEl.scrollTop = startVTop - dy;
         e.preventDefault();
       };
       const onUp = () => {down = false;setDragging(false);};
@@ -405,24 +418,19 @@ ${tag(js)}
       const onClick = (e) => {if (moved) {e.stopPropagation();e.preventDefault();moved = false;}};
 
       const onWheel = (e) => {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          // Zoom MULTIPLICATIF, dézoom autorisé sous 100 % jusqu'à « tout visible »
-          // (plancher dynamique : la grille tient exactement dans le conteneur).
-          const fit = Math.min(1, (el.clientWidth || 900) / (baseRef.current || 900));
-          const next = Math.min(3, Math.max(fit, Math.round(zoomRef.current * (e.deltaY < 0 ? 1.25 : 0.8) * 100) / 100));
-          if (next === zoomRef.current) return;
-          // keep the point under the cursor stable while zooming
-          const rect = el.getBoundingClientRect();
-          const pointerX = e.clientX - rect.left + el.scrollLeft;
-          const ratio = next / zoomRef.current;
-          setZoom(next);
-          requestAnimationFrame(() => {el.scrollLeft = pointerX * ratio - (e.clientX - rect.left);});
-        } else if (e.deltaY !== 0 && el.scrollWidth > el.clientWidth) {
-          // turn vertical wheel into horizontal timeline scroll
-          el.scrollLeft += e.deltaY;
-          e.preventDefault();
-        }
+        // Molette = zoom/dézoom DIRECT (plus de modificateur ; le déplacement se fait au clic gauche).
+        e.preventDefault();
+        // Zoom MULTIPLICATIF, dézoom autorisé sous 100 % jusqu'à « tout visible »
+        // (plancher dynamique : la grille tient exactement dans le conteneur).
+        const fit = Math.min(1, (el.clientWidth || 900) / (baseRef.current || 900));
+        const next = Math.min(3, Math.max(fit, Math.round(zoomRef.current * (e.deltaY < 0 ? 1.25 : 0.8) * 100) / 100));
+        if (next === zoomRef.current) return;
+        // keep the point under the cursor stable while zooming
+        const rect = el.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left + el.scrollLeft;
+        const ratio = next / zoomRef.current;
+        setZoom(next);
+        requestAnimationFrame(() => {el.scrollLeft = pointerX * ratio - (e.clientX - rect.left);});
       };
       const onDbl = () => setZoom(1);
 
@@ -443,8 +451,8 @@ ${tag(js)}
     }, []);
 
     const Nav = () =>
-    <div className="gantt-hint" title="Glissez pour défiler · molette pour parcourir · Ctrl/⌘ + molette pour zoomer/dézoomer · double-clic pour réinitialiser">
-        {window.ICONS.drag}<span>glisser · molette · ⌘+molette = zoom</span>
+    <div className="gantt-hint" title="Clic gauche maintenu pour déplacer le graphe (horizontal et vertical) · molette pour zoomer/dézoomer · double-clic pour réinitialiser">
+        {window.ICONS.drag}<span>glisser = déplacer · molette = zoom</span>
         {zoom !== 1 && <span className="gnav-zoom">{Math.round(zoom * 100)}%</span>}
       </div>;
     // width plafonnée à 100 % en dézoom (la grille remplit le conteneur, les jours se resserrent).
