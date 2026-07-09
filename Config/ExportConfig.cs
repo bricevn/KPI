@@ -244,10 +244,12 @@ public sealed class ExportConfig
     public const string SkipExtractionSentinel = "__skip__";
 
     /// <summary>
-    /// Milestone de DÉPART de l'export par projet (clé = id de projet GitLab ; valeur = titre de milestone).
-    /// Écrit par /setup : l'extraction IGNORE les issues des milestones antérieures (comparaison par date
-    /// due/start du catalogue du projet ; issues sans milestone conservées). Absent ⇒ tout l'historique.
-    /// Valeur <see cref="SkipExtractionSentinel"/> ⇒ projet sauté (pas d'extraction).
+    /// Milestone d'IMPORT INITIAL par projet (clé = id de projet GitLab ; valeur = titre de milestone).
+    /// Écrit par /setup : la 1re extraction importe UNIQUEMENT cette milestone — ce n'est PAS une borne :
+    /// les rafraîchissements globaux mettent ensuite à jour les milestones déjà importées (store ∪ celle-ci),
+    /// et une régénération ciblée (Options) peut importer n'importe quelle autre milestone à tout moment.
+    /// Vide/absent ⇒ tout l'historique. Valeur <see cref="SkipExtractionSentinel"/> ⇒ projet sauté (pas
+    /// d'extraction ; import ultérieur via régénération ciblée).
     /// NB : clés numériques ⇒ pas concerné par la corruption « : » de IConfiguration (RepairColonKeyedMaps).
     /// </summary>
     public Dictionary<int, string> StartMilestones { get; set; } = new();

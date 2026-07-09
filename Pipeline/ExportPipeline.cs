@@ -158,26 +158,53 @@ public static class ExportPipeline
             }
             Console.WriteLine($"== Serveur '{server.Id}' ({server.BaseUrl}) : {projectIds.Count} projet(s){(scoped ? " · acquisition ciblée" : "")} ==");
 
+            // Store existant lu UNE fois par serveur : il donne les milestones déjà importées par projet
+            // (périmètre des rafraîchissements globaux) et alimente le merge final.
+            var prevTxt = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "issues.json"));
+            var existing = prevTxt == null ? new List<IssueExport>()
+                : JsonSerializer.Deserialize<List<IssueExport>>(prevTxt, _readJson) ?? new();
+
             var allIssues = new List<IssueExport>();
             var labels = new Dictionary<string, GitLabLabel>(StringComparer.OrdinalIgnoreCase);
             var milestones = new Dictionary<string, GitLabMilestone>(StringComparer.OrdinalIgnoreCase);
-            var skippedPids = new HashSet<string>(); // projets « Aucune » sautés CE run (données existantes à préserver)
+            // Portée REMPLACÉE par projet CE run : null = projet entièrement ré-extrait ; sinon = les
+            // milestones ré-extraites (le reste du projet est conservé au merge). Projet absent de la
+            // map = non traité (sauté / hors cible) → toutes ses données sont conservées.
+            var scopeByProject = new Dictionary<string, HashSet<string>?>();
 
             foreach (var pid in projectIds)
             {
                 ct.ThrowIfCancellationRequested();
+                var setupMs = int.TryParse(pid, out var pidInt)
+                    && (config.Export.StartMilestones ?? new()).TryGetValue(pidInt, out var t) ? t : null;
+                var skipCfg = setupMs == ExportConfig.SkipExtractionSentinel;
                 // « Aucune » (sentinelle __skip__) : le projet est SAUTÉ lors des runs globaux — sauf si
-                // la régénération le CIBLE explicitement (projectFilter) : la demande explicite prime,
-                // il est alors extrait sans borne de départ.
-                var skipCfg = int.TryParse(pid, out var pidPre)
-                    && (config.Export.StartMilestones ?? new()).TryGetValue(pidPre, out var preTitle)
-                    && preTitle == ExportConfig.SkipExtractionSentinel;
-                if (skipCfg && projectFilter == null)
+                // la régénération CIBLE explicitement un projet (projectFilter) OU une milestone
+                // (milestoneFilter) : la demande explicite prime. C'est ce qui permet le workflow
+                // « setup sans milestone → dashboard vide → import ciblé des milestones plus tard ».
+                if (skipCfg && projectFilter == null && milestoneFilter == null)
                 {
-                    skippedPids.Add(pid);
                     Console.WriteLine($"  -- projet {pid} : extraction SAUTÉE (« Aucune » au setup) — données existantes conservées --");
                     continue;
                 }
+
+                // Milestones à extraire pour CE projet :
+                //  - régénération ciblée (Options) → la milestone demandée, telle quelle ;
+                //  - run global avec milestone d'import choisie au setup → milestones DÉJÀ importées
+                //    (store) ∪ celle du setup. Le choix du setup n'est PAS une borne : c'est le
+                //    périmètre INITIAL d'import ; le rafraîchissement global met ensuite à jour tout
+                //    ce qui a été importé, sans jamais rien effacer d'autre ;
+                //  - sinon (« Tout l'historique », ou projet « Aucune » ciblé par projet) → tout le projet.
+                List<string>? targetMs = null; // null = extraction complète du projet
+                if (milestoneFilter != null) targetMs = new List<string> { milestoneFilter };
+                else if (!skipCfg && !string.IsNullOrWhiteSpace(setupMs))
+                {
+                    var set = new HashSet<string>(
+                        existing.Where(e => e.ProjectId.ToString() == pid && !string.IsNullOrEmpty(e.Milestone)).Select(e => e.Milestone!),
+                        StringComparer.OrdinalIgnoreCase) { setupMs! };
+                    targetMs = set.ToList();
+                }
+                scopeByProject[pid] = targetMs == null ? null : new HashSet<string>(targetMs, StringComparer.OrdinalIgnoreCase);
                 var glCfg = new GitLabConfig
                 {
                     BaseUrl = server.BaseUrl,
@@ -189,71 +216,51 @@ public static class ExportPipeline
                 };
                 using var client = new GitLabClient(glCfg);
                 var service = new ExportService(client, glCfg, config.Export);
-                Console.WriteLine($"  -- projet {pid} --");
-                // Catalogue des milestones AVANT les issues : alimente milestones.json ET sert de référence
-                // de dates au filtre « milestone de départ » ci-dessous.
-                var projMs = new List<GitLabMilestone>();
-                try { projMs = await client.GetProjectMilestonesAsync(ct); foreach (var m in projMs) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
+                Console.WriteLine($"  -- projet {pid}{(targetMs != null ? " · milestones : " + string.Join(", ", targetMs) : " · tout l'historique")} --");
+                // Catalogue des milestones AVANT les issues : alimente milestones.json.
+                try { foreach (var m in await client.GetProjectMilestonesAsync(ct)) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
-                // Milestone de DÉPART (config /setup) : les issues des milestones ANTÉRIEURES (date due/start
-                // strictement plus ancienne) sont exclues. Sans milestone, ou milestone inconnue du catalogue
-                // (pas de date comparable) → conservées.
-                Func<GitLabIssue, bool>? startFilter = null;
-                if (int.TryParse(pid, out var pidInt)
-                    && (config.Export.StartMilestones ?? new()).TryGetValue(pidInt, out var startMsTitle)
-                    && !string.IsNullOrWhiteSpace(startMsTitle)
-                    && startMsTitle != ExportConfig.SkipExtractionSentinel) // ciblage explicite d'un projet « Aucune » → sans borne
-                {
-                    var boundary = projMs.FirstOrDefault(m => string.Equals(m.Title, startMsTitle, StringComparison.OrdinalIgnoreCase));
-                    var boundaryDate = boundary?.DueDate ?? boundary?.StartDate; // ISO yyyy-MM-dd → comparaison ordinale
-                    if (!string.IsNullOrEmpty(boundaryDate))
+                // Extraction : projet entier, ou milestone par milestone (chaque IssueExport porte déjà
+                // son ProjectId — le groupement du dashboard est préservé).
+                if (targetMs == null)
+                    allIssues.AddRange(await service.BuildIssueExportsAsync(ct, onProgress, ""));
+                else
+                    foreach (var msTitle in targetMs)
                     {
-                        var msDates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var m in projMs) if (!string.IsNullOrEmpty(m.Title) && !msDates.ContainsKey(m.Title)) msDates[m.Title] = m.DueDate ?? m.StartDate;
-                        Console.WriteLine($"     départ de l'export : milestone « {startMsTitle} » (≥ {boundaryDate})");
-                        startFilter = iss =>
-                        {
-                            var t = iss.Milestone?.Title;
-                            if (string.IsNullOrEmpty(t) || string.Equals(t, startMsTitle, StringComparison.OrdinalIgnoreCase)) return true;
-                            return !(msDates.TryGetValue(t, out var d) && !string.IsNullOrEmpty(d) && string.CompareOrdinal(d, boundaryDate) < 0);
-                        };
+                        ct.ThrowIfCancellationRequested();
+                        allIssues.AddRange(await service.BuildIssueExportsAsync(ct, onProgress, msTitle));
                     }
-                    else Console.WriteLine($"     [warn] milestone de départ « {startMsTitle} » introuvable/sans date → historique complet.");
-                }
-                var issues = await service.BuildIssueExportsAsync(ct, onProgress, milestoneFilter ?? "", startFilter);
-                allIssues.AddRange(issues);  // chaque IssueExport porte déjà son ProjectId (groupement)
                 try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
             }
 
-            if (scoped || skippedPids.Count > 0)
+            // MERGE systématique avec le store : on ne remplace que la portée réellement extraite CE run
+            // (projet entier, ou milestones précises) ; tout le reste — projets sautés / hors cible,
+            // autres milestones, issues sans milestone — est conservé. Une issue re-extraite qui a changé
+            // de milestone n'est pas dupliquée (dédoublonnage par clé projet+iid, le frais gagne).
+            if (existing.Count > 0)
             {
-                // Acquisition CIBLÉE et/ou projets SAUTÉS (« Aucune ») → merge avec le store existant :
-                // on ne remplace que la portée réellement extraite ; le reste (autres projets/milestones,
-                // projets sautés) est conservé — un run global réécrivant tout les effacerait sinon.
-                var prevTxt = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "issues.json"));
-                if (prevTxt != null)
+                bool Keep(IssueExport e)
                 {
-                    var existing = JsonSerializer.Deserialize<List<IssueExport>>(prevTxt, _readJson) ?? new();
-                    bool InScope(IssueExport e) =>
-                        (projectFilter == null || e.ProjectId.ToString() == projectFilter)
-                        && (milestoneFilter == null || string.Equals(e.Milestone, milestoneFilter, StringComparison.OrdinalIgnoreCase));
-                    bool Keep(IssueExport e) => skippedPids.Contains(e.ProjectId.ToString()) || (scoped && !InScope(e));
-                    var newKeys = new HashSet<(long, long)>(allIssues.Select(e => (e.ProjectId, e.Iid)));
-                    var preserved = existing.Where(e => Keep(e) && !newKeys.Contains((e.ProjectId, e.Iid))).ToList();
-                    Console.WriteLine($"  Merge : {preserved.Count} issues conservées (hors portée / projets sautés) + {allIssues.Count} fraîchement extraites.");
-                    allIssues = preserved.Concat(allIssues).OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
+                    if (!scopeByProject.TryGetValue(e.ProjectId.ToString(), out var ms)) return true; // projet non traité ce run
+                    if (ms == null) return false;                                                     // projet entièrement ré-extrait
+                    return string.IsNullOrEmpty(e.Milestone) || !ms.Contains(e.Milestone);            // hors des milestones remplacées
                 }
-                // Catalogues labels/milestones : réinjecter l'existant (autres projets) — le frais gagne.
-                var prevLb = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "labels.json"));
-                if (prevLb != null)
-                    foreach (var l in JsonSerializer.Deserialize<List<GitLabLabel>>(prevLb, _readJson) ?? new())
-                        if (!string.IsNullOrEmpty(l.Name) && !labels.ContainsKey(l.Name)) labels[l.Name] = l;
-                var prevMs = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "milestones.json"));
-                if (prevMs != null)
-                    foreach (var m in JsonSerializer.Deserialize<List<GitLabMilestone>>(prevMs, _readJson) ?? new())
-                        if (!string.IsNullOrEmpty(m.Title) && !milestones.ContainsKey(m.Title)) milestones[m.Title] = m;
+                var newKeys = new HashSet<(long, long)>(allIssues.Select(e => (e.ProjectId, e.Iid)));
+                var preserved = existing.Where(e => Keep(e) && !newKeys.Contains((e.ProjectId, e.Iid))).ToList();
+                if (preserved.Count > 0)
+                    Console.WriteLine($"  Merge : {preserved.Count} issues conservées (hors portée / projets sautés) + {allIssues.Count} fraîchement extraites.");
+                allIssues = preserved.Concat(allIssues).OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
             }
+            // Catalogues labels/milestones : réinjecter l'existant (autres projets) — le frais gagne.
+            var prevLb = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "labels.json"));
+            if (prevLb != null)
+                foreach (var l in JsonSerializer.Deserialize<List<GitLabLabel>>(prevLb, _readJson) ?? new())
+                    if (!string.IsNullOrEmpty(l.Name) && !labels.ContainsKey(l.Name)) labels[l.Name] = l;
+            var prevMs = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "milestones.json"));
+            if (prevMs != null)
+                foreach (var m in JsonSerializer.Deserialize<List<GitLabMilestone>>(prevMs, _readJson) ?? new())
+                    if (!string.IsNullOrEmpty(m.Title) && !milestones.ContainsKey(m.Title)) milestones[m.Title] = m;
 
             // Écriture CHIFFRÉE (sous-clé du serveur) — cloisonnée sous output/<serverId>/.
             await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(serverDir, "issues.json"),

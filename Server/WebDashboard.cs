@@ -1344,7 +1344,8 @@ public sealed class WebDashboard
         ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
         // Projets importés (nom + namespace) — n'écrit que si le client les transmet (sinon préserve l'existant).
         if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
-        // v4 — milestone de DÉPART de l'export par projet : l'extraction ignore les milestones antérieures.
+        // v4 — milestone à IMPORTER par projet (périmètre de la 1re extraction — pas une borne ; les
+        // runs globaux rafraîchissent ensuite les milestones déjà importées).
         // Clés = ids de projets SÉLECTIONNÉS uniquement ; valeurs vides ignorées (= tout l'historique).
         if (b?["startMilestones"] is JsonObject smIn)
         {

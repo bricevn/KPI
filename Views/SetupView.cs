@@ -417,7 +417,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       saveImpossible:"Enregistrement impossible.", serverUnreachable:"Serveur injoignable.",
       newPhase:"Nouvelle phase", extractingShort:"Extraction…",
       searchProjects:"Rechercher un projet…", noProjMatch:"Aucun projet ne correspond à « {q} »",
-      msStart:"Milestone de départ de l’export", noProjSelected:"Aucun projet sélectionné",
+      msStart:"Milestone à importer", noProjSelected:"Aucun projet sélectionné",
       msNone:"Aucune — ne pas extraire", msAll:"Tout l’historique"
     },
     en:{
@@ -472,7 +472,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       saveImpossible:"Could not save.", serverUnreachable:"Server unreachable.",
       newPhase:"New phase", extractingShort:"Extracting…",
       searchProjects:"Search a project…", noProjMatch:"No project matches “{q}”",
-      msStart:"Export start milestone", noProjSelected:"No project selected",
+      msStart:"Milestone to import", noProjSelected:"No project selected",
       msNone:"None — do not extract", msAll:"Full history"
     },
     es:{
@@ -570,7 +570,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "Nueva fase",
       "extractingShort": "Extrayendo…",
       "searchProjects": "Buscar un proyecto…", "noProjMatch": "Ningún proyecto coincide con «{q}»",
-      "msStart": "Hito de inicio de la exportación", "noProjSelected": "Ningún proyecto seleccionado",
+      "msStart": "Hito a importar", "noProjSelected": "Ningún proyecto seleccionado",
       "msNone": "Ninguno — no extraer", "msAll": "Todo el historial",
     },
     de:{
@@ -668,7 +668,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "Neue Phase",
       "extractingShort": "Extraktion…",
       "searchProjects": "Projekt suchen…", "noProjMatch": "Kein Projekt entspricht „{q}“",
-      "msStart": "Start-Milestone des Exports", "noProjSelected": "Kein Projekt ausgewählt",
+      "msStart": "Zu importierender Milestone", "noProjSelected": "Kein Projekt ausgewählt",
       "msNone": "Keine — nicht extrahieren", "msAll": "Gesamter Verlauf",
     },
     it:{
@@ -766,7 +766,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "Nuova fase",
       "extractingShort": "Estrazione…",
       "searchProjects": "Cerca un progetto…", "noProjMatch": "Nessun progetto corrisponde a «{q}»",
-      "msStart": "Milestone di partenza dell’export", "noProjSelected": "Nessun progetto selezionato",
+      "msStart": "Milestone da importare", "noProjSelected": "Nessun progetto selezionato",
       "msNone": "Nessuna — non estrarre", "msAll": "Tutto lo storico",
     },
     pt:{
@@ -864,7 +864,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "Nova fase",
       "extractingShort": "A extrair…",
       "searchProjects": "Pesquisar um projeto…", "noProjMatch": "Nenhum projeto corresponde a «{q}»",
-      "msStart": "Milestone de início da exportação", "noProjSelected": "Nenhum projeto selecionado",
+      "msStart": "Milestone a importar", "noProjSelected": "Nenhum projeto selecionado",
       "msNone": "Nenhum — não extrair", "msAll": "Todo o histórico",
     },
     ru:{
@@ -962,7 +962,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "Новая фаза",
       "extractingShort": "Извлечение…",
       "searchProjects": "Поиск проекта…", "noProjMatch": "Ни один проект не соответствует «{q}»",
-      "msStart": "Начальная веха выгрузки", "noProjSelected": "Проект не выбран",
+      "msStart": "Веха для импорта", "noProjSelected": "Проект не выбран",
       "msNone": "Нет — не извлекать", "msAll": "Вся история",
     },
     ar:{
@@ -1060,7 +1060,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "مرحلة جديدة",
       "extractingShort": "جاري الاستخراج…",
       "searchProjects": "البحث عن مشروع…", "noProjMatch": "لا يوجد مشروع يطابق «{q}»",
-      "msStart": "إصدار بداية التصدير", "noProjSelected": "لم يتم اختيار أي مشروع",
+      "msStart": "الإصدار المراد استيراده", "noProjSelected": "لم يتم اختيار أي مشروع",
       "msNone": "لا شيء — عدم الاستخراج", "msAll": "كل السجل",
     },
     zh:{
@@ -1158,7 +1158,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "新阶段",
       "extractingShort": "提取中…",
       "searchProjects": "搜索项目…", "noProjMatch": "没有项目匹配“{q}”",
-      "msStart": "导出起始里程碑", "noProjSelected": "未选择项目",
+      "msStart": "要导入的里程碑", "noProjSelected": "未选择项目",
       "msNone": "无 — 不提取", "msAll": "全部历史",
     },
     ja:{
@@ -1256,7 +1256,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
       "newPhase": "新しいフェーズ",
       "extractingShort": "抽出中…",
       "searchProjects": "プロジェクトを検索…", "noProjMatch": "「{q}」に一致するプロジェクトはありません",
-      "msStart": "エクスポート開始マイルストーン", "noProjSelected": "プロジェクト未選択",
+      "msStart": "インポートするマイルストーン", "noProjSelected": "プロジェクト未選択",
       "msNone": "なし — 抽出しない", "msAll": "全履歴",
     },
   };
@@ -1485,8 +1485,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     }
     return h+'</div><button class="btn outline sm" style="align-self:flex-start;margin-top:12px" data-act="addteam">'+ic('plus',16)+T.newTeamName+'</button>';
   }
-  // Milestone de DÉPART de l'export pour un projet : choix explicite (y compris '' = tout
-  // l'historique et '__skip__' = ne pas extraire), sinon défaut = la plus récente.
+  // Milestone à IMPORTER pour un projet (périmètre initial, pas une borne) : choix explicite
+  // (y compris '' = tout l'historique et '__skip__' = ne pas extraire), sinon défaut = la plus récente.
   function msFor(p){var v=ST.exportMilestone[p.id];if(v!==undefined&&v!==null)return v;return (p.milestones&&p.milestones[0])||'';}
   function s4(){
     var imp=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return p.name;});
@@ -1498,12 +1498,13 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var h='<div class="recap">';
     for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
     h+='</div>';
-    // Milestone de départ de l'export, PAR PROJET sélectionné (l'extraction ignore les antérieures).
+    // Milestone à importer, PAR PROJET sélectionné (la 1re extraction n'importe qu'elle ; les autres
+    // milestones restent importables à tout moment via Options → Régénération).
     var imported=ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;});
     h+='<div class="mstones"><div class="msecthead"><span class="msectlabel">'+T.msStart+'</span></div>';
     if(!imported.length)h+='<div class="empty" style="padding:10px 16px">'+T.noProjSelected+'</div>';
     else for(var mi=0;mi<imported.length;mi++){var mp2=imported[mi];
-      // « Aucune » = ne pas extraire ce projet (sauté aux runs globaux) ; « Tout l'historique » = sans borne.
+      // « Aucune » = ne rien importer pour ce projet ; « Tout l'historique » = tout le projet.
       var opts=[['__skip__',T.msNone],['',T.msAll]].concat((mp2.milestones||[]).map(function(m){return [m,m];}));
       h+='<div class="msrow"><span class="msdot">'+ic('flag',14)+'</span><span class="msname">'+esc(mp2.name)+'</span>'+menuSel('ms:'+mp2.id,msFor(mp2),opts,null)+'</div>';}
     h+='</div>';
@@ -1623,7 +1624,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       admins:[],
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),
-      // Milestone de DÉPART de l'export par projet (l'extraction ignore les milestones antérieures).
+      // Milestone à IMPORTER par projet (périmètre de la 1re extraction — pas une borne).
       startMilestones:ST.importIds.reduce(function(o,id){var p=ST.projects.filter(function(x){return x.id===id;})[0];var m=p?msFor(p):'';if(m)o[id]=m;return o;},{}),
       // Projets importés AVEC nom + namespace (pour l'onglet Options du dashboard, qui ne peut pas dériver les noms).
       projects:ST.projects.filter(function(p){return ST.importIds.indexOf(p.id)>=0;}).map(function(p){return {id:p.id,name:p.name,group:p.groupFull||''};}),
