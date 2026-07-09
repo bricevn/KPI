@@ -653,7 +653,9 @@
 .recap-nm{width:var(--name-col, calc(30ch + 18px)); flex:none; display:flex; align-items:center; gap:8px; color:var(--ink-dim); white-space:nowrap; overflow:hidden;}
 .recap-bar{flex:1; height:9px; border-radius:5px; background:var(--panel-3); overflow:hidden;}
 .recap-bar i{display:block; height:100%; border-radius:5px;}
-.recap-v{width:34px; text-align:right; font-family:var(--disp-font,'Space Grotesk'),sans-serif; font-weight:700;}
+/* --val-col : largeur de la colonne valeur, CONSTANTE sur toutes les lignes (posée par la carte
+   selon sa valeur la plus longue) — la barre (flex:1) reste alignée | nom | barre | valeur |. */
+.recap-v{width:var(--val-col, 34px); flex:none; text-align:right; white-space:nowrap; font-family:var(--disp-font,'Space Grotesk'),sans-serif; font-weight:700;}
 .drill-list .arow{border-radius:10px;}
 .drill-list .arow:hover{background:var(--panel-2);}
 .drill-group + .drill-group{margin-top:18px;}
