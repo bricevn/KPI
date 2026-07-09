@@ -501,6 +501,8 @@ ${tag(js)}
     }
     return (
       <Modal title={title} subtitle={subtitle} headline={headline} onClose={onClose} wide layout={layout}>
+        {/* carte « temps passé par type » TOUT EN HAUT du drill cycle (demande explicite) */}
+        {mode === 'cycle' && issues && issues.length > 0 && <CycleTypeRecap issues={issues} cyc={cyc} />}
         {mode === 'cycle' && cycSummary &&
         <div className="cycstat">
             <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{cycSummary.avg.toFixed(1)} j</span><span className="cl">moyenne</span></div>
@@ -508,7 +510,6 @@ ${tag(js)}
             <div className="cycstat-item"><span className="cv">{cycSummary.min.toFixed(1)} j</span><span className="cl">le plus court</span></div>
             <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max.toFixed(1)} j</span><span className="cl">le plus long</span></div>
           </div>}
-        {mode === 'cycle' && issues && issues.length > 0 && <CycleTypeRecap issues={issues} cyc={cyc} />}
         {groups ?
         groups.map((g, i) =>
         <div key={i} className="drill-group">
