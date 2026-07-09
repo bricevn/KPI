@@ -472,11 +472,12 @@ ${tag(js)}
     const max = Math.max(...rows.map((r) => r.avg), 0.1);
     // Valeurs pré-formatées → largeur de colonne CONSTANTE (--val-col, sur la plus longue) :
     // l'alignement | type | barre flexible | temps | est identique sur toutes les lignes.
-    rows.forEach((r) => {r.val = window.fmt1(r.avg) + ' ' + window.t('unit_day') + ' · ' + r.n;});
+    // UNIQUEMENT le temps (pas de compteur d'issues — demande explicite).
+    rows.forEach((r) => {r.val = window.fmt1(r.avg) + ' ' + window.t('unit_day');});
     const valCol = 'calc(' + Math.max(...rows.map((r) => r.val.length)) + 'ch)';
     return (
       <div className="recap" style={{ '--name-col': 'calc(' + Math.min(30, Math.max(0, ...rows.map((r) => (r.name || '').length))) + 'ch + 18px)', '--val-col': valCol }}>
-        <div className="recap-h">{window.t('drill.timeByType')}<span className="recap-tot">{issues.length} {window.t('issues')}</span></div>
+        <div className="recap-h">{window.t('drill.timeByType')}</div>
         {rows.map((r) =>
         <div key={r.key} className="recap-row">
             <span className="recap-nm"><span className="dot" style={{ background: window.typeColor(r.key) }}></span>{r.name}</span>
