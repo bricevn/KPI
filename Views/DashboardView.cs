@@ -146,12 +146,17 @@ public sealed class DashboardView
             // « none » est exclu : ce n'est pas une période mais le marqueur « non suivi » de labelPhases.
             periods = (periods ?? Array.Empty<PeriodDefinition>())
                     .Where(p => !string.IsNullOrEmpty(p.Key) && !string.Equals(p.Key, "none", StringComparison.OrdinalIgnoreCase))
-                    .Select(p => new PeriodPayload
+                    .Select(p =>
                     {
-                        key = p.Key,
-                        name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name,        // jamais de libellé vide
-                        color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, // jamais de couleur vide
-                        timed = p.Timed,
+                        var role = NormRole(p); // WebDashboard migre déjà les rôles ; repli léger ici pour /ref
+                        return new PeriodPayload
+                        {
+                            key = p.Key,
+                            name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name,        // jamais de libellé vide
+                            color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, // jamais de couleur vide
+                            role = role,
+                            timed = role != "nogc",                                            // dérivé de role (rétro-compat lecteurs pas encore migrés)
+                        };
                     })
                     .ToList(),
             issues = exports.Select(ToPayload).ToList(),
@@ -301,7 +306,17 @@ public sealed class DashboardView
         public string key { get; set; } = "";
         public string name { get; set; } = "";
         public string color { get; set; } = "";
+        public string role { get; set; } = "active"; // "active" | "wait" | "nogc"
         public bool timed { get; set; }
+    }
+
+    // Rôle normalisé d'une période, avec repli léger (rétro-compat /ref & données démo sans role) :
+    // role valide → tel quel ; sinon Timed → "active", non chronométré → "nogc". La migration COMPLÈTE
+    // (distinction active/wait depuis EffectivePhases) est faite en amont par WebDashboard.
+    private static string NormRole(PeriodDefinition p)
+    {
+        var r = (p.Role ?? "").Trim().ToLowerInvariant();
+        return (r == "active" || r == "wait" || r == "nogc") ? r : (p.Timed ? "active" : "nogc");
     }
 
     private sealed class LabelColorPayload

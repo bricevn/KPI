@@ -24,8 +24,12 @@ window.buildAPP = function (D) {
   // Catalogue des périodes (Export.Periods, payload window.__DATA__.periods). Source de vérité des
   // noms/couleurs/flag timed. Repli sur les phases standard si non configuré (rétro-compat).
   var PERIODS = (D.periods || []).filter(function (p) { return p && p.key; });
+  // TIMED = phases chronométrées. Piste 2 : dérivé de p.role (!== 'nogc') ; rétro-compat sur p.timed si role absent.
   var TIMED = {};
-  if (PERIODS.length) PERIODS.forEach(function (p) { if (p.timed) TIMED[p.key] = 1; });
+  if (PERIODS.length) PERIODS.forEach(function (p) {
+    var timed = p.role ? (p.role !== 'nogc') : (p.timed !== false);
+    if (timed) TIMED[p.key] = 1;
+  });
   else TIMED = { dev: 1, review: 1, qawait: 1, qa: 1, tofix: 1, po: 1 };
   // Clés de phase chronométrées, dans l'ordre admin — pilotent durées, colonnes pivot, moyennes.
   var PHASE_KEYS = Object.keys(TIMED);
@@ -50,10 +54,11 @@ window.buildAPP = function (D) {
   var MIN_SEG_MS = Math.max(0, +WT.minPhaseMinutes || 0) * 60000;
   var HOURS_PER_DAY_MS = (W_END - W_START) * 3600000;
   // Phases de « travail actif » (temps EFFECTIF = somme ouvrée de ces phases, hors attentes).
-  // Configurable dans Options → Calcul du temps (WT.effectivePhases). Repli : dev/review/qa/tofix.
+  // Piste 2 : dérivé des périodes role === 'active' (rétro-compat : role absent → 'active' si chronométrée).
+  // WT.effectivePhases n'est plus lu (l'appartenance vit désormais sur la période).
   var EFF_SET = {};
-  ((WT.effectivePhases && WT.effectivePhases.length) ? WT.effectivePhases : ['dev', 'review', 'qa', 'tofix'])
-    .forEach(function (k) { EFF_SET[k] = 1; });
+  if (PERIODS.length) PERIODS.forEach(function (p) { if ((p.role || (p.timed === false ? 'nogc' : 'active')) === 'active') EFF_SET[p.key] = 1; });
+  else ['dev', 'review', 'qa', 'tofix'].forEach(function (k) { EFF_SET[k] = 1; });
   var isoOf = function (d) { var p = function (n) { return ('0' + n).slice(-2); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
   function workingMs(s, e) {
     if (!(e > s)) return 0;

@@ -1623,7 +1623,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   }
   function save(){
     ST.saving=true;ST.saveErr='';render();
-    function perPayload(arr){return arr.map(function(p){return {key:p.id,name:p.name,color:p.color,timed:p.id!=='uiux'};});}
+    function perPayload(arr){return arr.map(function(p){return {key:p.id,name:p.name,color:p.color,role:p.id==='uiux'?'nogc':'active',timed:p.id!=='uiux'};});}
     var payload={baseUrl:conn().baseUrl,token:conn().token,selfSigned:ST.selfSigned,timeout:conn().timeout,
       admins:[],
       projectIds:ST.importIds,labelPhases:ST.labelPhase,periods:perPayload(ST.phases),

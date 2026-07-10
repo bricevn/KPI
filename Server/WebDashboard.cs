@@ -1043,14 +1043,6 @@ public sealed class WebDashboard
                 return Results.Json(new { ok = false, error = $"Jour férié invalide : « {s} » (format aaaa-mm-jj)." });
             if (seenH.Add(s)) holidays.Add(s);
         }
-        // Phases de travail actif (clés de phase) → somme ouvrée = temps effectif. Dédoublonnées, ordre préservé.
-        var effPhases = new JsonArray();
-        var seenP = new HashSet<string>();
-        foreach (var p in (b?["effectivePhases"] as JsonArray) ?? new JsonArray())
-        {
-            var s = (p?.GetValue<string>() ?? "").Trim();
-            if (s.Length > 0 && seenP.Add(s)) effPhases.Add(s);
-        }
 
         JsonObject root;
         try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
@@ -1061,7 +1053,6 @@ public sealed class WebDashboard
         ex["WorkingDaysOnly"] = daysOnly;
         ex["Holidays"] = holidays;
         ex["MinPhaseMinutes"] = noise;
-        ex["EffectivePhases"] = effPhases;
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try { await WriteFileAtomicAsync(RuntimeConfigPath(), outText); }
         catch (Exception e) { Console.Error.WriteLine("SaveWorkTime KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
@@ -1069,6 +1060,18 @@ public sealed class WebDashboard
         try { _config = BuildConfig(); _payloadCache.Clear(); }
         catch (Exception e) { Console.Error.WriteLine("SaveWorkTime reload KO : " + e); }
         return Results.Json(new { ok = true });
+    }
+
+    // Rôle d'une période à l'écriture (Piste 2) : lit `role` (active|wait|nogc) ; repli sur `timed` si un
+    // vieux client ne l'envoie pas encore (timed:true → active, timed:false → nogc). Le `Timed` persisté
+    // en est dérivé (Role != "nogc").
+    private static string PeriodRole(JsonObject po)
+    {
+        static string? S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+        var r = (S(po["role"]) ?? "").Trim().ToLowerInvariant();
+        if (r == "active" || r == "wait" || r == "nogc") return r;
+        var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
+        return timed ? "active" : "nogc";
     }
 
     // POST /api/options → sauvegarde des sections Export (projets/phases/labels/équipes, global + par projet) ET
@@ -1094,8 +1097,8 @@ public sealed class WebDashboard
             if (string.IsNullOrEmpty(key) || key == "none" || !validKeys.Add(key)) continue;
             var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
             var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-            var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
-            periodsArr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+            var role = PeriodRole(po);
+            periodsArr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
         }
         var trackedLabels = new List<string>();
         var labelPhases = new Dictionary<string, string>();
@@ -1145,8 +1148,8 @@ public sealed class WebDashboard
                     if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
                     var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
                     var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-                    var timed = po["timed"] is JsonValue ptv && ptv.TryGetValue<bool>(out var ptb) ? ptb : true;
-                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+                    var role = PeriodRole(po);
+                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
                 }
                 outPbp[kv.Key] = arr;
             }
@@ -1316,13 +1319,14 @@ public sealed class WebDashboard
             if (string.IsNullOrEmpty(name)) name = key;                       // « » → repli sur la clé
             var color = (Str(po["color"]) ?? "").Trim();
             if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc"; // hex strict, sinon défaut
-            var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
+            var role = PeriodRole(po);
             periodsArr.Add(new JsonObject
             {
                 ["Key"]   = key,
                 ["Name"]  = name,
                 ["Color"] = color,
-                ["Timed"] = timed,
+                ["Role"]  = role,
+                ["Timed"] = role != "nogc",
             });
         }
 
@@ -1437,8 +1441,8 @@ public sealed class WebDashboard
                     if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
                     var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
                     var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-                    var timed = po["timed"] is JsonValue ptv && ptv.TryGetValue<bool>(out var ptb) ? ptb : true;
-                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Timed"] = timed });
+                    var role = PeriodRole(po);
+                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
                 }
                 outPbp[kv.Key] = arr;
             }
@@ -1858,7 +1862,18 @@ public sealed class WebDashboard
         string ProjName(int id, string? saved) =>
             !string.IsNullOrWhiteSpace(saved) ? saved! : (nameById.TryGetValue(id, out var n) ? n : "#" + id);
         static bool RealPeriod(PeriodDefinition p) => !string.IsNullOrEmpty(p.Key) && !string.Equals(p.Key, "none", StringComparison.OrdinalIgnoreCase);
-        static object PeriodObj(PeriodDefinition p) => new { key = p.Key, name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name, color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, timed = p.Timed };
+        // Migration Piste 2 : rôle depuis Role si présent, sinon dérivé de Timed + EffectivePhases (repli dev/review/qa/tofix).
+        var effActive = (cfg.Export.EffectivePhases is { Count: > 0 }) ? cfg.Export.EffectivePhases : new List<string> { "dev", "review", "qa", "tofix" };
+        var effSet = new HashSet<string>(effActive, StringComparer.OrdinalIgnoreCase);
+        string RoleOf(PeriodDefinition p)
+        {
+            var r = (p.Role ?? "").Trim().ToLowerInvariant();
+            if (r == "active" || r == "wait" || r == "nogc") return r;
+            return !p.Timed ? "nogc" : (effSet.Contains(p.Key) ? "active" : "wait");
+        }
+        PeriodDefinition WithRole(PeriodDefinition p) { var role = RoleOf(p); return new PeriodDefinition { Key = p.Key, Name = p.Name, Color = p.Color, Role = role, Timed = role != "nogc" }; }
+        object PeriodObj(PeriodDefinition p) { var role = RoleOf(p); return new { key = p.Key, name = string.IsNullOrWhiteSpace(p.Name) ? p.Key : p.Name, color = string.IsNullOrWhiteSpace(p.Color) ? "#cccccc" : p.Color, role, timed = role != "nogc" }; }
+        var rolePeriods = (cfg.Export.Periods ?? new()).Select(WithRole).ToList();
         List<object> setupProjects = (cfg.Export.Projects is { Count: > 0 })
             ? cfg.Export.Projects.Select(p => (object)new { id = p.Id, name = ProjName(p.Id, p.Name), group = p.Group ?? "", imported = true }).ToList()
             : (cfg.Export.ProjectIds ?? new()).Select(id => (object)new { id, name = ProjName(id, null), group = "", imported = true }).ToList();
@@ -1883,9 +1898,9 @@ public sealed class WebDashboard
             // ?? new() : même garde que le bloc setup ci-dessus — un JSON édité à la main peut rendre
             // ces propriétés réellement nulles malgré l'annotation (et le ?? voisin fait considérer au
             // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
-            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), cfg.Export.Periods ?? new(),
+            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), rolePeriods,
             labels, milestones, lastExtracted, setup,
-            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes, effectivePhases = cfg.Export.EffectivePhases ?? new() });
+            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes });
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }

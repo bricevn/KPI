@@ -267,8 +267,10 @@ public sealed class ExportConfig
     /// <summary>Anti-bruit : les segments de phase plus courts que ce seuil (minutes, temps réel) sont
     /// ignorés dans les durées — élimine les poses/retraits de label accidentels. 0 = désactivé.</summary>
     public int MinPhaseMinutes { get; set; } = 0;
-    /// <summary>Phases de « travail actif » (clés de phase) dont la SOMME ouvrée forme le « temps effectif »
-    /// (hors attentes). Vide ⇒ repli mapper : dev/review/qa/tofix. Pas de « : » ⇒ Bind sûr.</summary>
+    /// <summary>OBSOLÈTE (Piste 2) : l'appartenance au « travail actif » est désormais portée par
+    /// <see cref="PeriodDefinition.Role"/> (= "active"). Conservé UNIQUEMENT en lecture pour migrer les
+    /// vieilles configs (période sans Role → Role dérivé de Timed + cette liste). Plus jamais écrit.
+    /// Repli si vide : dev/review/qa/tofix. Pas de « : » ⇒ Bind sûr.</summary>
     public List<string> EffectivePhases { get; set; } = new();
 }
 
@@ -294,8 +296,14 @@ public sealed class PeriodDefinition
     public string Name { get; set; } = "";
     /// <summary>Couleur hex (#RRGGBB).</summary>
     public string Color { get; set; } = "";
-    /// <summary>Si true, la période est chronométrée (compte dans les durées). Ex. uiux=false (segment Gantt seul).</summary>
+    /// <summary>Si true, la période est chronométrée (compte dans les durées). Ex. uiux=false (segment Gantt seul).
+    /// DÉRIVÉ de <see cref="Role"/> à l'écriture (<c>Role != "nogc"</c>) ; conservé en lecture pour la migration.</summary>
     public bool Timed { get; set; } = true;
+    /// <summary>Rôle de la phase (Piste 2, remplace Timed + EffectivePhases) :
+    /// <c>"active"</c> = chronométrée ET comptée dans le temps effectif ; <c>"wait"</c> = chronométrée mais
+    /// exclue (attente) ; <c>"nogc"</c> = non chronométrée (segment Gantt seul).
+    /// Vide ⇒ à migrer depuis Timed + <see cref="ExportConfig.EffectivePhases"/> au chargement.</summary>
+    public string Role { get; set; } = "";
 }
 
 public sealed class LabelTransitionConfig

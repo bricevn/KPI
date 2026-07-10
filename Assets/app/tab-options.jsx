@@ -26,9 +26,218 @@
   }
   const mapClone = (obj, fn) => { const o = {}; Object.keys(obj || {}).forEach((k) => { o[k] = fn(obj[k]); }); return o; };
   const sameSet = (a, b) => a.length === b.length && a.slice().sort().join(',') === b.slice().sort().join(',');
-  const clonePhases = (arr) => (arr || []).map((p) => ({ key: p.key, name: p.name, color: p.color, timed: p.timed !== false }));
+  const clonePhases = (arr) => (arr || []).map((p) => { const role = p.role || (p.timed === false ? 'nogc' : 'active'); return { key: p.key, name: p.name, color: p.color, role: role, timed: role !== 'nogc' }; });
   const cloneTeams = (arr) => (arr || []).map((t) => ({ name: t.name, members: (t.members || []).slice(), lead: (t.members || [])[0] || null }));
   const orderTeam = (t) => ({ name: t.name, members: t.lead ? [t.lead].concat((t.members || []).filter((m) => m !== t.lead)) : (t.members || []).slice() });
+
+  // ===================== JOURS FÉRIÉS AUTOMATIQUES (langue → pays par défaut) =====================
+  // Génère une ESTIMATION éditable des fériés d'un pays sur les années couvertes par les données, 100 %
+  // côté client (aucun appel externe) : dates fixes + fêtes mobiles pascales (Meeus) + n-ième jour de
+  // semaine + équinoxes (Japon). Les fêtes LUNAIRES (islamiques, chinoises) ne se calculent pas
+  // simplement → laissées à la saisie manuelle (cf. note d'aide).
+  const HL = (function () {
+    const pad = (n) => ('0' + n).slice(-2);
+    const isoD = (dt) => dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+    const mk = (y, m, d, off) => { const dt = new Date(y, m - 1, d); if (off) dt.setDate(dt.getDate() + off); return dt; };
+    const fx = (y, m, d) => isoD(mk(y, m, d, 0));
+    const easter = (y) => { // Pâques grégorienne (Meeus/Jones/Butcher)
+      const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4,
+        f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+        i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, mm = Math.floor((a + 11 * h + 22 * l) / 451);
+      return { m: Math.floor((h + l - 7 * mm + 114) / 31), d: ((h + l - 7 * mm + 114) % 31) + 1 };
+    };
+    const ea = (y, off) => { const e = easter(y); return isoD(mk(y, e.m, e.d, off)); };
+    const nth = (y, m, dow, n) => { const dt = new Date(y, m - 1, 1); dt.setDate(1 + ((dow - dt.getDay() + 7) % 7) + (n - 1) * 7); return isoD(dt); };
+    const last = (y, m, dow) => { const dt = new Date(y, m, 0); dt.setDate(dt.getDate() - ((dt.getDay() - dow + 7) % 7)); return isoD(dt); };
+    const vEq = (y) => fx(y, 3, Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4))); // équinoxes JP (~1980-2099)
+    const aEq = (y) => fx(y, 9, Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4)));
+    const RULES = {
+      FR: (y) => [fx(y, 1, 1), ea(y, 1), fx(y, 5, 1), fx(y, 5, 8), ea(y, 39), ea(y, 50), fx(y, 7, 14), fx(y, 8, 15), fx(y, 11, 1), fx(y, 11, 11), fx(y, 12, 25)],
+      US: (y) => [fx(y, 1, 1), nth(y, 1, 1, 3), nth(y, 2, 1, 3), last(y, 5, 1), fx(y, 6, 19), fx(y, 7, 4), nth(y, 9, 1, 1), nth(y, 10, 1, 2), fx(y, 11, 11), nth(y, 11, 4, 4), fx(y, 12, 25)],
+      GB: (y) => [fx(y, 1, 1), ea(y, -2), ea(y, 1), nth(y, 5, 1, 1), last(y, 5, 1), last(y, 8, 1), fx(y, 12, 25), fx(y, 12, 26)],
+      ES: (y) => [fx(y, 1, 1), fx(y, 1, 6), ea(y, -2), fx(y, 5, 1), fx(y, 8, 15), fx(y, 10, 12), fx(y, 11, 1), fx(y, 12, 6), fx(y, 12, 8), fx(y, 12, 25)],
+      DE: (y) => [fx(y, 1, 1), ea(y, -2), ea(y, 1), fx(y, 5, 1), ea(y, 39), ea(y, 50), fx(y, 10, 3), fx(y, 12, 25), fx(y, 12, 26)],
+      IT: (y) => [fx(y, 1, 1), fx(y, 1, 6), ea(y, 1), fx(y, 4, 25), fx(y, 5, 1), fx(y, 6, 2), fx(y, 8, 15), fx(y, 11, 1), fx(y, 12, 8), fx(y, 12, 25), fx(y, 12, 26)],
+      PT: (y) => [fx(y, 1, 1), ea(y, -2), ea(y, 0), fx(y, 4, 25), fx(y, 5, 1), ea(y, 60), fx(y, 6, 10), fx(y, 8, 15), fx(y, 10, 5), fx(y, 11, 1), fx(y, 12, 1), fx(y, 12, 8), fx(y, 12, 25)],
+      BR: (y) => [fx(y, 1, 1), ea(y, -2), fx(y, 4, 21), fx(y, 5, 1), ea(y, 60), fx(y, 9, 7), fx(y, 10, 12), fx(y, 11, 2), fx(y, 11, 15), fx(y, 12, 25)],
+      RU: (y) => [fx(y, 1, 1), fx(y, 1, 2), fx(y, 1, 3), fx(y, 1, 4), fx(y, 1, 5), fx(y, 1, 6), fx(y, 1, 7), fx(y, 1, 8), fx(y, 2, 23), fx(y, 3, 8), fx(y, 5, 1), fx(y, 5, 9), fx(y, 6, 12), fx(y, 11, 4)],
+      JP: (y) => [fx(y, 1, 1), nth(y, 1, 1, 2), fx(y, 2, 11), fx(y, 2, 23), vEq(y), fx(y, 4, 29), fx(y, 5, 3), fx(y, 5, 4), fx(y, 5, 5), nth(y, 7, 1, 3), fx(y, 8, 11), nth(y, 9, 1, 3), aEq(y), nth(y, 10, 1, 2), fx(y, 11, 3), fx(y, 11, 23)],
+      CN: (y) => [fx(y, 1, 1), fx(y, 5, 1), fx(y, 10, 1), fx(y, 10, 2), fx(y, 10, 3)], // fériés fixes seulement (lunaires manuels)
+      SA: (y) => [fx(y, 2, 22), fx(y, 9, 23)] // fériés civils fixes (Aïd = lunaire, manuel)
+    };
+    const LANG = { fr: 'FR', en: 'US', es: 'ES', de: 'DE', it: 'IT', pt: 'PT', ru: 'RU', ar: 'SA', zh: 'CN', ja: 'JP' };
+    const NAMES = [['FR', 'France'], ['US', 'United States'], ['GB', 'United Kingdom'], ['ES', 'Spain'], ['DE', 'Germany'], ['IT', 'Italy'], ['PT', 'Portugal'], ['BR', 'Brazil'], ['RU', 'Russia'], ['JP', 'Japan'], ['CN', 'China'], ['SA', 'Saudi Arabia']];
+    // pays sans fêtes lunaires calculables → l'estimation est partielle (note renforcée).
+    const LUNAR = { CN: 1, SA: 1 };
+    return {
+      countries: NAMES,
+      defaultFor: (lang) => LANG[lang] || 'FR',
+      partial: (country) => !!LUNAR[country],
+      generate: (country, years) => {
+        const fn = RULES[country] || RULES.FR, set = {};
+        years.forEach((y) => fn(y).forEach((iso) => { set[iso] = 1; }));
+        return Object.keys(set).sort();
+      }
+    };
+  })();
+
+  // ===================== A3 — ÉDITEUR DE PHASES GROUPÉ (drag entre Travail actif / Attentes / Hors chrono) =====================
+  // phases : [{ key, name, color, role }] — role ∈ 'active' | 'wait' | 'nogc'. Glisser une phase écrit son role.
+  function PhasesGroupEditor({ phases, setPhases }) {
+    const [openColor, setOpenColor] = useState(null);
+    const [dragKey, setDragKey] = useState(null);
+    const [over, setOver] = useState(null);
+
+    // Rétro-compat : si `role` absent (vieille config non migrée), le déduire de `timed`.
+    const roleOf = (p) => p.role || (p.timed === false ? 'nogc' : 'active');
+
+    const GROUPS = [
+      ['active', 'opt.groupActive', 'opt.groupActiveSub', '#27e07a'],
+      ['wait',   'opt.groupWait',   'opt.groupWaitSub',   '#e0a93b'],
+      ['nogc',   'opt.groupNogc',   'opt.groupNogcSub',   '#5f6b7a'],
+    ];
+
+    const move    = (key, role) => setPhases((ps) => ps.map((p) => p.key === key ? Object.assign({}, p, { role, timed: role !== 'nogc' }) : p));
+    const rename  = (key, name) => setPhases((ps) => ps.map((p) => p.key === key ? Object.assign({}, p, { name }) : p));
+    const recolor = (key, color) => { setPhases((ps) => ps.map((p) => p.key === key ? Object.assign({}, p, { color }) : p)); setOpenColor(null); };
+    const remove  = (key) => setPhases((ps) => ps.filter((p) => p.key !== key));
+    const add     = () => setPhases((ps) => ps.concat([{ key: 'ph' + Date.now().toString(36), name: window.t('opt.newPhase'), color: PALETTE[ps.length % PALETTE.length], role: 'active', timed: true }]));
+
+    const activeN = phases.filter((p) => roleOf(p) === 'active').length;
+
+    const Row = (p) => (
+      <div className="opt-phrow" key={p.key} draggable
+        onDragStart={() => setDragKey(p.key)} onDragEnd={() => { setDragKey(null); setOver(null); }}
+        style={dragKey === p.key ? { opacity: .4 } : undefined}>
+        <span className="opt-grip" aria-hidden="true">⠿</span>
+        <div className="opt-swatchwrap">
+          <button className="opt-swatch" style={{ background: p.color }} onClick={() => setOpenColor(openColor === p.key ? null : p.key)} title={window.t('opt.accent')}></button>
+          {openColor === p.key &&
+          <div className="opt-pop">
+            {PALETTE.map((c) => <button key={c} className={'opt-pc' + (c === p.color ? ' on' : '')} style={{ background: c }} onClick={() => recolor(p.key, c)}></button>)}
+          </div>}
+        </div>
+        <input className="opt-phname" value={p.name} onChange={(e) => rename(p.key, e.target.value)} />
+        <button className="opt-phx" onClick={() => remove(p.key)} title="×">×</button>
+      </div>
+    );
+
+    return (
+      <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+        <div className="lbl">{window.t('opt.prodPhases')}<span>{window.t('opt.phasesGroupNote')}</span></div>
+
+        {GROUPS.map(([id, tKey, subKey, dot]) => {
+          const list = phases.filter((p) => roleOf(p) === id);
+          return (
+            <div className="opt-phgroup" key={id}>
+              <div className="opt-phghead">
+                <span className="opt-phgdot" style={{ background: dot }}></span>
+                <span className="opt-phgt">{window.t(tKey)}</span>
+                <span className="opt-phgc">{list.length} · {window.t(subKey)}</span>
+              </div>
+              <div className={'opt-phdrop' + (over === id ? ' over' : '') + (list.length ? '' : ' empty')}
+                data-empty={window.t('opt.dropPhaseHere')}
+                onDragOver={(e) => { e.preventDefault(); if (over !== id) setOver(id); }}
+                onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }}
+                onDrop={() => { if (dragKey) move(dragKey, id); setOver(null); setDragKey(null); }}>
+                {list.map(Row)}
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={add}>+ {window.t('opt.addPhase')}</button>
+
+        <div className="opt-eff">
+          <span className="opt-eff-n">{activeN}</span>
+          <span className="opt-eff-t">{window.t('opt.effSummary')}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ===================== B3 — JOURS FÉRIÉS EN APERÇU CALENDRIER (clic pour basculer) =====================
+  // value : tableau d'ISO (aaaa-mm-jj). Le pays + « Générer » vivent ici (helper HL partagé).
+  function HolidaysCalendar({ value, onChange, lang }) {
+    const L = lang || window.__LANG__ || 'fr';
+    const [country, setCountry] = useState(() => HL.defaultFor(L));
+    const set = new Set(value || []);
+    const yearsInData = (value || []).map((d) => +String(d).slice(0, 4)).filter(Boolean);
+    const [year, setYear] = useState(() => yearsInData.length ? Math.min.apply(null, yearsInData) : new Date().getFullYear());
+
+    const pad = (n) => ('0' + n).slice(-2);
+    const iso = (y, m, d) => y + '-' + pad(m + 1) + '-' + pad(d);
+    const toggle = (id) => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); onChange(Array.from(n).sort()); };
+
+    // « Générer » : mêmes années couvertes par l'activité que l'ancien genHolidays.
+    const generate = () => {
+      let min = Infinity, max = -Infinity;
+      ((window.__DATA__ || {}).issues || []).forEach((is) => {
+        (is.labelEvents || []).forEach((e) => { const y = new Date(e.at).getFullYear(); if (y) { if (y < min) min = y; if (y > max) max = y; } });
+        [is.closedAt, is.createdAt].forEach((s) => { if (s) { const y = new Date(s).getFullYear(); if (y) { if (y < min) min = y; if (y > max) max = y; } } });
+      });
+      const now = new Date().getFullYear();
+      if (!isFinite(min)) { min = now - 2; max = now + 1; }
+      if (max < now) max = now;
+      if (max - min > 15) min = max - 15;
+      const years = []; for (let y = min; y <= max; y++) years.push(y);
+      onChange(HL.generate(country, years));
+      setYear(min);
+    };
+
+    const monthName = (m) => new Date(year, m, 1).toLocaleDateString(L, { month: 'long' });
+    const dowLetters = []; // 2024-01-01 est un lundi → semaine lundi-first, localisée
+    for (let i = 0; i < 7; i++) dowLetters.push(new Date(2024, 0, 1 + i).toLocaleDateString(L, { weekday: 'narrow' }));
+
+    const Month = (m) => {
+      const startDow = (new Date(year, m, 1).getDay() + 6) % 7; // lundi = 0
+      const days = new Date(year, m + 1, 0).getDate();
+      const cells = [];
+      for (let i = 0; i < startDow; i++) cells.push(<span className="opt-cald mut" key={'p' + i}></span>);
+      for (let d = 1; d <= days; d++) {
+        const id = iso(year, m, d);
+        const dow = new Date(year, m, d).getDay();
+        const we = dow === 0 || dow === 6;
+        cells.push(<span key={d} className={'opt-cald day' + (set.has(id) ? ' hol' : (we ? ' we' : ''))} onClick={() => toggle(id)} title={id}>{d}</span>);
+      }
+      return (
+        <div className="opt-calm" key={m}>
+          <div className="opt-calmh">{monthName(m)}</div>
+          <div className="opt-caldays">
+            {dowLetters.map((x, i) => <span key={'h' + i} className="opt-cald hdr">{x}</span>)}
+            {cells}
+          </div>
+        </div>
+      );
+    };
+
+    const countYear = (value || []).filter((d) => String(d).slice(0, 4) === String(year)).length;
+    const calSel = { border: '1px solid var(--line)', borderRadius: 9, background: 'var(--panel-2)', color: 'var(--ink)', padding: '9px 12px', font: '13px system-ui' };
+
+    return (
+      <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+        <div className="lbl">{window.t('opt.holidays')}<span>{window.t('opt.holidaysSub')}</span></div>
+
+        <div className="opt-holbar">
+          <select aria-label={window.t('opt.holidaysGen')} style={calSel} value={country} onChange={(e) => setCountry(e.target.value)}>
+            {HL.countries.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+          </select>
+          <button className="btn btn-sm" type="button" onClick={generate}>{window.ICONS.refresh} {window.t('opt.holidaysGen')}</button>
+          <span className="opt-yrnav">
+            <button type="button" onClick={() => setYear((y) => y - 1)} title="−1">‹</button>
+            <span className="y">{year}</span>
+            <button type="button" onClick={() => setYear((y) => y + 1)} title="+1">›</button>
+          </span>
+          <span className="opt-holcount">{countYear} · {year}</span>
+        </div>
+
+        <div className="opt-calgrid">{[0,1,2,3,4,5,6,7,8,9,10,11].map((m) => Month(m))}</div>
+
+        <div className="opt-callegend"><span className="sw"></span> {window.t('opt.holidaysLegend')}</div>
+        <span className="muted" style={{ fontSize: 11, lineHeight: 1.5 }}>{window.t(HL.partial(country) ? 'opt.holidaysHintLunar' : 'opt.holidaysHint')}</span>
+      </div>
+    );
+  }
 
   function Toggle({ on, onClick }) {
     return <button onClick={onClick} style={{ width: 42, height: 24, borderRadius: 999, border: 0, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--panel-3)', position: 'relative', transition: 'background .15s' }}>
@@ -137,7 +346,6 @@
     const [assocProjects, setAssocProjects] = useState((S.projects || []).map((p) => p.name));
     const [teamProjects, setTeamProjects] = useState((S.projects || []).map((p) => p.name));
     const [labelsCache, setLabelsCache] = useState({});
-    const [openColor, setOpenColor] = useState(null);
     const [saving, setSaving] = useState('idle'); // idle | busy | done | err
     const [err, setErr] = useState('');
 
@@ -200,18 +408,14 @@
       else setTeamsByProj((prev) => { const base = prev[teamKey] !== undefined ? prev[teamKey] : cloneTeams(teamsGlobal); return Object.assign({}, prev, { [teamKey]: updater(base) }); });
     };
 
-    // ---- phases (globales) ----
-    const addPhase = () => setPhases((ps) => ps.concat([{ key: 'ph' + Date.now().toString(36), name: window.t('opt.newPhase'), color: PALETTE[ps.length % PALETTE.length], timed: true }]));
-    const removePhase = (key) => { setPhases((ps) => ps.filter((p) => p.key !== key)); setLpGlobal((m) => { const n = {}; Object.keys(m).forEach((l) => { n[l] = m[l] === key ? 'none' : m[l]; }); return n; }); };
-    const renamePhase = (key, name) => setPhases((ps) => ps.map((p) => p.key === key ? Object.assign({}, p, { name }) : p));
-    const recolorPhase = (key, color) => { setPhases((ps) => ps.map((p) => p.key === key ? Object.assign({}, p, { color }) : p)); setOpenColor(null); };
+    // ---- phases (globales) : édition déléguée à <PhasesGroupEditor> ; phaseColorOf sert encore à l'association labels. ----
     const phaseColorOf = (key) => key === 'none' ? '#5f6b7a' : ((phases.find((p) => p.key === key) || {}).color || '#5f6b7a');
 
     const filterImport = (obj) => { const o = {}; Object.keys(obj || {}).forEach((k) => { if (importIds.indexOf(+k) >= 0) o[k] = obj[k]; }); return o; };
     const payload = () => ({
       projectIds: importIds,
       projects: projList.filter((p) => importIds.indexOf(p.id) >= 0).map((p) => ({ id: p.id, name: p.name, group: p.groupFull || p.group || '' })),
-      periods: phases.map((p) => ({ key: p.key, name: p.name, color: p.color, timed: p.timed !== false })),
+      periods: phases.map((p) => ({ key: p.key, name: p.name, color: p.color, role: p.role || 'active' })),
       labelPhases: lpGlobal,
       labelPhasesByProject: filterImport(lpByProj),
       teams: teamsGlobal.map(orderTeam),
@@ -244,26 +448,8 @@
               : <span><window.MultiSelect label="" options={allNames} value={importedNames} onChange={setImportedByNames} /></span>}
         </div>
 
-        {/* ---- Phases de production (globales) ---- */}
-        <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
-          <div className="lbl">{window.t('opt.prodPhases')}<span>{window.t('opt.phasesEditNote')}</span></div>
-          <div className="opt-phases">
-            {phases.length ? phases.map((p) =>
-            <div className="opt-phrow" key={p.key}>
-              <div className="opt-swatchwrap">
-                <button className="opt-swatch" style={{ background: p.color }} onClick={() => setOpenColor(openColor === p.key ? null : p.key)} title={window.t('opt.accent')}></button>
-                {openColor === p.key &&
-                <div className="opt-pop">
-                  {PALETTE.map((c) => <button key={c} className={'opt-pc' + (c === p.color ? ' on' : '')} style={{ background: c }} onClick={() => recolorPhase(p.key, c)}></button>)}
-                </div>}
-              </div>
-              <input className="opt-phname" value={p.name} onChange={(e) => renamePhase(p.key, e.target.value)} />
-              <button className="opt-phx" onClick={() => removePhase(p.key)} title="×">×</button>
-            </div>
-            ) : <p className="opt-note">{window.t('opt.noPhases')}</p>}
-          </div>
-          <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={addPhase}>+ {window.t('opt.addPhase')}</button>
-        </div>
+        {/* ---- Phases de production (A3 : groupes glissables Travail actif / Attentes / Hors chrono) ---- */}
+        <PhasesGroupEditor phases={phases} setPhases={setPhases} />
 
         {/* ---- Association labels → phases (Prod::*, portée par projet) ---- */}
         <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
@@ -341,21 +527,14 @@
   // ===================== CALCUL DU TEMPS (admin) =====================
   // Fenêtre de temps ouvré + anti-bruit des durées de phase (cycle). Persisté via
   // POST /api/options/worktime ; le recalcul s'applique au rechargement de la page.
-  function WorkTimeEditor() {
+  function WorkTimeEditor({ lang }) {
     const W = (window.__DATA__ || {}).workTime || {};
     const [start, setStart] = useState(W.startHour != null ? W.startHour : 9);
     const [end, setEnd] = useState(W.endHour != null ? W.endHour : 19);
     const [daysOnly, setDaysOnly] = useState(W.workingDaysOnly !== false);
-    const [holidays, setHolidays] = useState((W.holidays || []).join('\n'));
+    // Jours fériés : tableau d'ISO (aaaa-mm-jj). Le pays + « Générer » + l'aperçu calendrier vivent dans <HolidaysCalendar>.
+    const [holidays, setHolidays] = useState(W.holidays || []);
     const [noise, setNoise] = useState(W.minPhaseMinutes || 0);
-    // Phases de « travail actif » (temps effectif) — cases à cocher parmi les phases chronométrées.
-    // Repli si non configuré : dev/review/qa/tofix (intersecté avec les phases qui existent réellement).
-    const allPhases = A.phases || [];
-    const [effPhases, setEffPhases] = useState(() => {
-      const cfg = (W.effectivePhases && W.effectivePhases.length) ? W.effectivePhases : ['dev', 'review', 'qa', 'tofix'];
-      return allPhases.filter((p) => cfg.indexOf(p.key) >= 0).map((p) => p.key);
-    });
-    const toggleEff = (k) => setEffPhases((s) => s.indexOf(k) >= 0 ? s.filter((x) => x !== k) : s.concat([k]));
     const [st, setSt] = useState('idle'); // idle | busy | done | err
     const [err, setErr] = useState('');
     const save = () => {
@@ -364,9 +543,8 @@
         workStartHour: parseInt(start, 10) || 0,
         workEndHour: parseInt(end, 10) || 0,
         workingDaysOnly: daysOnly,
-        holidays: String(holidays).split('\n').map((s) => s.trim()).filter(Boolean),
-        minPhaseMinutes: parseInt(noise, 10) || 0,
-        effectivePhases: effPhases
+        holidays: holidays,
+        minPhaseMinutes: parseInt(noise, 10) || 0
       };
       fetch('/api/options/worktime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then((r) => r.json()).then((j) => {if (j.ok) setSt('done');else {setSt('err');setErr(j.error || '');}})
@@ -388,25 +566,12 @@
           <div className="lbl">{window.t('opt.workDays')}<span>{window.t('opt.workDaysSub')}</span></div>
           <Toggle on={daysOnly} onClick={() => setDaysOnly((v) => !v)} />
         </div>
-        <div className="opt-row" style={{ alignItems: 'flex-start' }}>
-          <div className="lbl">{window.t('opt.holidays')}<span>{window.t('opt.holidaysSub')}</span></div>
-          <textarea style={Object.assign({}, selStyle, { width: 220, height: 92, resize: 'vertical', fontFamily: 'var(--mono, monospace)', fontSize: 12, lineHeight: 1.6, padding: '8px 10px' })}
-          placeholder={'2026-01-01\n2026-05-01'} value={holidays} onChange={(e) => setHolidays(e.target.value)} />
-        </div>
         <div className="opt-row">
           <div className="lbl">{window.t('opt.noise')}<span>{window.t('opt.noiseSub')}</span></div>
           <input style={numStyle} type="number" min="0" max="1440" value={noise} onChange={(e) => setNoise(e.target.value)} />
           <span className="muted">min</span>
         </div>
-        <div className="opt-row" style={{ alignItems: 'flex-start' }}>
-          <div className="lbl">{window.t('opt.effectivePhases')}<span>{window.t('opt.effectivePhasesSub')}</span></div>
-          {allPhases.length
-            ? <div className="checklist">
-                {allPhases.map((p) => { const on = effPhases.indexOf(p.key) >= 0; return (
-                  <label key={p.key} className={on ? 'on' : ''}><input type="checkbox" checked={on} onChange={() => toggleEff(p.key)} />{p.name}</label>); })}
-              </div>
-            : <p className="opt-note">{window.t('opt.noPhases')}</p>}
-        </div>
+        <HolidaysCalendar value={holidays} onChange={setHolidays} lang={lang} />
         <div className="opt-row">
           <div className="lbl"></div>
           <button className="btn btn-primary" disabled={st === 'busy'} onClick={save}>{window.t('opt.save')}</button>
@@ -547,7 +712,7 @@
           {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
         </div>}
 
-        {isAdmin && <WorkTimeEditor />}
+        {isAdmin && <WorkTimeEditor lang={appearance.lang} />}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
       </div>);
