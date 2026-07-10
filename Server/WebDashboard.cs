@@ -1827,7 +1827,10 @@ public sealed class WebDashboard
 
         var json = DashboardView.BuildPayloadJson(
             "", filtered.ToList(), // v2 : pas de milestone global (filtre UI) ; le payload couvre toutes les issues du périmètre
-            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases, cfg.Export.Periods,
+            // ?? new() : même garde que le bloc setup ci-dessus — un JSON édité à la main peut rendre
+            // ces propriétés réellement nulles malgré l'annotation (et le ?? voisin fait considérer au
+            // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
+            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), cfg.Export.Periods ?? new(),
             labels, milestones, lastExtracted, setup);
         _payloadCache[cacheKey] = (sig, json);
         return json;
