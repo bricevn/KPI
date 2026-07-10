@@ -512,7 +512,9 @@ ${tag(js)}
     let cycSummary = null;
     if (mode === 'cycle' && issues && issues.length) {
       const ds = issues.map(cyc).sort((a, b) => a - b);
-      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: ds[Math.floor(ds.length / 2)], avg: ds.reduce((s, x) => s + x, 0) / ds.length };
+      // P50 = médiane ; P85 = 85 % des issues en dessous (rang le plus proche) — robustes aux extrêmes.
+      const pctl = (p) => ds[Math.min(ds.length - 1, Math.max(0, Math.ceil(p / 100 * ds.length) - 1))];
+      cycSummary = { min: ds[0], max: ds[ds.length - 1], med: pctl(50), p85: pctl(85), avg: ds.reduce((s, x) => s + x, 0) / ds.length };
     }
     return (
       <Modal title={title} subtitle={subtitle} headline={headline} onClose={onClose} wide layout={layout}>
@@ -521,7 +523,8 @@ ${tag(js)}
         {mode === 'cycle' && cycSummary &&
         <div className="cycstat">
             <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.avg) }}>{cycSummary.avg.toFixed(1)} j</span><span className="cl">moyenne</span></div>
-            <div className="cycstat-item"><span className="cv">{cycSummary.med.toFixed(1)} j</span><span className="cl">médiane</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.med.toFixed(1)} j</span><span className="cl">P50 (médiane)</span></div>
+            <div className="cycstat-item"><span className="cv">{cycSummary.p85.toFixed(1)} j</span><span className="cl">P85</span></div>
             <div className="cycstat-item"><span className="cv">{cycSummary.min.toFixed(1)} j</span><span className="cl">le plus court</span></div>
             <div className="cycstat-item"><span className="cv" style={{ color: cycleTone(cycSummary.max) }}>{cycSummary.max.toFixed(1)} j</span><span className="cl">le plus long</span></div>
           </div>}

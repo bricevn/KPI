@@ -28,7 +28,9 @@
     const phaseTotal = A.phaseAvg.reduce((s, p) => s + p.days, 0);
     // moyennes de phase indexées par key (pour la ligne Total) + max pour l'échelle des barres.
     const pa = {}; A.phaseAvg.forEach((p) => { pa[p.key] = p.days; });
-    const phaseMax = Math.max(1, ...A.phaseAvg.map((p) => p.days));
+    // sous-vue de « Temps moyen par phase » : work (travaillé) | span (traversée) | ratio.
+    const [phView, setPhView] = useState('work');
+    const phVMax = Math.max(0.1, ...A.phaseAvg.map((p) => phView === 'span' ? p.span : p.days));
     // tendance RÉELLE du cycle : moyenne du temps de cycle (_times.total) des issues regroupées
     // par jour de complétion (d.end) en 6 tranches sur la fenêtre. Delta = dernière vs première tranche non vide.
     const cycleTrend = (function () {
@@ -73,6 +75,7 @@
             onClick={() => setDrill({ title: t('dash.approvals'), headline: K.approvals.pct + '%', subtitle: t('dash.subApprovals', { done: K.approvals.with, notDone: K.approvals.total - K.approvals.with }), issues: approved, recap: 'issues' })} />
           <Kard chip={window.ICONS.clock} chipBg="var(--p-qawait)" label={t('dash.avgCycle')}
             value={K.cycle.days} suffix={t('unit_day')}
+            cap={[{ v: K.cycle.p50 + ' ' + t('unit_day'), label: 'P50', color: 'var(--p-qawait)' }, { v: K.cycle.p85 + ' ' + t('unit_day'), label: 'P85' }]}
             cue={t('dash.seeLongest')}
             onClick={() => setDrill({ title: t('dash.cycleTitle'), subtitle: t('dash.cycleSub'), issues: byCycle, recap: false, mode: 'cycle' })}
             bottom={cycleTrend.some((x) => x > 0) &&
@@ -158,20 +161,30 @@
         </div>
 
         <div className="pnl">
-          <div className="pnl-h"><h3>{t('dash.avgTimePhase')}</h3><window.InfoTip text={t('dash.avgTimePhaseTip')} /></div>
+          {/* 3 sous-vues : temps TRAVAILLÉ (fenêtre ouvrée) / temps de TRAVERSÉE (réel écoulé) /
+              RATIO d'efficience (travaillé ÷ traversée, ms bruts) — même toggle que Graphiques. */}
+          <div className="pnl-h"><h3>{t('dash.avgTimePhase')}</h3><window.InfoTip text={t('dash.avgTimePhaseTip')} />
+            <div className="g-seg" role="tablist" style={{ marginLeft: 'auto' }}>
+              {[['work', t('dash.tWorked')], ['span', t('dash.tSpan')], ['ratio', t('dash.tRatio')]].map(([k, lbl]) =>
+              <button key={k} role="tab" aria-selected={phView === k} className={phView === k ? 'on' : ''} onClick={() => setPhView(k)}>{lbl}</button>)}
+            </div>
+          </div>
           <div className="pnl-b">
             <div className="phase-grid">
-              {A.phaseAvg.map((p) =>
-              <div key={p.key} className="phase">
-                  <span className="nm">{p.name}</span>
-                  <span className="tr"><i style={{ width: Math.min(100, p.days / phaseMax * 100) + '%', background: window.phaseColor(p.key) }}></i></span>
-                  <span className="v">{p.days.toFixed(1)}{t('unit_day')}</span>
-                </div>
-              )}
+              {A.phaseAvg.map((p) => {
+                const val = phView === 'work' ? p.days : phView === 'span' ? p.span : p.ratio;
+                const barPct = phView === 'ratio' ? Math.min(100, val) : Math.min(100, val / phVMax * 100);
+                return (
+                  <div key={p.key} className="phase">
+                    <span className="nm">{p.name}</span>
+                    <span className="tr"><i style={{ width: barPct + '%', background: window.phaseColor(p.key) }}></i></span>
+                    <span className="v">{phView === 'ratio' ? val + ' %' : val.toFixed(1) + t('unit_day')}</span>
+                  </div>);
+              })}
             </div>
             <div className="phase-total">
               <span className="nm">{t('dash.totalLead')}</span>
-              <span className="v">{phaseTotal.toFixed(1)} {t('unit_day')}</span>
+              <span className="v">{phView === 'ratio' ? (A.phaseTotals || {}).ratio + ' %' : phView === 'span' ? ((A.phaseTotals || {}).span || 0).toFixed(1) + ' ' + t('unit_day') : phaseTotal.toFixed(1) + ' ' + t('unit_day')}</span>
             </div>
           </div>
         </div>

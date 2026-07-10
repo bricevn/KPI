@@ -69,12 +69,13 @@ window.buildAPP = function (D) {
   // Durées de phase (ms ouvré), incluant To fix, + retours.
   function times(iss) {
     var e = evs(iss);
-    var acc = {}, cnt = {}, since = {};
-    PHASE_KEYS.forEach(function (k) { acc[k] = 0; cnt[k] = 0; since[k] = null; });
+    var acc = {}, spn = {}, cnt = {}, since = {};
+    PHASE_KEYS.forEach(function (k) { acc[k] = 0; spn[k] = 0; cnt[k] = 0; since[k] = null; });
     var retours = 0;
     // Anti-bruit : un passage de phase plus court que le seuil (temps RÉEL) est ignoré — élimine
     // les poses/retraits de label accidentels qui polluaient les cycles.
-    var flush = function (ph, from, to) { if (to > from && (to - from) >= MIN_SEG_MS) acc[ph] += workingMs(from, to); };
+    // acc = temps TRAVAILLÉ (fenêtre ouvrée) ; spn = temps de TRAVERSÉE (temps réel écoulé).
+    var flush = function (ph, from, to) { if (to > from && (to - from) >= MIN_SEG_MS) { acc[ph] += workingMs(from, to); spn[ph] += (to - from); } };
     // Comptage ÉQUILIBRÉ par phase (clés DYNAMIQUES depuis la config) : on accumule le temps ouvré tant
     // qu'au moins un label de la phase est actif. La phase de clé « tofix » → +1 retour à chaque ajout.
     for (var i = 0; i < e.length; i++) {
@@ -82,7 +83,7 @@ window.buildAPP = function (D) {
       if (isNaN(t)) continue;
       var ph = phaseOf(lo);
       if (!ph || !TIMED[ph]) continue;
-      if (acc[ph] === undefined) { acc[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
+      if (acc[ph] === undefined) { acc[ph] = 0; spn[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
       if (add) { if (cnt[ph] === 0) since[ph] = t; cnt[ph]++; if (ph === 'tofix') retours++; }
       else if (cnt[ph] > 0) { cnt[ph]--; if (cnt[ph] === 0 && since[ph] !== null) { flush(ph, since[ph], t); since[ph] = null; } }
     }
@@ -94,8 +95,10 @@ window.buildAPP = function (D) {
       if (!isNaN(endRef)) Object.keys(cnt).forEach(function (k) { if (cnt[k] > 0 && since[k] !== null) { flush(k, since[k], endRef); since[k] = null; cnt[k] = 0; } });
     }
     var days = function (ms) { return ms > 0 ? Math.round(ms / HOURS_PER_DAY_MS * 10) / 10 : 0; };
-    var out = { total: 0, retours: retours };
-    Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; });
+    // _work/_span : ms BRUTS par phase (travaillé / traversée) — servent aux agrégats phaseAvg
+    // (moyenne de traversée, ratio d'efficience) sans mélanger des unités de « jour » différentes.
+    var out = { total: 0, retours: retours, _work: {}, _span: {} };
+    Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; out._work[k] = acc[k]; out._span[k] = spn[k]; });
     return out;
   }
   // Segment Gantt : même mapping label → phase que les durées (inclut uiux). phaseOf gère config + repli.
@@ -253,13 +256,18 @@ window.buildAPP = function (D) {
   var totG = blankAgg(); detail.forEach(function (d) { addToAgg(totG, d); }); finishAgg(totG);
   var totals = { issues: totG.issues, open: totG.open, closed: totG.closed, wV: totG.wV, wNV: totG.wNV, weight: totG.wV + totG.wNV, ret: totG.ret };
   var pct = function (a, b) { return b ? Math.round(a / b * 100) : 0; };
-  var cycDays = (function () { var arr = detail.map(function (d) { return d._times.total; }).filter(function (x) { return x > 0; }); return arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0; })();
+  // Cycle : moyenne + PERCENTILES (rang le plus proche) sur les issues à temps travaillé > 0.
+  // P50 (médiane) = 50 % des issues sortent plus vite ; P85 = engagement tenable (85 % en dessous) —
+  // robustes aux issues extrêmes qui déforment la moyenne.
+  var cycArr = detail.map(function (d) { return d._times.total; }).filter(function (x) { return x > 0; }).sort(function (a, b) { return a - b; });
+  var pctl = function (p) { if (!cycArr.length) return 0; return Math.round(cycArr[Math.min(cycArr.length - 1, Math.max(0, Math.ceil(p / 100 * cycArr.length) - 1))] * 10) / 10; };
+  var cycDays = cycArr.length ? Math.round(cycArr.reduce(function (s, x) { return s + x; }, 0) / cycArr.length * 10) / 10 : 0;
   var kpis = {
     progress: { closed: totals.closed, total: totals.issues, pct: pct(totals.closed, totals.issues) },
     weight: { v: totals.wV, total: totals.weight, pct: pct(totals.wV, totals.weight) },
     // Approbations rapportées aux issues AVEC MR (une issue sans MR ne peut pas être approuvée).
     approvals: { with: totG.appr, total: totG.mr, pct: pct(totG.appr, totG.mr) },
-    cycle: { days: cycDays }
+    cycle: { days: cycDays, p50: pctl(50), p85: pctl(85) }
   };
 
   // ---------- transversaux ----------
@@ -275,10 +283,29 @@ window.buildAPP = function (D) {
   var PH = PERIODS.length
     ? PERIODS.filter(function (p) { return TIMED[p.key]; }).map(function (p) { return [p.key, p.name || p.key]; })
     : [['dev', 'Dev'], ['review', 'Review'], ['qawait', 'QA wait'], ['qa', 'QA'], ['tofix', 'To fix'], ['po', 'PO']];
+  // Par phase : days = temps TRAVAILLÉ moyen (jours de fenêtre ouvrée) ; span = temps de TRAVERSÉE
+  // moyen (jours calendaires 24 h, temps réel écoulé dans la phase) ; ratio = efficience GLOBALE
+  // Σ travaillé / Σ traversée en ms BRUTS (les deux « jours » n'ont pas la même base, on ne les
+  // divise jamais l'un par l'autre).
+  var avg1 = function (arr) { return arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0; };
   var phaseAvg = PH.map(function (p) {
     var arr = detail.map(function (d) { return d._times[p[0]]; }).filter(function (x) { return x > 0; });
-    return { key: p[0], name: p[1], days: arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0 };
+    var spanArr = detail.map(function (d) { return (d._times._span[p[0]] || 0) / 86400000; }).filter(function (x) { return x > 0; });
+    var wMs = 0, sMs = 0;
+    detail.forEach(function (d) { wMs += d._times._work[p[0]] || 0; sMs += d._times._span[p[0]] || 0; });
+    return { key: p[0], name: p[1], days: avg1(arr), span: avg1(spanArr), ratio: sMs > 0 ? Math.round(wMs / sMs * 100) : 0 };
   });
+  // Totaux de la section « Temps moyen par phase » : sommes des moyennes (travaillé / traversée) +
+  // ratio GLOBAL toutes phases confondues (ms bruts).
+  var phaseTotals = (function () {
+    var w = 0, s = 0;
+    detail.forEach(function (d) { PH.forEach(function (p) { w += d._times._work[p[0]] || 0; s += d._times._span[p[0]] || 0; }); });
+    return {
+      work: Math.round(phaseAvg.reduce(function (a, p) { return a + p.days; }, 0) * 10) / 10,
+      span: Math.round(phaseAvg.reduce(function (a, p) { return a + p.span; }, 0) * 10) / 10,
+      ratio: s > 0 ? Math.round(w / s * 100) : 0
+    };
+  })();
 
   // ---------- weight buckets + matrix ----------
   var weightBuckets = FIB.map(function (w) {
@@ -403,7 +430,7 @@ window.buildAPP = function (D) {
     // catalogue des assignés du périmètre (l'onglet Options s'en sert pour lister les membres).
     selectedUsers: D.selectedUsers || null,
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
-    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, weightBuckets: weightBuckets,
+    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, phaseTotals: phaseTotals, weightBuckets: weightBuckets,
     milestone: milestone, meta: meta, FIB: FIB,
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.
