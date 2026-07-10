@@ -114,12 +114,19 @@ window.buildAPP = function (D) {
     // closedAt : la fermeture est de l'activité réelle (la vélocité compte le poids validé CETTE semaine-là).
     if (i.closedAt) { var cl = new Date(i.closedAt).getTime(); if (!isNaN(cl)) allT.push(cl); }
   });
-  var START = allT.length ? Math.min.apply(null, allT) : NaN;
+  // START ancré à MINUIT LOCAL : les offsets jour (dayOff) et la grille calendaire d'affichage
+  // (cal.dayDate, ancrée sur les composants y/m/j) doivent partager la MÊME origine. Avec un START
+  // brut (heure du 1er événement, ex. 10h23), toutes les dates affichées glissaient de cette heure :
+  // un événement à 04h27 était daté de la VEILLE (écart constaté GitLab vs KPI sur #1405).
+  var dayFloor = function (ms) { var d = new Date(ms); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  var START = allT.length ? dayFloor(Math.min.apply(null, allT)) : NaN;
   var END = allT.length ? Math.max.apply(null, allT) : NaN;
   if (!isNaN(MS_START)) START = isNaN(START) ? MS_START : Math.min(START, MS_START);
   if (!isNaN(MS_END)) END = isNaN(END) ? MS_END : Math.max(END, MS_END);
-  if (isNaN(START) || isNaN(END)) { START = Date.now() - 84 * MS_DAY; END = Date.now(); }
-  var DAYS = Math.max(1, Math.round((END - START) / MS_DAY));
+  if (isNaN(START) || isNaN(END)) { START = dayFloor(Date.now() - 84 * MS_DAY); END = Date.now(); }
+  // ceil (et non round) : le dernier jour PARTIEL a sa cellule — un événement à 23 h le dernier
+  // jour reste dans la fenêtre au lieu d'être écrêté sur l'offset DAYS.
+  var DAYS = Math.max(1, Math.ceil((END - START) / MS_DAY));
   var WEEKS = Math.max(1, Math.ceil(DAYS / 7));
   var NOW = Date.now();
   // floor (pas round) : l'offset du jour COURANT — avec round, dès midi le marqueur « aujourd'hui »
