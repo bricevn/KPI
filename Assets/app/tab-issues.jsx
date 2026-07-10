@@ -39,6 +39,8 @@
           <span className="issue-meta">
             <span className="chip"><span className="dot" style={{ background: window.typeColor(d.type) }}></span>{A.typeByKey[d.type].short}</span>
             {d.mrCount > 0 && <span className="chip">{window.ICONS.git}{d.mrCount} MR</span>}
+            {/* temps TOTAL (somme des phases chronométrées) — détail par phase dans le corps déplié */}
+            <span className="chip" title={window.t('iss.timeTotal')}>{window.ICONS.clock}{window.fmt1(d._times.total)} {window.t('unit_day')}</span>
             <span className="wchip-l" title="Poids estimé (Fibonacci)"><span className="lk">{window.t('common.weight')}</span>{d.weight}</span>
             <span className="av-stack">{d.assignees.map((a) => <window.Avatar key={a} pid={a} />)}</span>
             <StatusBadge state={d.state} />
@@ -50,6 +52,16 @@
               <div className="ib-row">
                 <span className="ib-k">{window.t('iss.labels')}</span>
                 <span className="ib-v ib-chips">{d.labels.map((l) => <span key={l} className="lbl-chip"><span className="dot" style={{ background: labelColor(l, d) }}></span>{l}</span>)}</span>
+              </div>
+              <div className="ib-row">
+                {/* temps par PHASE — le catalogue vient des périodes chronométrées configurées (Options) */}
+                <span className="ib-k">{window.t('iss.timeByPhase')}</span>
+                <span className="ib-v ib-chips">
+                  {A.phases.length ? A.phases.map((ph) => {
+                  const v = d._times[ph.key] || 0;
+                  return <span key={ph.key} className="chip" style={v ? null : { opacity: 0.45 }}><span className="dot" style={{ background: window.phaseColor(ph.key) }}></span>{ph.name} · {window.fmt1(v)} {window.t('unit_day')}</span>;
+                }) : <span className="muted">—</span>}
+                </span>
               </div>
               <div className="ib-row">
                 <span className="ib-k">{window.t('iss.mergeRequests')}</span>
