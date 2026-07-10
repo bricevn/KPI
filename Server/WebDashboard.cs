@@ -1043,6 +1043,14 @@ public sealed class WebDashboard
                 return Results.Json(new { ok = false, error = $"Jour férié invalide : « {s} » (format aaaa-mm-jj)." });
             if (seenH.Add(s)) holidays.Add(s);
         }
+        // Phases de travail actif (clés de phase) → somme ouvrée = temps effectif. Dédoublonnées, ordre préservé.
+        var effPhases = new JsonArray();
+        var seenP = new HashSet<string>();
+        foreach (var p in (b?["effectivePhases"] as JsonArray) ?? new JsonArray())
+        {
+            var s = (p?.GetValue<string>() ?? "").Trim();
+            if (s.Length > 0 && seenP.Add(s)) effPhases.Add(s);
+        }
 
         JsonObject root;
         try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
@@ -1053,6 +1061,7 @@ public sealed class WebDashboard
         ex["WorkingDaysOnly"] = daysOnly;
         ex["Holidays"] = holidays;
         ex["MinPhaseMinutes"] = noise;
+        ex["EffectivePhases"] = effPhases;
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try { await WriteFileAtomicAsync(RuntimeConfigPath(), outText); }
         catch (Exception e) { Console.Error.WriteLine("SaveWorkTime KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
@@ -1876,7 +1885,7 @@ public sealed class WebDashboard
             // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
             cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), cfg.Export.Periods ?? new(),
             labels, milestones, lastExtracted, setup,
-            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes });
+            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes, effectivePhases = cfg.Export.EffectivePhases ?? new() });
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }

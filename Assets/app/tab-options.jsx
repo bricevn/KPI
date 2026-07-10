@@ -348,6 +348,14 @@
     const [daysOnly, setDaysOnly] = useState(W.workingDaysOnly !== false);
     const [holidays, setHolidays] = useState((W.holidays || []).join('\n'));
     const [noise, setNoise] = useState(W.minPhaseMinutes || 0);
+    // Phases de « travail actif » (temps effectif) — cases à cocher parmi les phases chronométrées.
+    // Repli si non configuré : dev/review/qa/tofix (intersecté avec les phases qui existent réellement).
+    const allPhases = A.phases || [];
+    const [effPhases, setEffPhases] = useState(() => {
+      const cfg = (W.effectivePhases && W.effectivePhases.length) ? W.effectivePhases : ['dev', 'review', 'qa', 'tofix'];
+      return allPhases.filter((p) => cfg.indexOf(p.key) >= 0).map((p) => p.key);
+    });
+    const toggleEff = (k) => setEffPhases((s) => s.indexOf(k) >= 0 ? s.filter((x) => x !== k) : s.concat([k]));
     const [st, setSt] = useState('idle'); // idle | busy | done | err
     const [err, setErr] = useState('');
     const save = () => {
@@ -357,7 +365,8 @@
         workEndHour: parseInt(end, 10) || 0,
         workingDaysOnly: daysOnly,
         holidays: String(holidays).split('\n').map((s) => s.trim()).filter(Boolean),
-        minPhaseMinutes: parseInt(noise, 10) || 0
+        minPhaseMinutes: parseInt(noise, 10) || 0,
+        effectivePhases: effPhases
       };
       fetch('/api/options/worktime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then((r) => r.json()).then((j) => {if (j.ok) setSt('done');else {setSt('err');setErr(j.error || '');}})
@@ -388,6 +397,15 @@
           <div className="lbl">{window.t('opt.noise')}<span>{window.t('opt.noiseSub')}</span></div>
           <input style={numStyle} type="number" min="0" max="1440" value={noise} onChange={(e) => setNoise(e.target.value)} />
           <span className="muted">min</span>
+        </div>
+        <div className="opt-row" style={{ alignItems: 'flex-start' }}>
+          <div className="lbl">{window.t('opt.effectivePhases')}<span>{window.t('opt.effectivePhasesSub')}</span></div>
+          {allPhases.length
+            ? <div className="checklist">
+                {allPhases.map((p) => { const on = effPhases.indexOf(p.key) >= 0; return (
+                  <label key={p.key} className={on ? 'on' : ''}><input type="checkbox" checked={on} onChange={() => toggleEff(p.key)} />{p.name}</label>); })}
+              </div>
+            : <p className="opt-note">{window.t('opt.noPhases')}</p>}
         </div>
         <div className="opt-row">
           <div className="lbl"></div>

@@ -267,6 +267,9 @@ public sealed class ExportConfig
     /// <summary>Anti-bruit : les segments de phase plus courts que ce seuil (minutes, temps réel) sont
     /// ignorés dans les durées — élimine les poses/retraits de label accidentels. 0 = désactivé.</summary>
     public int MinPhaseMinutes { get; set; } = 0;
+    /// <summary>Phases de « travail actif » (clés de phase) dont la SOMME ouvrée forme le « temps effectif »
+    /// (hors attentes). Vide ⇒ repli mapper : dev/review/qa/tofix. Pas de « : » ⇒ Bind sûr.</summary>
+    public List<string> EffectivePhases { get; set; } = new();
 }
 
 /// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>

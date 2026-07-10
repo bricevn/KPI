@@ -49,6 +49,11 @@ window.buildAPP = function (D) {
   var HOLIDAYS = {}; (WT.holidays || []).forEach(function (h) { if (h) HOLIDAYS[h] = 1; });
   var MIN_SEG_MS = Math.max(0, +WT.minPhaseMinutes || 0) * 60000;
   var HOURS_PER_DAY_MS = (W_END - W_START) * 3600000;
+  // Phases de « travail actif » (temps EFFECTIF = somme ouvrée de ces phases, hors attentes).
+  // Configurable dans Options → Calcul du temps (WT.effectivePhases). Repli : dev/review/qa/tofix.
+  var EFF_SET = {};
+  ((WT.effectivePhases && WT.effectivePhases.length) ? WT.effectivePhases : ['dev', 'review', 'qa', 'tofix'])
+    .forEach(function (k) { EFF_SET[k] = 1; });
   var isoOf = function (d) { var p = function (n) { return ('0' + n).slice(-2); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
   function workingMs(s, e) {
     if (!(e > s)) return 0;
@@ -96,7 +101,7 @@ window.buildAPP = function (D) {
     }
     var days = function (ms) { return ms > 0 ? Math.round(ms / HOURS_PER_DAY_MS * 10) / 10 : 0; };
     // _work/_span : ms BRUTS par phase (travaillé / traversée) — servent aux agrégats phaseAvg
-    // (moyenne de traversée, ratio d'efficience) sans mélanger des unités de « jour » différentes.
+    // (moyenne, temps effectif = somme des phases actives) sans mélanger des unités de « jour ».
     var out = { total: 0, retours: retours, _work: {}, _span: {} };
     Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; out._work[k] = acc[k]; out._span[k] = spn[k]; });
     return out;
@@ -284,26 +289,22 @@ window.buildAPP = function (D) {
     ? PERIODS.filter(function (p) { return TIMED[p.key]; }).map(function (p) { return [p.key, p.name || p.key]; })
     : [['dev', 'Dev'], ['review', 'Review'], ['qawait', 'QA wait'], ['qa', 'QA'], ['tofix', 'To fix'], ['po', 'PO']];
   // Par phase : days = temps TRAVAILLÉ moyen (jours de fenêtre ouvrée) ; span = temps de TRAVERSÉE
-  // moyen (jours calendaires 24 h, temps réel écoulé dans la phase) ; ratio = efficience GLOBALE
-  // Σ travaillé / Σ traversée en ms BRUTS (les deux « jours » n'ont pas la même base, on ne les
-  // divise jamais l'un par l'autre).
+  // moyen (jours calendaires 24 h, temps réel écoulé dans la phase, usage interne). active = la phase
+  // compte dans le « temps effectif » (EFF_SET) → la vue Effectif du dashboard ne montre que celles-là.
   var avg1 = function (arr) { return arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0; };
   var phaseAvg = PH.map(function (p) {
     var arr = detail.map(function (d) { return d._times[p[0]]; }).filter(function (x) { return x > 0; });
     var spanArr = detail.map(function (d) { return (d._times._span[p[0]] || 0) / 86400000; }).filter(function (x) { return x > 0; });
-    var wMs = 0, sMs = 0;
-    detail.forEach(function (d) { wMs += d._times._work[p[0]] || 0; sMs += d._times._span[p[0]] || 0; });
-    return { key: p[0], name: p[1], days: avg1(arr), span: avg1(spanArr), ratio: sMs > 0 ? Math.round(wMs / sMs * 100) : 0 };
+    return { key: p[0], name: p[1], days: avg1(arr), span: avg1(spanArr), active: !!EFF_SET[p[0]] };
   });
-  // Totaux de la section « Temps moyen par phase » : sommes des moyennes (travaillé / traversée) +
-  // ratio GLOBAL toutes phases confondues (ms bruts).
+  // Totaux de la section « Temps moyen par phase » : work = Σ des moyennes travaillées (toutes phases) ;
+  // effective = Σ des moyennes des SEULES phases de travail actif (= work − les phases d'attente,
+  // et = somme des barres affichées en vue Effectif) ; span = usage interne.
   var phaseTotals = (function () {
-    var w = 0, s = 0;
-    detail.forEach(function (d) { PH.forEach(function (p) { w += d._times._work[p[0]] || 0; s += d._times._span[p[0]] || 0; }); });
     return {
       work: Math.round(phaseAvg.reduce(function (a, p) { return a + p.days; }, 0) * 10) / 10,
       span: Math.round(phaseAvg.reduce(function (a, p) { return a + p.span; }, 0) * 10) / 10,
-      ratio: s > 0 ? Math.round(w / s * 100) : 0
+      effective: Math.round(phaseAvg.reduce(function (a, p) { return a + (p.active ? p.days : 0); }, 0) * 10) / 10
     };
   })();
 
