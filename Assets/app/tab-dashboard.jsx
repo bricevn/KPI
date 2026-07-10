@@ -19,7 +19,10 @@
     const validated = A.detail.filter((d) => d.validated);
     const closed = A.detail.filter((d) => d.state === 'closed');
     const approved = A.detail.filter((d) => d.approval);
-    const byCycle = [...A.detail].sort((a, b) => (b.end - b.start) - (a.end - a.start));
+    // tri par temps TRAVAILLÉ (même métrique que la carte KPI et les badges du drill).
+    // Seules les issues à temps NON NUL : la carte moyenne sur >0 — la popup doit faire pareil,
+    // sinon sa « moyenne » (diluée par les 0) contredit le chiffre de la carte.
+    const byCycle = A.detail.filter((d) => d._times.total > 0).sort((a, b) => b._times.total - a._times.total);
     const tComm = A.pivot.reduce((s, r) => s + r.comm, 0);
     // phase total = sum of average phase durations (mean lead time across phases)
     const phaseTotal = A.phaseAvg.reduce((s, p) => s + p.days, 0);

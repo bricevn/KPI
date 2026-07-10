@@ -253,6 +253,20 @@ public sealed class ExportConfig
     /// NB : clés numériques ⇒ pas concerné par la corruption « : » de IConfiguration (RepairColonKeyedMaps).
     /// </summary>
     public Dictionary<int, string> StartMilestones { get; set; } = new();
+
+    // ---- Calcul du temps (Options → « Calcul du temps ») : fenêtre de temps ouvré + anti-bruit
+    //      des durées de phase (cycle). Consommé par le mapper client via payload.workTime. ----
+    /// <summary>Heure de début de la journée travaillée (0-23, heure locale du serveur). Défaut 9 h.</summary>
+    public int WorkStartHour { get; set; } = 9;
+    /// <summary>Heure de fin de la journée travaillée (1-24, exclusive). Défaut 19 h (maximum légal cadre : 10 h/j).</summary>
+    public int WorkEndHour { get; set; } = 19;
+    /// <summary>true = seuls les jours ouvrés (lun-ven) comptent dans les durées de phase.</summary>
+    public bool WorkingDaysOnly { get; set; } = true;
+    /// <summary>Jours fériés (aaaa-mm-jj) exclus du temps ouvré.</summary>
+    public List<string> Holidays { get; set; } = new();
+    /// <summary>Anti-bruit : les segments de phase plus courts que ce seuil (minutes, temps réel) sont
+    /// ignorés dans les durées — élimine les poses/retraits de label accidentels. 0 = désactivé.</summary>
+    public int MinPhaseMinutes { get; set; } = 0;
 }
 
 /// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>

@@ -39,14 +39,25 @@ window.buildAPP = function (D) {
     if (!PH_HAS_CFG && (lo.indexOf('prod::ui/ux') === 0 || lo.indexOf('prod:: ui/ux') === 0)) return 'uiux';
     return null;
   }
+  // ---------- fenêtre de temps ouvré (Options → « Calcul du temps », payload.workTime) ----------
+  // Défauts : 9 h → 19 h (10 h/j = maximum légal cadre ; les collaborateurs n'ont pas tous la même
+  // plage, une fenêtre large capte tout le monde), jours ouvrés seuls, pas de férié, anti-bruit 0.
+  var WT = D.workTime || {};
+  var W_START = (typeof WT.startHour === 'number' && WT.startHour >= 0 && WT.startHour <= 23) ? WT.startHour : 9;
+  var W_END = (typeof WT.endHour === 'number' && WT.endHour > W_START && WT.endHour <= 24) ? WT.endHour : (W_START < 19 ? 19 : 24);
+  var W_WEEKDAYS_ONLY = WT.workingDaysOnly !== false;
+  var HOLIDAYS = {}; (WT.holidays || []).forEach(function (h) { if (h) HOLIDAYS[h] = 1; });
+  var MIN_SEG_MS = Math.max(0, +WT.minPhaseMinutes || 0) * 60000;
+  var HOURS_PER_DAY_MS = (W_END - W_START) * 3600000;
+  var isoOf = function (d) { var p = function (n) { return ('0' + n).slice(-2); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
   function workingMs(s, e) {
     if (!(e > s)) return 0;
     var total = 0, cur = new Date(s); cur.setHours(0, 0, 0, 0);
     while (cur.getTime() < e) {
       var dow = cur.getDay();
-      if (dow !== 0 && dow !== 6) {
-        var ws = new Date(cur); ws.setHours(9, 0, 0, 0);
-        var we = new Date(cur); we.setHours(19, 0, 0, 0);
+      if ((!W_WEEKDAYS_ONLY || (dow !== 0 && dow !== 6)) && !HOLIDAYS[isoOf(cur)]) {
+        var ws = new Date(cur); ws.setHours(W_START, 0, 0, 0);
+        var we = new Date(cur); we.setHours(W_END, 0, 0, 0);
         var lo = Math.max(s, ws.getTime()), hi = Math.min(e, we.getTime());
         if (hi > lo) total += (hi - lo);
       }
@@ -61,6 +72,9 @@ window.buildAPP = function (D) {
     var acc = {}, cnt = {}, since = {};
     PHASE_KEYS.forEach(function (k) { acc[k] = 0; cnt[k] = 0; since[k] = null; });
     var retours = 0;
+    // Anti-bruit : un passage de phase plus court que le seuil (temps RÉEL) est ignoré — élimine
+    // les poses/retraits de label accidentels qui polluaient les cycles.
+    var flush = function (ph, from, to) { if (to > from && (to - from) >= MIN_SEG_MS) acc[ph] += workingMs(from, to); };
     // Comptage ÉQUILIBRÉ par phase (clés DYNAMIQUES depuis la config) : on accumule le temps ouvré tant
     // qu'au moins un label de la phase est actif. La phase de clé « tofix » → +1 retour à chaque ajout.
     for (var i = 0; i < e.length; i++) {
@@ -70,9 +84,16 @@ window.buildAPP = function (D) {
       if (!ph || !TIMED[ph]) continue;
       if (acc[ph] === undefined) { acc[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
       if (add) { if (cnt[ph] === 0) since[ph] = t; cnt[ph]++; if (ph === 'tofix') retours++; }
-      else if (cnt[ph] > 0) { cnt[ph]--; if (cnt[ph] === 0 && since[ph] !== null) { acc[ph] += workingMs(since[ph], t); since[ph] = null; } }
+      else if (cnt[ph] > 0) { cnt[ph]--; if (cnt[ph] === 0 && since[ph] !== null) { flush(ph, since[ph], t); since[ph] = null; } }
     }
-    var days = function (ms) { return ms > 0 ? Math.round(ms / 36000000 * 10) / 10 : 0; };
+    // Clôture à closedAt : une issue FERMÉE avec un label de phase encore posé comptait ZÉRO pour
+    // cette phase (le temps n'était ajouté qu'au retrait du label) → sous-estimation systématique.
+    // Les phases encore actives d'une issue fermée sont clôturées à sa date de fermeture.
+    if (iss.state === 'closed' && iss.closedAt) {
+      var endRef = new Date(iss.closedAt).getTime();
+      if (!isNaN(endRef)) Object.keys(cnt).forEach(function (k) { if (cnt[k] > 0 && since[k] !== null) { flush(k, since[k], endRef); since[k] = null; cnt[k] = 0; } });
+    }
+    var days = function (ms) { return ms > 0 ? Math.round(ms / HOURS_PER_DAY_MS * 10) / 10 : 0; };
     var out = { total: 0, retours: retours };
     Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; });
     return out;

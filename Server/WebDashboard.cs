@@ -310,6 +310,7 @@ public sealed class WebDashboard
         app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
         app.MapGet("/api/options/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsLabelsAsync(ctx)));
         app.MapGet("/api/options/milestones", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsMilestonesAsync(ctx)));
+        app.MapPost("/api/options/worktime", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveWorkTimeAsync(ctx)));
         app.MapPost("/api/options", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveOptionsAsync(ctx)));
         // Identité résolue de l'utilisateur courant (rôle/périmètre/vue).
         app.MapGet("/api/me", (HttpContext ctx) => Results.Json(self.ResolveMe(ctx)));
@@ -1016,6 +1017,49 @@ public sealed class WebDashboard
             .ThenByDescending(x => x.title, StringComparer.OrdinalIgnoreCase)
             .Select(x => x.title).ToList();
         return Results.Json(new { ok = true, milestones });
+    }
+
+    // POST /api/options/worktime { workStartHour, workEndHour, workingDaysOnly, holidays:[], minPhaseMinutes }
+    // → persiste la fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps), hot-reload.
+    private async Task<IResult> SaveWorkTimeAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        var start = b?["workStartHour"]?.GetValue<int>() ?? 9;
+        var end = b?["workEndHour"]?.GetValue<int>() ?? 19;
+        var daysOnly = b?["workingDaysOnly"]?.GetValue<bool>() ?? true;
+        var noise = b?["minPhaseMinutes"]?.GetValue<int>() ?? 0;
+        if (start < 0 || start > 23 || end < 1 || end > 24 || end <= start)
+            return Results.Json(new { ok = false, error = "Plage horaire invalide (début 0-23, fin 1-24, fin > début)." });
+        if (noise < 0 || noise > 24 * 60)
+            return Results.Json(new { ok = false, error = "Seuil anti-bruit invalide (0 à 1440 minutes)." });
+        var holidays = new JsonArray();
+        var seenH = new HashSet<string>();
+        foreach (var h in (b?["holidays"] as JsonArray) ?? new JsonArray())
+        {
+            var s = (h?.GetValue<string>() ?? "").Trim();
+            if (s.Length == 0) continue;
+            if (!Regex.IsMatch(s, @"^\d{4}-\d{2}-\d{2}$") || !DateTime.TryParse(s, out _))
+                return Results.Json(new { ok = false, error = $"Jour férié invalide : « {s} » (format aaaa-mm-jj)." });
+            if (seenH.Add(s)) holidays.Add(s);
+        }
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
+        ex["WorkStartHour"] = start;
+        ex["WorkEndHour"] = end;
+        ex["WorkingDaysOnly"] = daysOnly;
+        ex["Holidays"] = holidays;
+        ex["MinPhaseMinutes"] = noise;
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try { await WriteFileAtomicAsync(RuntimeConfigPath(), outText); }
+        catch (Exception e) { Console.Error.WriteLine("SaveWorkTime KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+        // Hot-reload : les prochains payloads embarquent la nouvelle fenêtre (recalcul côté client au rechargement).
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveWorkTime reload KO : " + e); }
+        return Results.Json(new { ok = true });
     }
 
     // POST /api/options → sauvegarde des sections Export (projets/phases/labels/équipes, global + par projet) ET
@@ -1831,7 +1875,8 @@ public sealed class WebDashboard
             // ces propriétés réellement nulles malgré l'annotation (et le ?? voisin fait considérer au
             // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
             cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), cfg.Export.Periods ?? new(),
-            labels, milestones, lastExtracted, setup);
+            labels, milestones, lastExtracted, setup,
+            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes });
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }

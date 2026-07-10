@@ -55,11 +55,15 @@ public sealed class DashboardView
         IReadOnlyList<Kpi.GitLab.Models.GitLabLabel> labels,
         IReadOnlyList<Kpi.GitLab.Models.GitLabMilestone> milestones,
         string? lastExtractedAt,
-        object? setup = null)
+        object? setup = null,
+        object? workTime = null)
     {
         var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
         payload.setup = setup;
+        // Fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps) : consommée par le mapper
+        // client (workingMs). null (export statique/legacy) ⇒ défauts du mapper (9-19, lun-ven).
+        payload.workTime = workTime;
         foreach (var lab in labels)
             if (!string.IsNullOrEmpty(lab.Name))
                 payload.labelColors[lab.Name] = new LabelColorPayload { color = lab.Color ?? "", textColor = lab.TextColor ?? "" };
@@ -283,6 +287,7 @@ public sealed class DashboardView
         // Reflet de la config /setup pour l'onglet Options (projets, phases/associations par projet, équipes).
         // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
         public object? setup { get; set; }
+        public object? workTime { get; set; }
     }
 
     private sealed class TransitionConfigPayload

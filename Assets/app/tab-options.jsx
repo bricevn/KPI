@@ -338,6 +338,66 @@
       </div>);
   }
 
+  // ===================== CALCUL DU TEMPS (admin) =====================
+  // Fenêtre de temps ouvré + anti-bruit des durées de phase (cycle). Persisté via
+  // POST /api/options/worktime ; le recalcul s'applique au rechargement de la page.
+  function WorkTimeEditor() {
+    const W = (window.__DATA__ || {}).workTime || {};
+    const [start, setStart] = useState(W.startHour != null ? W.startHour : 9);
+    const [end, setEnd] = useState(W.endHour != null ? W.endHour : 19);
+    const [daysOnly, setDaysOnly] = useState(W.workingDaysOnly !== false);
+    const [holidays, setHolidays] = useState((W.holidays || []).join('\n'));
+    const [noise, setNoise] = useState(W.minPhaseMinutes || 0);
+    const [st, setSt] = useState('idle'); // idle | busy | done | err
+    const [err, setErr] = useState('');
+    const save = () => {
+      setSt('busy');setErr('');
+      const body = {
+        workStartHour: parseInt(start, 10) || 0,
+        workEndHour: parseInt(end, 10) || 0,
+        workingDaysOnly: daysOnly,
+        holidays: String(holidays).split('\n').map((s) => s.trim()).filter(Boolean),
+        minPhaseMinutes: parseInt(noise, 10) || 0
+      };
+      fetch('/api/options/worktime', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then((r) => r.json()).then((j) => {if (j.ok) setSt('done');else {setSt('err');setErr(j.error || '');}})
+        .catch(() => {setSt('err');setErr('');});
+    };
+    const numStyle = Object.assign({}, selStyle, { width: 74, textAlign: 'center' });
+    return (
+      <div className="opt-sec">
+        <h3>{window.t('opt.workcalc')}</h3>
+        <p className="lead">{window.t('opt.workcalcLead')}</p>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.workHours')}<span>{window.t('opt.workHoursSub')}</span></div>
+          <input style={numStyle} type="number" min="0" max="23" value={start} onChange={(e) => setStart(e.target.value)} />
+          <span className="muted">→</span>
+          <input style={numStyle} type="number" min="1" max="24" value={end} onChange={(e) => setEnd(e.target.value)} />
+          <span className="muted">h</span>
+        </div>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.workDays')}<span>{window.t('opt.workDaysSub')}</span></div>
+          <Toggle on={daysOnly} onClick={() => setDaysOnly((v) => !v)} />
+        </div>
+        <div className="opt-row" style={{ alignItems: 'flex-start' }}>
+          <div className="lbl">{window.t('opt.holidays')}<span>{window.t('opt.holidaysSub')}</span></div>
+          <textarea style={Object.assign({}, selStyle, { width: 220, height: 92, resize: 'vertical', fontFamily: 'var(--mono, monospace)', fontSize: 12, lineHeight: 1.6, padding: '8px 10px' })}
+          placeholder={'2026-01-01\n2026-05-01'} value={holidays} onChange={(e) => setHolidays(e.target.value)} />
+        </div>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.noise')}<span>{window.t('opt.noiseSub')}</span></div>
+          <input style={numStyle} type="number" min="0" max="1440" value={noise} onChange={(e) => setNoise(e.target.value)} />
+          <span className="muted">min</span>
+        </div>
+        <div className="opt-row">
+          <div className="lbl"></div>
+          <button className="btn btn-primary" disabled={st === 'busy'} onClick={save}>{window.t('opt.save')}</button>
+        </div>
+        {st === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.wtSaved')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+        {st === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{err || window.t('opt.refreshError')}</p>}
+      </div>);
+  }
+
   // ===================== ONGLET =====================
   window.TabOptions = function TabOptions({ theme, setTheme, appearance }) {
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
@@ -468,6 +528,8 @@
           {refreshState === 'cancelled' && <p className="opt-note">{window.t('opt.refreshCancelled')}</p>}
           {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
         </div>}
+
+        {isAdmin && <WorkTimeEditor />}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
       </div>);

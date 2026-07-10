@@ -493,7 +493,9 @@ ${tag(js)}
   // groups (optional): [{label, issues, recap}] renders labelled sections instead of a flat list.
   function IssueDrill({ title, subtitle, headline, issues, recap, mode, groups, onClose }) {
     const layout = typeof window !== 'undefined' && window.__drillLayout || 'modal';
-    const cyc = (d) => d.end - d.start;
+    // Métrique du drill Cycle UNIFIÉE avec la carte KPI : temps TRAVAILLÉ (somme des phases
+    // chronométrées, _times.total) — plus l'écart fin-début calendaire qui divergeait de la carte.
+    const cyc = (d) => d._times.total;
     const metric = recap === 'issues' ? 'issues' : 'weight';
 
     const Section = ({ items, recap: rc, metric: mc }) =>
