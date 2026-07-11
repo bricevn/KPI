@@ -24,14 +24,16 @@
     // sinon sa « moyenne » (diluée par les 0) contredit le chiffre de la carte.
     const byCycle = A.detail.filter((d) => d._times.total > 0).sort((a, b) => b._times.total - a._times.total);
     const tComm = A.pivot.reduce((s, r) => s + r.comm, 0);
-    // phase total = sum of average phase durations (mean lead time across phases)
-    const phaseTotal = A.phaseAvg.reduce((s, p) => s + p.days, 0);
-    // moyennes de phase indexées par key (pour la ligne Total) + max pour l'échelle des barres.
+    // moyennes de phase indexées par key (pour la ligne Total du tableau « KPIs par type »).
     const pa = {}; A.phaseAvg.forEach((p) => { pa[p.key] = p.days; });
-    // sous-vue de « Temps moyen par phase » : Travaillé (temps ouvré par phase, toutes phases) |
-    // Effectif (somme ouvrée des seules phases de travail actif — définies dans Options → Calcul du temps).
+    // sous-vues de « Temps moyen par phase » : Travaillé (toutes les phases chronométrées) | Effectif
+    // (seules les phases de travail actif) | Attente (seules les phases d'attente). Les rôles sont
+    // définis dans Options → Calcul du temps ; barres = temps ouvré par phase, total = somme des barres.
     const [phView, setPhView] = useState('work');
-    const phPhases = phView === 'effective' ? A.phaseAvg.filter((p) => p.active) : A.phaseAvg;
+    const phPhases = phView === 'effective' ? A.phaseAvg.filter((p) => p.active)
+      : phView === 'wait' ? A.phaseAvg.filter((p) => !p.active)
+      : A.phaseAvg;
+    const phShownTotal = phPhases.reduce((s, p) => s + p.days, 0);
     const phVMax = Math.max(0.1, ...phPhases.map((p) => p.days));
     // tendance RÉELLE du cycle : moyenne du temps de cycle (_times.total) des issues regroupées
     // par jour de complétion (d.end) en 6 tranches sur la fenêtre. Delta = dernière vs première tranche non vide.
@@ -163,16 +165,15 @@
         </div>
 
         <div className="pnl">
-          {/* 2 sous-vues : Travaillé (temps ouvré par phase, toutes phases) | Effectif (somme ouvrée des
-              seules phases de travail actif, cf. Options → Calcul du temps). Les barres montrent toujours
-              le temps travaillé de chaque phase ; en Effectif, le total = Travaillé − les phases d'attente. */}
+          {/* 3 sous-vues : Travaillé (toutes phases) | Effectif (phases de travail actif) | Attente
+              (phases d'attente). Rôles définis dans Options → Calcul du temps ; Travaillé = Effectif + Attente. */}
           {/* boutons + « i » regroupés dans un même conteneur poussé à droite : sans ça, .g-seg ET
               .infotip portent chacun margin-left:auto → l'espace libre se partage et le « i » flotte
               seul à l'extrême droite, détaché des boutons. Ici le « i » suit bien les boutons. */}
           <div className="pnl-h"><h3>{t('dash.avgTimePhase')}</h3>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div className="g-seg" role="tablist">
-                {[['work', t('dash.tWorked')], ['effective', t('dash.tEffective')]].map(([k, lbl]) =>
+                {[['work', t('dash.tWorked')], ['effective', t('dash.tEffective')], ['wait', t('dash.tWait')]].map(([k, lbl]) =>
                 <button key={k} role="tab" aria-selected={phView === k} className={phView === k ? 'on' : ''} onClick={() => setPhView(k)}>{lbl}</button>)}
               </div>
               <window.InfoTip text={t('dash.avgTimePhaseTip')} />
@@ -180,7 +181,7 @@
           </div>
           <div className="pnl-b">
             <div className="phase-grid">
-              {phPhases.map((p) => {
+              {phPhases.length ? phPhases.map((p) => {
                 const barPct = Math.min(100, p.days / phVMax * 100);
                 return (
                   <div key={p.key} className="phase">
@@ -188,11 +189,11 @@
                     <span className="tr"><i style={{ width: barPct + '%', background: window.phaseColor(p.key) }}></i></span>
                     <span className="v">{p.days.toFixed(1) + t('unit_day')}</span>
                   </div>);
-              })}
+              }) : <p className="opt-note">{t('dash.noWaitPhase')}</p>}
             </div>
             <div className="phase-total">
-              <span className="nm">{phView === 'effective' ? t('dash.tEffective') : t('dash.totalLead')}</span>
-              <span className="v">{(phView === 'effective' ? ((A.phaseTotals || {}).effective || 0) : phaseTotal).toFixed(1) + ' ' + t('unit_day')}</span>
+              <span className="nm">{phView === 'effective' ? t('dash.tEffective') : phView === 'wait' ? t('dash.tWait') : t('dash.totalLead')}</span>
+              <span className="v">{phShownTotal.toFixed(1) + ' ' + t('unit_day')}</span>
             </div>
           </div>
         </div>
