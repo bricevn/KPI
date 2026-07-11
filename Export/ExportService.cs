@@ -25,8 +25,7 @@ public sealed class ExportService
     public async Task<List<IssueExport>> BuildIssueExportsAsync(
         CancellationToken ct,
         Action<int, int>? onProgress = null,
-        string? milestoneOverride = null,
-        Func<GitLabIssue, bool>? filter = null)
+        string? milestoneOverride = null)
     {
         // milestoneOverride : null = utiliser _milestone (config), "" = TOUTES les issues du projet, sinon nom précis.
         var effective = milestoneOverride ?? _milestone;
@@ -34,14 +33,6 @@ public sealed class ExportService
             ? "Récupération de TOUTES les issues du projet (toutes milestones)..."
             : $"Récupération des issues (milestone={effective})...");
         var issues = await _client.GetIssuesByMilestoneAsync(effective, ct);
-        // Filtre AVANT la construction des exports : les label events sont récupérés PAR ISSUE (coûteux),
-        // autant écarter tout de suite celles hors périmètre (ex. milestones antérieures au départ configuré).
-        if (filter != null)
-        {
-            var before = issues.Count;
-            issues = issues.Where(filter).ToList();
-            if (issues.Count != before) Console.WriteLine($"  -> filtre de périmètre : {issues.Count}/{before} issues conservées.");
-        }
         Console.WriteLine($"  -> {issues.Count} issues récupérées.");
         onProgress?.Invoke(0, issues.Count);
 
@@ -116,17 +107,12 @@ public sealed class ExportService
         // Définition d'une transition : un "add" du label To précédé (chronologiquement) du label From actif.
         ComputeTransitions(ordered, export);
 
-        // Commentaires non-system : compte et regroupement par auteur.
+        // Commentaires non-system : seul le compte est consommé (dashboard « Commentaires »).
         var notes = await _client.GetIssueNotesAsync(issue.Iid, ct);
         var realNotes = notes.Where(n => !n.System).ToList();
-        var byAuthor = realNotes
-            .GroupBy(n => n.Author?.Username ?? "(inconnu)")
-            .OrderByDescending(g => g.Count())
-            .ToDictionary(g => g.Key, g => g.Count());
         export.Comments = new CommentsSummary
         {
             Count = realNotes.Count,
-            ByAuthor = byAuthor,
         };
 
         // Toutes les MR liées à l'issue, peu importe le statut.

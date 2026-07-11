@@ -31,15 +31,17 @@ using Microsoft.Extensions.Logging;
 namespace Kpi.Server;
 
 /// <summary>
-/// Serveur du dashboard sur ASP.NET Core (Kestrel). Remplace l'ancien HttpListener.
-/// Étape 1 de la sécurisation : même comportement/endpoints qu'avant, sans authentification.
-/// Conçu pour tourner derrière un reverse proxy (TLS géré en amont).
-/// Les étapes suivantes ajouteront : OAuth GitLab, résolution de compte/rôles, /api/data filtré.
+/// Serveur du dashboard (ASP.NET Core / Kestrel), bindé sur localhost — l'exposition publique passe
+/// par un reverse proxy (TLS en amont). Authentification par SSO GitLab (OAuth) + rôles GitLab.
+/// Classe PARTIELLE, découpée par domaine :
+///   WebDashboard.cs         — bootstrap, routes, refresh, payload/data, état.
+///   WebDashboard.Auth.cs    — authentification, rôles, résolution de compte.
+///   WebDashboard.Setup.cs   — assistant /setup (test, labels, OAuth, sauvegarde, fetch initial).
+///   WebDashboard.Options.cs — API de l'onglet Options (config phases/équipes, calcul du temps).
 /// </summary>
-public sealed class WebDashboard
+public sealed partial class WebDashboard
 {
     private volatile AppConfig _config; // rechargé à chaud via /api/config (volatile : visibilité multi-thread)
-    private const string TokenSentinel = "********";
     private readonly RefreshState _state = new();
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private CancellationTokenSource? _refreshCts;
@@ -61,6 +63,11 @@ public sealed class WebDashboard
 
     public static async Task RunAsync(AppConfig config, int port, CancellationToken ct)
     {
+        // Migration « aucun secret en clair au repos » : si appsettings.json contient encore des
+        // GroupToken / ClientSecret en clair (ancienne install, édition manuelle), on les réécrit
+        // chiffrés (enc:v1:…) une bonne fois. La config EN MÉMOIRE reste en clair (déjà déchiffrée).
+        await MigrateConfigSecretsAtRestAsync();
+
         var self = new WebDashboard(config);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -107,9 +114,12 @@ public sealed class WebDashboard
         // Data Protection : clés persistées → sessions conservées au redémarrage et partagées entre
         // instances (déploiement mondial). En multi-instance, monter ce dossier sur un volume PARTAGÉ
         // (ou remplacer par PersistKeysToStackExchangeRedis / Azure Blob).
-        builder.Services.AddDataProtection()
+        var dp = builder.Services.AddDataProtection()
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dp-keys")))
             .SetApplicationName("Kpi");
+        // Windows : clé maîtresse dp-keys chiffrée via DPAPI (même politique que SecureStore) — sans
+        // ça, le XML en clair à côté du binaire rend le chiffrement au repos contournable.
+        if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi();
 
         // OAuth GitLab enregistré INCONDITIONNELLEMENT : les identifiants sont relus EN DIRECT depuis la config
         // (self._config.Auth) à chaque (re)construction des options. Non configuré → placeholders (la validation
@@ -293,16 +303,7 @@ public sealed class WebDashboard
 
         app.MapGet("/", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         app.MapGet("/index.html", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
-        // App de référence (Claude Design) — DONNÉES DE DÉMO. Exposée uniquement en développement.
-        if (app.Environment.IsDevelopment())
-            app.MapGet("/ref", () => Results.Content(Kpi.Views.DashboardView.BuildReferencePage(), "text/html; charset=utf-8")).AllowAnonymous();
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
-        app.MapGet("/api/config", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeConfigAsync(ctx)));
-        app.MapGet("/api/config/token", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeTokenAsync(ctx)));
-        app.MapPost("/api/config", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveConfigAsync(ctx)));
-        // Comptes & vues : ADMIN-ONLY (étape 3).
-        app.MapGet("/api/accounts", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeAccountsAsync(ctx)));
-        app.MapPost("/api/accounts", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveAccountsAsync(ctx)));
         app.MapPost("/api/cancel", (HttpContext ctx) => self.CancelAsync(ctx));
         app.MapPost("/api/refresh", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshAsync(ctx)));
         // Édition de la config depuis le dashboard (ADMIN, cf. RequireAdmin) : listing live des projets/labels
@@ -352,11 +353,6 @@ public sealed class WebDashboard
             var back = SafeLocalReturn(@return);
             return Results.Challenge(new AuthenticationProperties { RedirectUri = back }, new[] { "gitlab" });
         }).AllowAnonymous().RequireRateLimiting("login");
-
-        // Connexion par Personal Access Token : validée CÔTÉ SERVEUR contre {instance}/api/v4/user.
-        // Le token N'EST PAS stocké : on ne garde que le username dans le cookie de session.
-        app.MapPost("/api/auth/token", (Func<HttpContext, Task<IResult>>)(ctx => self.LoginWithTokenAsync(ctx)))
-           .AllowAnonymous().RequireRateLimiting("login");
 
         app.MapGet("/logout", async (HttpContext ctx, string? @return) =>
         {
@@ -438,125 +434,6 @@ public sealed class WebDashboard
         return Results.Content(DashboardView.BuildReferencePage(json, lang), "text/html; charset=utf-8");
     }
 
-    private async Task<IResult> ServeConfigAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        try
-        {
-            var node = JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath()));
-            var gl = node?["GitLab"];
-            if (gl?["PrivateToken"] != null) gl["PrivateToken"] = TokenSentinel;
-            var au = node?["Auth"];
-            if (!string.IsNullOrEmpty(au?["ClientSecret"]?.GetValue<string>())) au!["ClientSecret"] = TokenSentinel;
-            var masked = node!.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-            return Results.Json(new ConfigPayload { content = masked });
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine("ServeConfig KO : " + ex);
-            return Results.Text("Lecture de la configuration impossible.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 500);
-        }
-    }
-
-    private async Task<IResult> SaveConfigAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        string content;
-        try
-        {
-            using var reader = new StreamReader(ctx.Request.Body);
-            var body = await reader.ReadToEndAsync();
-            content = JsonNode.Parse(body)?["content"]?.GetValue<string>() ?? "";
-        }
-        catch { return Results.Text("Requête invalide.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400); }
-
-        JsonNode? incoming;
-        try { incoming = JsonNode.Parse(content); }
-        catch (Exception ex) { return Results.Text("JSON invalide : " + ex.Message, "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400); }
-        if (incoming == null) return Results.Text("JSON vide.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400);
-
-        var glNode = incoming["GitLab"];
-        if (glNode != null)
-        {
-            var inTok = glNode["PrivateToken"]?.GetValue<string>();
-            if (string.IsNullOrEmpty(inTok) || inTok == TokenSentinel)
-                glNode["PrivateToken"] = ReadCurrentToken() ?? "";
-        }
-
-        // La section Auth (admins, OAuth) n'est PAS modifiable via l'app : on la préserve depuis
-        // le disque, quel que soit le contenu envoyé. Seul un accès au serveur peut la changer.
-        try
-        {
-            var current = JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath()));
-            var curAuth = current?["Auth"];
-            if (curAuth != null) incoming["Auth"] = curAuth.DeepClone();
-            else incoming.AsObject().Remove("Auth");
-        }
-        catch { incoming.AsObject().Remove("Auth"); }
-
-        var outText = incoming.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try
-        {
-            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
-            var src = SourceConfigPath();
-            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
-                await WriteFileAtomicAsync(src, outText);
-        }
-        catch (Exception ex) { Console.Error.WriteLine("SaveConfig write KO : " + ex); return Results.Text("Écriture de la configuration impossible.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 500); }
-
-        try { _config = BuildConfig(); _memberCache.Clear(); _payloadCache.Clear(); /* le projet a pu changer → re-résoudre accès + payloads */ }
-        catch (Exception ex) { Console.Error.WriteLine("SaveConfig reload KO : " + ex); return Results.Text("Configuration enregistrée, mais rechargement à chaud échoué (redémarrez le serveur).", "text/plain; charset=utf-8"); }
-
-        return Results.Text("Configuration enregistrée et rechargée. (Régénérez les vues / relancez un Rafraîchir si Milestone ou TrackedLabels ont changé.)", "text/plain; charset=utf-8");
-    }
-
-    private async Task<IResult> ServeAccountsAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        try
-        {
-            var p = AccountsPath();
-            var content = File.Exists(p) ? await File.ReadAllTextAsync(p) : "{\n  \"views\": [],\n  \"accounts\": []\n}";
-            JsonNode.Parse(content);
-            return Results.Json(new ConfigPayload { content = content });
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine("ServeAccounts KO : " + ex);
-            return Results.Text("Lecture des comptes impossible.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 500);
-        }
-    }
-
-    private async Task<IResult> SaveAccountsAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        string content;
-        try
-        {
-            using var reader = new StreamReader(ctx.Request.Body);
-            var body = await reader.ReadToEndAsync();
-            content = JsonNode.Parse(body)?["content"]?.GetValue<string>() ?? "";
-        }
-        catch { return Results.Text("Requête invalide.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400); }
-
-        JsonNode? incoming;
-        try { incoming = JsonNode.Parse(content); }
-        catch (Exception ex) { return Results.Text("JSON invalide : " + ex.Message, "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400); }
-        if (incoming == null) return Results.Text("JSON vide.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400);
-
-        var outText = incoming.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try
-        {
-            var p = AccountsPath();
-            var dir = Path.GetDirectoryName(p);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            await WriteFileAtomicAsync(p, outText);
-        }
-        catch (Exception ex) { Console.Error.WriteLine("SaveAccounts KO : " + ex); return Results.Text("Écriture des comptes impossible.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 500); }
-
-        return Results.Text("Comptes & vues enregistrés.", "text/plain; charset=utf-8");
-    }
-
     private IResult CancelAsync(HttpContext ctx)
     {
         var deny = RequireAdmin(ctx); if (deny != null) return deny;
@@ -587,8 +464,6 @@ public sealed class WebDashboard
                 var parsed = JsonSerializer.Deserialize<RefreshRequest>(body);
                 if (parsed?.milestones != null && parsed.milestones.Count > 0)
                     milestonesToRefresh.AddRange(parsed.milestones.Where(m => !string.IsNullOrWhiteSpace(m)));
-                else if (!string.IsNullOrWhiteSpace(parsed?.milestone))
-                    milestonesToRefresh.Add(parsed.milestone!);
                 if (!string.IsNullOrWhiteSpace(parsed?.project))
                     projectFilter = parsed!.project!.Trim();
             }
@@ -631,18 +506,13 @@ public sealed class WebDashboard
                         await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) => { _state.Current = cur; _state.Total = tot; }, linked.Token, projectFilter, milestonesToRefresh[i]);
                     }
             }
-            else if (milestonesToRefresh.Count == 0)
-            {
-                await ExportPipeline.RunFullExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, "");
-            }
             else
             {
-                for (int i = 0; i < milestonesToRefresh.Count; i++)
-                {
-                    linked.Token.ThrowIfCancellationRequested();
-                    Console.WriteLine($"[Refresh] Milestone {i + 1}/{milestonesToRefresh.Count} : {milestonesToRefresh[i]}");
-                    await ExportPipeline.RunFullExportAsync(_config, (cur, tot) => { _state.Current = cur; _state.Total = tot; }, linked.Token, milestonesToRefresh[i]);
-                }
+                // Aucun serveur v2 configuré : refus explicite. (L'ancien repli mono-serveur RunFullExportAsync
+                // écrivait des exports EN CLAIR à la racine de output/ — retiré : le web ne déclenche plus
+                // que le pipeline multi-serveurs chiffré. Les commandes CLI restent disponibles.)
+                _state.LastError = "Aucun serveur GitLab configuré — terminez le /setup avant de rafraîchir.";
+                Console.Error.WriteLine("[Refresh] refusé : aucun serveur configuré (Servers vide).");
             }
 
             _state.LastRefreshAt = DateTime.UtcNow;
@@ -674,6 +544,33 @@ public sealed class WebDashboard
 
     private static string RuntimeConfigPath() => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
+    /// <summary>Réécrit appsettings.json avec les secrets chiffrés (enc:v1:…) s'il en reste en clair.
+    /// Idempotent (ProtectSecret ne re-chiffre pas), atomique, best-effort (échec ⇒ log, l'app démarre).</summary>
+    private static async Task MigrateConfigSecretsAtRestAsync()
+    {
+        try
+        {
+            var path = RuntimeConfigPath();
+            if (!File.Exists(path)) return; // 1re mise en service : rien à migrer
+            if (JsonNode.Parse(await File.ReadAllTextAsync(path)) is not JsonObject root) return;
+            var changed = false;
+            void Enc(JsonObject o, string key)
+            {
+                var v = o[key]?.GetValue<string>() ?? "";
+                var enc = SecureStore.ProtectSecret(v);
+                if (enc != v) { o[key] = enc; changed = true; }
+            }
+            if (root["Servers"] is JsonArray servers)
+                foreach (var s in servers)
+                    if (s is JsonObject so && so["GroupToken"] != null) Enc(so, "GroupToken");
+            if (root["Auth"] is JsonObject auth && auth["ClientSecret"] != null) Enc(auth, "ClientSecret");
+            if (!changed) return;
+            await WriteFileAtomicAsync(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine("[Sécurité] Secrets de configuration chiffrés au repos (appsettings.json migré).");
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[Sécurité] Migration des secrets impossible : " + ex.Message); }
+    }
+
     private static string? SourceConfigPath()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -697,1100 +594,6 @@ public sealed class WebDashboard
         var tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await File.WriteAllTextAsync(tmp, content);
         File.Move(tmp, path, overwrite: true);
-    }
-
-    // POST /api/auth/token  body: { "instance": "https://gitlab.com", "token": "glpat-..." }
-    // Valide le PAT en interrogeant {instance}/api/v4/user, puis ouvre une session cookie
-    // contenant UNIQUEMENT le username. Le token n'est jamais conservé ni loggé.
-    private async Task<IResult> LoginWithTokenAsync(HttpContext ctx)
-    {
-        string instance, token;
-        try
-        {
-            using var reader = new StreamReader(ctx.Request.Body);
-            var body = await reader.ReadToEndAsync();
-            var node = JsonNode.Parse(body);
-            instance = (node?["instance"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-            token    = (node?["token"]?.GetValue<string>() ?? "").Trim();
-        }
-        catch { return Results.Json(new { ok = false, error = "Requête invalide." }, statusCode: 400); }
-
-        if (string.IsNullOrWhiteSpace(instance) || string.IsNullOrWhiteSpace(token))
-            return Results.Json(new { ok = false, error = "Instance et token requis." }, statusCode: 400);
-
-        // Garde anti-SSRF : URL absolue http/https uniquement.
-        if (!Uri.TryCreate(instance, UriKind.Absolute, out var baseUri)
-            || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
-            return Results.Json(new { ok = false, error = "Adresse GitLab invalide." }, statusCode: 400);
-
-        // Anti-SSRF + routage : l'instance DOIT correspondre à un SERVEUR CONFIGURÉ (par hôte).
-        // Sinon fail-closed (un POST anonyme ne doit pas pouvoir faire sonder une URL arbitraire).
-        var server = ServerForInstance(instance);
-        if (server == null)
-            return Results.Json(new { ok = false, error = "Instance GitLab non configurée sur ce serveur." }, statusCode: 400);
-
-        var http = SharedHttp;
-        using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, "/api/v4/user"));
-        req.Headers.Add("PRIVATE-TOKEN", token);
-        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        HttpResponseMessage resp;
-        try { resp = await http.SendAsync(req, ctx.RequestAborted); }
-        catch (TaskCanceledException) { return Results.Json(new { ok = false, error = "Délai dépassé en joignant l’instance GitLab." }, statusCode: 504); }
-        catch { return Results.Json(new { ok = false, error = "Instance GitLab injoignable." }, statusCode: 502); }
-
-        using (resp)
-        {
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized || resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
-                return Results.Json(new { ok = false, error = "Token d’accès invalide ou expiré. Vérifiez vos identifiants GitLab." });
-            if (!resp.IsSuccessStatusCode)
-                return Results.Json(new { ok = false, error = $"Réponse inattendue de GitLab ({(int)resp.StatusCode})." });
-
-            string username; bool isBot;
-            try
-            {
-                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ctx.RequestAborted));
-                username = doc.RootElement.TryGetProperty("username", out var u) ? (u.GetString() ?? "") : "";
-                isBot = doc.RootElement.TryGetProperty("bot", out var b) && b.ValueKind == JsonValueKind.True;
-            }
-            catch { return Results.Json(new { ok = false, error = "Réponse GitLab illisible." }); }
-
-            if (string.IsNullOrWhiteSpace(username))
-                return Results.Json(new { ok = false, error = "Compte GitLab sans username." });
-
-            // Comptes techniques (project/group access tokens) : refusés — ce sont des identités de
-            // service, pas des personnes. Le flag `bot` de /api/v4/user fait foi, le pattern en filet.
-            if (isBot || IsBotUsername(username))
-                return Results.Json(new { ok = false, error = "Les comptes de service (bot) ne peuvent pas ouvrir de session — utilisez votre token personnel." });
-
-            // Rôles GitLab : seuls les MEMBRES d'un projet du serveur (ou les admins) entrent.
-            if (!IsAdminLogin(username) && await GetServerAccessLevelAsync(server, username, ctx.RequestAborted) == null)
-                return Results.Json(new { ok = false, error = "Votre compte GitLab n’est pas membre des projets analysés — accès refusé." });
-
-            // Session cookie : username + serverId (cloisonnement par serveur). AUCUN token stocké.
-            var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username), new Claim(ServerClaim, server.Id) },
-                CookieAuthenticationDefaults.AuthenticationScheme);
-            await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-
-            return Results.Json(new { ok = true, user = new { username }, server = server.Id });
-        }
-    }
-
-    // --- Assistant de première mise en service (/setup) -----------------
-
-    // Configuré ? = au moins un serveur effectif (Servers v2 OU bloc GitLab legacy via ResolveServers)
-    // a une URL + un token. Sinon `/` redirige vers /setup.
-    private bool IsConfigured() =>
-        _config.ResolveServers().Any(s =>
-            !string.IsNullOrWhiteSpace(s.BaseUrl) && !string.IsNullOrWhiteSpace(s.GroupToken));
-
-    private static async Task<JsonNode?> ReadJsonBody(HttpContext ctx)
-    {
-        // Corps vide / JSON malformé → null (les appelants tolèrent null via b?[...]) plutôt qu'une 500.
-        try { using var r = new StreamReader(ctx.Request.Body); return JsonNode.Parse(await r.ReadToEndAsync()); }
-        catch { return null; }
-    }
-
-    // Garde anti-SSRF du setup : URL absolue http/https + (si Auth.Authority défini) même hôte.
-    // Pendant le bootstrap (Authority non défini), admin-only suffit ; sinon on verrouille sur l'autorité.
-    private bool SetupHostAllowed(Uri baseUri)
-    {
-        if (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps) return false;
-        if (!string.IsNullOrWhiteSpace(_config.Auth.Authority)
-            && Uri.TryCreate(_config.Auth.Authority, UriKind.Absolute, out var au))
-            return string.Equals(baseUri.Host, au.Host, StringComparison.OrdinalIgnoreCase);
-        return true;
-    }
-
-    // GET GitLab avec le token fourni par l'assistant (HttpClient PARTAGÉ — pas de socket exhaustion).
-    private async Task<JsonNode?> GlGet(HttpClient http, Uri baseUri, string path, string token, CancellationToken ct)
-    {
-        // Robuste : toute erreur réseau/parse (instance injoignable, DNS, TLS, JSON) → null (pas de 500).
-        // L'appelant traduit null en message clair ("Connexion refusée…") dans l'assistant.
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
-            req.Headers.Add("PRIVATE-TOKEN", token);
-            using var resp = await http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return null;
-            return JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct));
-        }
-        catch { return null; }
-    }
-
-    // POST /api/setup/test → { ok, projects:[{id,name,group}], groups:[{name,members:[{username,name,role}]}] }
-    private async Task<IResult> SetupTestAsync(HttpContext ctx)
-    {
-        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
-        var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
-        var selfS   = b?["selfSigned"]?.GetValue<bool>() ?? false;
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || string.IsNullOrWhiteSpace(token))
-            return Results.Json(new { ok = false, error = "URL ou token invalide." });
-        if (!SetupHostAllowed(baseUri))
-            return Results.Json(new { ok = false, error = "Instance non autorisée (différente de l'autorité configurée)." });
-
-        var http = selfS ? _sharedHttpRelaxed : _sharedHttp;
-        var me = await GlGet(http, baseUri, "/api/v4/user", token, ctx.RequestAborted);
-        if (me is null) return Results.Json(new { ok = false, error = "Connexion refusée. Vérifiez l'URL et le token." });
-
-        var projects = new List<object>();
-        var pj = await GlGet(http, baseUri, "/api/v4/projects?membership=true&simple=true&per_page=100&order_by=name&sort=asc", token, ctx.RequestAborted);
-        foreach (var p in pj?.AsArray() ?? new JsonArray())
-        {
-            var pid = p!["id"]!.GetValue<int>();
-            // Milestones du projet (récentes d'abord) : alimentent le sélecteur « Milestone de départ
-            // de l'export » du récap. Tri par date due/start décroissante (sans date → en dernier).
-            var milestones = new List<string>();
-            var mj = await GlGet(http, baseUri, $"/api/v4/projects/{pid}/milestones?per_page=100&state=all", token, ctx.RequestAborted);
-            milestones = (mj?.AsArray() ?? new JsonArray())
-                .Select(m => new
-                {
-                    title = m?["title"]?.GetValue<string>() ?? "",
-                    date  = m?["due_date"]?.GetValue<string>() ?? m?["start_date"]?.GetValue<string>() ?? ""
-                })
-                .Where(m => !string.IsNullOrWhiteSpace(m.title))
-                .OrderByDescending(m => m.date, StringComparer.Ordinal)   // ISO yyyy-MM-dd → tri lexical OK
-                .ThenByDescending(m => m.title, StringComparer.OrdinalIgnoreCase)
-                .Select(m => m.title)
-                .ToList();
-            projects.Add(new { id = pid, name = p["name"]!.GetValue<string>(),
-                group = p["namespace"]?["path"]?.GetValue<string>() ?? "",
-                // full_path du namespace : clé STABLE pour rattacher un projet à son groupe (= group.name = full_path).
-                groupFull = p["namespace"]?["full_path"]?.GetValue<string>() ?? "",
-                milestones });
-        }
-
-        var groups = new List<object>();
-        var gj = await GlGet(http, baseUri, "/api/v4/groups?per_page=100&order_by=name", token, ctx.RequestAborted);
-        foreach (var g in gj?.AsArray() ?? new JsonArray())
-        {
-            var gid = g!["id"]!.GetValue<int>();
-            var members = new List<object>();
-            var mj = await GlGet(http, baseUri, $"/api/v4/groups/{gid}/members?per_page=100", token, ctx.RequestAborted);
-            foreach (var m in mj?.AsArray() ?? new JsonArray())
-            {
-                var lvl = m!["access_level"]?.GetValue<int>() ?? 0; // 40 Maintainer / 50 Owner → lead ; sinon membre
-                members.Add(new { username = m["username"]!.GetValue<string>(),
-                    name = m["name"]?.GetValue<string>() ?? m["username"]!.GetValue<string>(),
-                    role = lvl >= 40 ? "lead" : "member" });
-            }
-            groups.Add(new { name = g["full_path"]?.GetValue<string>() ?? g["name"]!.GetValue<string>(), members });
-        }
-        return Results.Json(new { ok = true, projects, groups });
-    }
-
-    // POST /api/setup/labels { baseUrl, token, selfSigned, projectIds:[] }
-    //   → { ok, labels:[...], total, perProject:[{id,count,ok}] }
-    // perProject permet de distinguer « projet sans label » (ok:true,count:0) d'un « échec d'accès » (ok:false).
-    private async Task<IResult> SetupLabelsAsync(HttpContext ctx)
-    {
-        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
-        var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
-        var selfS   = b?["selfSigned"]?.GetValue<bool>() ?? false;
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || !SetupHostAllowed(baseUri))
-            return Results.Json(new { ok = false, error = "Instance non autorisée." });
-
-        var http = selfS ? _sharedHttpRelaxed : _sharedHttp;
-        var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        var perProject = new JsonArray();
-        foreach (var pidNode in (b?["projectIds"] as JsonArray) ?? new JsonArray())
-        {
-            // ProjectIds tolérant : nombre (id) OU chaîne (id ou chemin "namespace/projet").
-            var pid = pidNode is JsonValue v && v.TryGetValue<int>(out var iv) ? iv.ToString() : (pidNode?.GetValue<string>() ?? "");
-            if (string.IsNullOrWhiteSpace(pid)) continue;
-            var enc = Uri.EscapeDataString(pid);
-            int count = 0; bool ok = false;
-            // include_ancestor_groups=true : les labels Prod:: sont souvent définis au niveau GROUPE.
-            // Pagination (jusqu'à 5×100) pour les projets riches en labels.
-            for (int page = 1; page <= 5; page++)
-            {
-                var lj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/labels?per_page=100&page={page}&include_ancestor_groups=true&with_counts=false", token, ctx.RequestAborted);
-                if (lj is not JsonArray arr) break; // null = échec requête (accès/réseau) ou réponse inattendue
-                ok = true;
-                if (arr.Count == 0) break;
-                foreach (var l in arr) { var n = l?["name"]?.GetValue<string>(); if (!string.IsNullOrWhiteSpace(n)) { set.Add(n); count++; } }
-                if (arr.Count < 100) break;
-            }
-            perProject.Add(new JsonObject { ["id"] = pid, ["count"] = count, ["ok"] = ok });
-        }
-        return Results.Json(new { ok = true, labels = set, total = set.Count, perProject });
-    }
-
-    // --- Édition de la config depuis le dashboard (ADMIN) -------------------------------------------------
-    /// <summary>Serveur GitLab du périmètre courant (claim de session, repli sur le 1er configuré).</summary>
-    private ServerConfig? CurrentServer(HttpContext ctx)
-        => ServerById(ctx.User.FindFirst(ServerClaim)?.Value) ?? _config.ResolveServers().FirstOrDefault();
-
-    // GET /api/options/projects → TOUS les projets accessibles au token de groupe STOCKÉ (+ flag imported).
-    private async Task<IResult> OptionsProjectsAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var server = CurrentServer(ctx);
-        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
-            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
-            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
-        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
-        var imported = new HashSet<int>(_config.Export.ProjectIds ?? new());
-        var projects = new List<object>();
-        var seen = new HashSet<int>();
-        for (int page = 1; page <= 10; page++)
-        {
-            var pj = await GlGet(http, baseUri, $"/api/v4/projects?membership=true&simple=true&per_page=100&page={page}&order_by=name&sort=asc", server.GroupToken, ctx.RequestAborted);
-            if (pj is not JsonArray arr || arr.Count == 0) break;
-            foreach (var p in arr)
-            {
-                if (p is not JsonObject po) continue;
-                var id = po["id"] is JsonValue iv && iv.TryGetValue<int>(out var ii) ? ii : 0;
-                if (id == 0 || !seen.Add(id)) continue;
-                projects.Add(new
-                {
-                    id,
-                    name = po["name"]?.GetValue<string>() ?? "",
-                    group = po["namespace"]?["path"]?.GetValue<string>() ?? "",
-                    groupFull = po["namespace"]?["full_path"]?.GetValue<string>() ?? "",
-                    imported = imported.Contains(id),
-                });
-            }
-            if (arr.Count < 100) break;
-        }
-        return Results.Json(new { ok = true, projects });
-    }
-
-    // GET /api/options/labels?projectIds=4,11 → labels (incl. ancêtres de groupe) des projets choisis.
-    private async Task<IResult> OptionsLabelsAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var server = CurrentServer(ctx);
-        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
-            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
-            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
-        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
-        var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pid in (ctx.Request.Query["projectIds"].ToString() ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var enc = Uri.EscapeDataString(pid);
-            for (int page = 1; page <= 5; page++)
-            {
-                var lj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/labels?per_page=100&page={page}&include_ancestor_groups=true&with_counts=false", server.GroupToken, ctx.RequestAborted);
-                if (lj is not JsonArray arr || arr.Count == 0) break;
-                foreach (var l in arr) { var n = l?["name"]?.GetValue<string>(); if (!string.IsNullOrWhiteSpace(n)) set.Add(n); }
-                if (arr.Count < 100) break;
-            }
-        }
-        return Results.Json(new { ok = true, labels = set });
-    }
-
-    // GET /api/options/milestones?projectIds=4,11 → milestones (triées, récentes d'abord) des projets
-    // choisis, récupérées EN DIRECT sur GitLab. Indispensable AVANT la 1re extraction : le catalogue
-    // local (availableMilestones du payload) est encore vide, or la régénération se cible par milestone.
-    private async Task<IResult> OptionsMilestonesAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var server = CurrentServer(ctx);
-        if (server == null || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)
-            || !Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
-            return Results.Json(new { ok = false, error = "Aucun serveur GitLab configuré." });
-        var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
-        // projectIds absent/vide → tous les projets configurés du serveur.
-        var pids = (ctx.Request.Query["projectIds"].ToString() ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        if (pids.Count == 0) pids = (server.ProjectIds ?? new()).ToList();
-        var items = new List<(string title, string date)>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pid in pids)
-        {
-            var enc = Uri.EscapeDataString(pid);
-            var mj = await GlGet(http, baseUri, $"/api/v4/projects/{enc}/milestones?per_page=100&state=all", server.GroupToken, ctx.RequestAborted);
-            foreach (var m in mj?.AsArray() ?? new JsonArray())
-            {
-                var title = m?["title"]?.GetValue<string>() ?? "";
-                if (string.IsNullOrWhiteSpace(title) || !seen.Add(title)) continue;
-                items.Add((title, m?["due_date"]?.GetValue<string>() ?? m?["start_date"]?.GetValue<string>() ?? ""));
-            }
-        }
-        var milestones = items
-            .OrderByDescending(x => x.date, StringComparer.Ordinal)   // ISO yyyy-MM-dd → tri lexical OK
-            .ThenByDescending(x => x.title, StringComparer.OrdinalIgnoreCase)
-            .Select(x => x.title).ToList();
-        return Results.Json(new { ok = true, milestones });
-    }
-
-    // POST /api/options/worktime { workStartHour, workEndHour, workingDaysOnly, holidays:[], minPhaseMinutes }
-    // → persiste la fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps), hot-reload.
-    private async Task<IResult> SaveWorkTimeAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
-        var start = b?["workStartHour"]?.GetValue<int>() ?? 9;
-        var end = b?["workEndHour"]?.GetValue<int>() ?? 19;
-        var daysOnly = b?["workingDaysOnly"]?.GetValue<bool>() ?? true;
-        var noise = b?["minPhaseMinutes"]?.GetValue<int>() ?? 0;
-        if (start < 0 || start > 23 || end < 1 || end > 24 || end <= start)
-            return Results.Json(new { ok = false, error = "Plage horaire invalide (début 0-23, fin 1-24, fin > début)." });
-        if (noise < 0 || noise > 24 * 60)
-            return Results.Json(new { ok = false, error = "Seuil anti-bruit invalide (0 à 1440 minutes)." });
-        var holidays = new JsonArray();
-        var seenH = new HashSet<string>();
-        foreach (var h in (b?["holidays"] as JsonArray) ?? new JsonArray())
-        {
-            var s = (h?.GetValue<string>() ?? "").Trim();
-            if (s.Length == 0) continue;
-            if (!Regex.IsMatch(s, @"^\d{4}-\d{2}-\d{2}$") || !DateTime.TryParse(s, out _))
-                return Results.Json(new { ok = false, error = $"Jour férié invalide : « {s} » (format aaaa-mm-jj)." });
-            if (seenH.Add(s)) holidays.Add(s);
-        }
-
-        JsonObject root;
-        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
-        catch { root = new JsonObject(); }
-        var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
-        ex["WorkStartHour"] = start;
-        ex["WorkEndHour"] = end;
-        ex["WorkingDaysOnly"] = daysOnly;
-        ex["Holidays"] = holidays;
-        ex["MinPhaseMinutes"] = noise;
-        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try { await WriteFileAtomicAsync(RuntimeConfigPath(), outText); }
-        catch (Exception e) { Console.Error.WriteLine("SaveWorkTime KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
-        // Hot-reload : les prochains payloads embarquent la nouvelle fenêtre (recalcul côté client au rechargement).
-        try { _config = BuildConfig(); _payloadCache.Clear(); }
-        catch (Exception e) { Console.Error.WriteLine("SaveWorkTime reload KO : " + e); }
-        return Results.Json(new { ok = true });
-    }
-
-    // Rôle d'une période à l'écriture (Piste 2) : lit `role` (active|wait|nogc) ; repli sur `timed` si un
-    // vieux client ne l'envoie pas encore (timed:true → active, timed:false → nogc). Le `Timed` persisté
-    // en est dérivé (Role != "nogc").
-    private static string PeriodRole(JsonObject po)
-    {
-        static string? S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
-        var r = (S(po["role"]) ?? "").Trim().ToLowerInvariant();
-        if (r == "active" || r == "wait" || r == "nogc") return r;
-        var timed = po["timed"] is JsonValue tv && tv.TryGetValue<bool>(out var tb) ? tb : true;
-        return timed ? "active" : "nogc";
-    }
-
-    // POST /api/options → sauvegarde des sections Export (projets/phases/labels/équipes, global + par projet) ET
-    // Servers[<courant>].ProjectIds. PRÉSERVE GroupToken/BaseUrl/Auth (Teams écrites si transmises, sinon préservées).
-    // Hot-reload ; refetch optionnel.
-    // Réutilise la validation de SetupSaveAsync (clés de période uniques, hex strict, label→période croisée).
-    private async Task<IResult> SaveOptionsAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
-        static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
-
-        var projectIds = ((b?["projectIds"] as JsonArray) ?? new JsonArray())
-            .Select(n => n is JsonValue v && v.TryGetValue<int>(out var i) ? i : 0).Where(i => i > 0).Distinct().ToList();
-        if (projectIds.Count == 0) return Results.Json(new { ok = false, error = "Sélectionnez au moins un projet." });
-
-        var periodsArr = new JsonArray();
-        var validKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in (b?["periods"] as JsonArray) ?? new JsonArray())
-        {
-            if (p is not JsonObject po) continue;
-            var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(key) || key == "none" || !validKeys.Add(key)) continue;
-            var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
-            var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-            var role = PeriodRole(po);
-            periodsArr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
-        }
-        var trackedLabels = new List<string>();
-        var labelPhases = new Dictionary<string, string>();
-        foreach (var kv in ((b?["labelPhases"] as JsonObject) ?? new JsonObject()))
-        {
-            var ph = Str(kv.Value) ?? "none";
-            if (ph != "none" && validKeys.Count > 0 && !validKeys.Contains(ph)) ph = "none";
-            labelPhases[kv.Key] = ph;
-            if (ph != "none") trackedLabels.Add(kv.Key);
-        }
-        var projectsArr = new JsonArray();
-        foreach (var p in (b?["projects"] as JsonArray) ?? new JsonArray())
-        {
-            if (p is not JsonObject po) continue;
-            var pid = po["id"] is JsonValue piv && piv.TryGetValue<int>(out var pii) ? pii : 0; if (pid == 0) continue;
-            projectsArr.Add(new JsonObject { ["Id"] = pid, ["Name"] = (Str(po["name"]) ?? "").Trim(), ["Group"] = (Str(po["group"]) ?? "").Trim() });
-        }
-
-        JsonObject root;
-        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
-        catch { root = new JsonObject(); }
-
-        // Serveur courant : on met à jour SES ProjectIds, sans toucher au token ni à l'URL.
-        var serverId = CurrentServer(ctx)?.Id;
-        if (root["Servers"] is JsonArray serversArr && serverId != null)
-            foreach (var sNode in serversArr)
-                if (sNode is JsonObject so && string.Equals(so["Id"]?.GetValue<string>(), serverId, StringComparison.OrdinalIgnoreCase))
-                { so["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i.ToString())).ToArray()); break; }
-
-        var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
-        ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
-        ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
-        ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
-        if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
-        if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
-        if (b?["periodsByProject"] is JsonObject pbp)
-        {
-            var outPbp = new JsonObject();
-            foreach (var kv in pbp)
-            {
-                if (kv.Value is not JsonArray parr) continue;
-                var arr = new JsonArray(); var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var p in parr)
-                {
-                    if (p is not JsonObject po) continue;
-                    var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
-                    if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
-                    var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
-                    var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-                    var role = PeriodRole(po);
-                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
-                }
-                outPbp[kv.Key] = arr;
-            }
-            ex["PeriodsByProject"] = outPbp;
-        }
-        if (b?["labelPhasesByProject"] is JsonObject lbp)
-        {
-            var outLbp = new JsonObject();
-            foreach (var kv in lbp)
-            {
-                if (kv.Value is not JsonObject m) continue;
-                var mm = new JsonObject();
-                foreach (var e in m) mm[e.Key] = (Str(e.Value) ?? "none");
-                outLbp[kv.Key] = mm;
-            }
-            ex["LabelPhasesByProject"] = outLbp;
-        }
-        // Équipes éditées dans l'onglet Options : { name, members:[username] } — lead = 1er membre (pas de
-        // champ « lead » en config). N'écrit QUE si le client transmet "teams" (sinon préserve l'existant) ;
-        // TeamGroups (mapping équipe→groupe GitLab, posé au /setup) est laissé intact.
-        if (b?["teams"] is JsonArray teamsArr)
-        {
-            var teams = new JsonObject();
-            foreach (var t in teamsArr)
-            {
-                if (t is not JsonObject to) continue;
-                var name = (Str(to["name"]) ?? "").Trim();
-                if (name.Length == 0 || teams.ContainsKey(name)) continue;
-                var arr = new JsonArray(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var m in (to["members"] as JsonArray) ?? new JsonArray())
-                {
-                    var u = (Str(m) ?? "").Trim();
-                    if (u.Length > 0 && seen.Add(u)) arr.Add(JsonValue.Create(u));
-                }
-                teams[name] = arr;
-            }
-            ex["Teams"] = teams;
-        }
-        // Équipes PAR PROJET : { "projectId": [ {name, members:[username]} ] } → { name → members } par projet.
-        // N'écrit QUE si transmis (sinon préserve l'existant).
-        if (b?["teamsByProject"] is JsonObject tbp)
-        {
-            var outTbp = new JsonObject();
-            foreach (var kv in tbp)
-            {
-                if (kv.Value is not JsonArray tarr) continue;
-                var teamsObj = new JsonObject();
-                foreach (var t in tarr)
-                {
-                    if (t is not JsonObject to) continue;
-                    var name = (Str(to["name"]) ?? "").Trim();
-                    if (name.Length == 0 || teamsObj.ContainsKey(name)) continue;
-                    var arr = new JsonArray(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var m in (to["members"] as JsonArray) ?? new JsonArray())
-                    { var u = (Str(m) ?? "").Trim(); if (u.Length > 0 && seen.Add(u)) arr.Add(JsonValue.Create(u)); }
-                    teamsObj[name] = arr;
-                }
-                outTbp[kv.Key] = teamsObj;
-            }
-            ex["TeamsByProject"] = outTbp;
-        }
-
-        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try
-        {
-            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
-            var src = SourceConfigPath();
-            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
-                await WriteFileAtomicAsync(src, outText);
-        }
-        catch (Exception e) { Console.Error.WriteLine("SaveOptions write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
-
-        try { _config = BuildConfig(); _memberCache.Clear(); _payloadCache.Clear(); }
-        catch (Exception e) { Console.Error.WriteLine("SaveOptions reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
-
-        var refetch = b?["refetch"] is JsonValue rv && rv.TryGetValue<bool>(out var rb) && rb;
-        if (refetch) StartSetupFetch(ctx);
-        return Results.Json(new { ok = true, refetch });
-    }
-
-    // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority
-    // dans appsettings.json, recharge la config, et INVALIDE le cache des options OAuth → reconfiguration À CHAUD
-    // (le bouton SSO devient actif sans redémarrage). Le Secret n'est pas renvoyé au client.
-    private async Task<IResult> SetupOAuthSaveAsync(HttpContext ctx)
-    {
-        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
-        var clientId     = (b?["clientId"]?.GetValue<string>() ?? "").Trim();
-        var clientSecret = (b?["clientSecret"]?.GetValue<string>() ?? "").Trim();
-        var authority    = (b?["authority"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(clientId))
-            return Results.Json(new { ok = false, error = "Application ID requis." });
-        // Instance EXPLICITE et obligatoire : plus de repli silencieux sur l'Authority existante (c'était le piège
-        // qui laissait gitlab.com quand le champ n'était pas renseigné → SSO vers gitlab.com public).
-        if (string.IsNullOrWhiteSpace(authority))
-            return Results.Json(new { ok = false, error = "Renseignez l'URL de l'instance GitLab (ex. https://gitlab.exemple.com)." });
-        if (!Uri.TryCreate(authority, UriKind.Absolute, out var au) || (au.Scheme != Uri.UriSchemeHttp && au.Scheme != Uri.UriSchemeHttps))
-            return Results.Json(new { ok = false, error = "URL d'instance invalide (http/https requis)." });
-
-        JsonObject root;
-        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
-        catch { root = new JsonObject(); }
-        var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
-        // Secret : requis à la première config ; en RECONFIGURATION (champ laissé vide), on CONSERVE l'existant
-        // (permet de corriger l'instance seule sans recoller le secret).
-        var existingSecret = (auth["ClientSecret"]?.GetValue<string>() ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(clientSecret) && string.IsNullOrWhiteSpace(existingSecret))
-            return Results.Json(new { ok = false, error = "Secret requis." });
-        auth["Authority"] = authority;
-        auth["ClientId"] = clientId;
-        if (!string.IsNullOrWhiteSpace(clientSecret)) auth["ClientSecret"] = clientSecret;
-        if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
-        // Cert auto-signé / CA interne : porté par l'étape 1 (avant l'enregistrement du serveur), persisté sur Auth
-        // pour que le backchannel OAuth tolère le TLS dès le bootstrap. Conserve une valeur déjà posée si omise.
-        var selfSigned = b?["selfSigned"]?.GetValue<bool>() ?? (auth["AllowSelfSignedCertificates"]?.GetValue<bool>() ?? false);
-        auth["AllowSelfSignedCertificates"] = selfSigned;
-
-        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try
-        {
-            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
-            var src = SourceConfigPath();
-            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
-                await WriteFileAtomicAsync(src, outText);
-        }
-        catch (Exception e) { Console.Error.WriteLine("SetupOAuthSave write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
-
-        try { _config = BuildConfig(); }
-        catch (Exception e) { Console.Error.WriteLine("SetupOAuthSave reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
-
-        // Reconfiguration À CHAUD : vider le cache des options du schéma « gitlab » → reconstruites (via le
-        // delegate AddOAuth) avec les nouveaux identifiants au prochain challenge. Pas de redémarrage requis.
-        try { (ctx.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptionsMonitorCache<Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions>)) as Microsoft.Extensions.Options.IOptionsMonitorCache<Microsoft.AspNetCore.Authentication.OAuth.OAuthOptions>)?.TryRemove("gitlab"); }
-        catch (Exception e) { Console.Error.WriteLine("OAuth options cache invalidation KO : " + e); }
-
-        return Results.Json(new { ok = true });
-    }
-
-    // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json
-    private async Task<IResult> SetupSaveAsync(HttpContext ctx)
-    {
-        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
-        var bootstrap = !IsConfigured(); // 1re mise en service : on pourra écrire Auth (admin) ; sinon Auth verrouillé
-        var b = await ReadJsonBody(ctx);
-        var baseUrl = (b?["baseUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
-        var token   = (b?["token"]?.GetValue<string>() ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
-            return Results.Json(new { ok = false, error = "Connexion manquante." });
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) || !SetupHostAllowed(baseUri))
-            return Results.Json(new { ok = false, error = "Instance non autorisée." });
-
-        var projectIds = ((b?["projectIds"] as JsonArray) ?? new JsonArray()).Select(n => n!.GetValue<int>()).ToList();
-        if (projectIds.Count == 0) return Results.Json(new { ok = false, error = "Sélectionnez au moins un projet." });
-
-        // Catalogue des périodes (phases) — normalisé en PascalCase pour matcher le DTO PeriodDefinition
-        // (binding tolérant à la casse, mais on reste explicite). « none » exclu (marqueur, pas une période).
-        // Extraction robuste contre les types JSON inattendus (admin pouvant envoyer un body malformé).
-        static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
-        var periodsArr = new JsonArray();
-        var validPeriodKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in (b?["periods"] as JsonArray) ?? new JsonArray())
-        {
-            if (p is not JsonObject po) continue;
-            var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(key) || key == "none" || !validPeriodKeys.Add(key)) continue;
-            var name = (Str(po["name"]) ?? "").Trim();
-            if (string.IsNullOrEmpty(name)) name = key;                       // « » → repli sur la clé
-            var color = (Str(po["color"]) ?? "").Trim();
-            if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc"; // hex strict, sinon défaut
-            var role = PeriodRole(po);
-            periodsArr.Add(new JsonObject
-            {
-                ["Key"]   = key,
-                ["Name"]  = name,
-                ["Color"] = color,
-                ["Role"]  = role,
-                ["Timed"] = role != "nogc",
-            });
-        }
-
-        var trackedLabels = new List<string>();
-        var labelPhases = new Dictionary<string, string>();
-        foreach (var kv in ((b?["labelPhases"] as JsonObject) ?? new JsonObject()))
-        {
-            var ph = kv.Value?.GetValue<string>() ?? "none";
-            // Validation croisée : un label pointant vers une période inexistante est rétrogradé en « none »
-            // (pas de key orpheline). Si aucune période n'est transmise → on accepte tel quel (rétro-compat).
-            if (ph != "none" && validPeriodKeys.Count > 0 && !validPeriodKeys.Contains(ph)) ph = "none";
-            labelPhases[kv.Key] = ph;
-            if (ph != "none") trackedLabels.Add(kv.Key);
-        }
-
-        var teams = new JsonObject();
-        var teamGroups = new JsonObject();           // nom d'équipe → groupPath (full_path du groupe GitLab)
-        foreach (var t in b?["teams"]?.AsArray() ?? new JsonArray())
-        {
-            var name = t!["name"]!.GetValue<string>();
-            var arr = new JsonArray();
-            foreach (var m in t["members"]?.AsArray() ?? new JsonArray())
-                arr.Add(m!["username"]!.GetValue<string>());
-            teams[name] = arr;
-            var gp = (Str(t["groupPath"]) ?? "").Trim();
-            if (gp.Length > 0) teamGroups[name] = gp;
-        }
-
-        // Projets importés AVEC nom + namespace (l'onglet Options du dashboard ne peut pas dériver les noms des IDs).
-        var projectsArr = new JsonArray();
-        foreach (var p in (b?["projects"] as JsonArray) ?? new JsonArray())
-        {
-            if (p is not JsonObject po) continue;
-            var pid = po["id"] is JsonValue piv && piv.TryGetValue<int>(out var pii) ? pii : 0;
-            if (pid == 0) continue;
-            projectsArr.Add(new JsonObject
-            {
-                ["Id"]    = pid,
-                ["Name"]  = (Str(po["name"]) ?? "").Trim(),
-                ["Group"] = (Str(po["group"]) ?? "").Trim(),
-            });
-        }
-
-        // Merge non destructif : la section Auth (admins, OAuth) est PRÉSERVÉE telle quelle (non modifiable via l'app).
-        JsonObject root;
-        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
-        catch { root = new JsonObject(); }
-
-        var selfSigned = b?["selfSigned"]?.GetValue<bool>() ?? false;
-        var timeout = b?["timeout"]?.GetValue<int>() ?? 60;
-        var serverId = DeriveServerId(baseUri);
-
-        // 1c-D : on n'écrit plus le bloc GitLab legacy ; on retire un éventuel bloc résiduel pour une config propre.
-        if (root["GitLab"] != null) root.Remove("GitLab");
-
-        // v2 — entrée Servers cloisonnée (token de GROUPE, projets sélectionnés). Insert OU update par Id
-        // (dérivé de l'hôte) → relancer /setup pour une autre instance AJOUTE un serveur sans écraser les autres.
-        var serversArr = root["Servers"] as JsonArray;
-        if (serversArr == null) { serversArr = new JsonArray(); root["Servers"] = serversArr; }
-        JsonObject? entry = null;
-        foreach (var sNode in serversArr)
-            if (sNode is JsonObject so && string.Equals(so["Id"]?.GetValue<string>(), serverId, StringComparison.OrdinalIgnoreCase))
-            { entry = so; break; }
-        if (entry == null) { entry = new JsonObject(); serversArr.Add(entry); }
-        entry["Id"] = serverId;
-        entry["BaseUrl"] = baseUrl;
-        entry["GroupToken"] = token;
-        entry["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i.ToString())).ToArray());
-        entry["AllowSelfSignedCertificates"] = selfSigned;
-        entry["RequestTimeoutSeconds"] = timeout;
-
-        var ex = root["Export"] as JsonObject ?? new JsonObject(); root["Export"] = ex;
-        ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
-        ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
-        ex["Teams"] = teams;
-        ex["TeamGroups"] = teamGroups;
-        ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
-        // Projets importés (nom + namespace) — n'écrit que si le client les transmet (sinon préserve l'existant).
-        if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
-        // v4 — milestone à IMPORTER par projet (périmètre de la 1re extraction — pas une borne ; les
-        // runs globaux rafraîchissent ensuite les milestones déjà importées).
-        // Clés = ids de projets SÉLECTIONNÉS uniquement ; valeurs vides ignorées (= tout l'historique).
-        if (b?["startMilestones"] is JsonObject smIn)
-        {
-            var outSm = new JsonObject();
-            foreach (var kv in smIn)
-            {
-                if (!int.TryParse(kv.Key, out var smPid) || !projectIds.Contains(smPid)) continue;
-                var smTitle = (Str(kv.Value) ?? "").Trim();
-                if (smTitle.Length > 0) outSm[smPid.ToString()] = smTitle;
-            }
-            ex["StartMilestones"] = outSm;
-        }
-        // Catalogue des périodes : on n'écrit QUE si le wizard a transmis le champ (même vide = volonté
-        // explicite de « pas de phase »). Champ absent (client ancien) → on préserve l'éventuel existant.
-        if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
-
-        // v3 — PHASES PAR PROJET (mode « Par projet » du wizard). Persistées en plus du global ; un projet
-        // absent retombe sur le global. ⚠ Stage 1 : écrites mais PAS encore consommées par le dashboard (Stage 2).
-        if (b?["periodsByProject"] is JsonObject pbp)
-        {
-            var outPbp = new JsonObject();
-            foreach (var kv in pbp)
-            {
-                if (kv.Value is not JsonArray parr) continue;
-                var arr = new JsonArray();
-                var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var p in parr)
-                {
-                    if (p is not JsonObject po) continue;
-                    var key = (Str(po["key"]) ?? "").Trim().ToLowerInvariant();
-                    if (string.IsNullOrEmpty(key) || key == "none" || !keys.Add(key)) continue;
-                    var name = (Str(po["name"]) ?? "").Trim(); if (name.Length == 0) name = key;
-                    var color = (Str(po["color"]) ?? "").Trim(); if (!Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$")) color = "#cccccc";
-                    var role = PeriodRole(po);
-                    arr.Add(new JsonObject { ["Key"] = key, ["Name"] = name, ["Color"] = color, ["Role"] = role, ["Timed"] = role != "nogc" });
-                }
-                outPbp[kv.Key] = arr;
-            }
-            ex["PeriodsByProject"] = outPbp;
-        }
-        if (b?["labelPhasesByProject"] is JsonObject lbp)
-        {
-            var outLbp = new JsonObject();
-            foreach (var kv in lbp)
-            {
-                if (kv.Value is not JsonObject m) continue;
-                var mm = new JsonObject();
-                foreach (var e in m) { mm[e.Key] = (Str(e.Value) ?? "none"); }
-                outLbp[kv.Key] = mm;
-            }
-            ex["LabelPhasesByProject"] = outLbp;
-        }
-
-        // BOOTSTRAP (1re mise en service) : établir le 1er admin + l'autorité (login/OAuth). C'est la SEULE
-        // écriture de Auth via l'app ; une fois configuré, Auth est verrouillé (cf. SaveConfigAsync préserve Auth).
-        if (bootstrap)
-        {
-            // Admin de la 1re mise en service. Source PRIORITAIRE : le compte GitLab qui a ouvert la SESSION
-            // OAuth pour atteindre /setup (ctx.User) → pas d'injection possible. Repli rétro-compatible : le(s)
-            // username(s) du body `admins` (ancien flux où l'admin n'était pas encore authentifié). Au moins un requis.
-            var admins = new JsonArray();
-            var oauthLogin = ctx.User.Identity?.Name ?? "";
-            if (!string.IsNullOrWhiteSpace(oauthLogin)) admins.Add(JsonValue.Create(oauthLogin));
-            else foreach (var a in b?["admins"]?.AsArray() ?? new JsonArray())
-            { var u = (Str(a) ?? "").Trim(); if (u.Length > 0) admins.Add(JsonValue.Create(u)); }
-            if (admins.Count == 0) return Results.Json(new { ok = false, error = "Connectez-vous via GitLab (ou indiquez au moins un compte administrateur)." });
-            var auth = root["Auth"] as JsonObject ?? new JsonObject(); root["Auth"] = auth;
-            auth["Authority"] = baseUrl;     // verrouille l'instance de login sur ce host
-            auth["AdminUsers"] = admins;
-            if (auth["CallbackPath"] == null) auth["CallbackPath"] = "/signin-gitlab";
-        }
-
-        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-        try
-        {
-            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
-            var src = SourceConfigPath();
-            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
-                await WriteFileAtomicAsync(src, outText);
-        }
-        catch (Exception e) { Console.Error.WriteLine("SetupSave write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
-
-        try { _config = BuildConfig(); _memberCache.Clear(); _payloadCache.Clear(); }
-        catch (Exception e) { Console.Error.WriteLine("SetupSave reload KO : " + e); return Results.Json(new { ok = false, error = "Configuration enregistrée, mais rechargement échoué (redémarrez le serveur)." }); }
-
-        // Fetch-all multi-serveurs en arrière-plan (best-effort) : extrait les projets sélectionnés
-        // et écrit les données CHIFFRÉES sous output/<serverId>/. Le dashboard suit l'avancement via /api/status.
-        StartSetupFetch(ctx);
-
-        // bootstrap : la session est anonyme et l'instance vient de devenir « configurée » → le frontend
-        // redirige vers /login (l'admin se connecte ; l'extraction tourne en fond). Sinon (admin) → loader.
-        return Results.Json(new { ok = true, jobId = "setup", bootstrap });
-    }
-
-    /// <summary>Identifiant de serveur stable dérivé de l'hôte de l'instance (segment de dossier, [a-z0-9-]).</summary>
-    private static string DeriveServerId(Uri baseUri)
-    {
-        var host = baseUri.Host ?? "";
-        var r = new string(host.Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-').ToArray()).Trim('-');
-        return string.IsNullOrEmpty(r) ? "default" : r;
-    }
-
-    /// <summary>Lance l'extraction multi-serveurs en tâche de fond après une mise en service réussie
-    /// (réutilise le verrou/état/CTS du refresh ; RunRefreshAsync route vers le multi-serveur car Servers est configuré).</summary>
-    private void StartSetupFetch(HttpContext ctx)
-    {
-        if (!_refreshLock.Wait(0)) return; // une acquisition tourne déjà → ne pas doubler
-        // État posé SYNCHRONEMENT (avant le Task.Run) : sinon le 1er poll /api/setup/progress verrait
-        // Running=false et conclurait 'done' à tort → redirection prématurée vers le dashboard.
-        _state.Reset();
-        _state.Running = true;
-        _state.StartedAt = DateTime.UtcNow;
-        var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
-        var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
-        _ = Task.Run(() => RunRefreshAsync(new List<string>(), null, serverCt));
-    }
-
-    /// <summary>Progression du scrap post-setup, mappée sur l'état du job (loader temps réel côté /setup).</summary>
-    private IResult SetupProgress(HttpContext ctx)
-    {
-        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
-        var s = _state.Snapshot();
-        var status = s.running ? "running" : (!string.IsNullOrEmpty(s.lastError) ? "error" : "done");
-        var percent = s.total > 0 ? Math.Min(99, (int)Math.Round(s.current * 100.0 / s.total)) : (s.running ? 3 : 100);
-        if (status == "done") percent = 100;
-        double? eta = null;
-        var started = _state.StartedAt;
-        if (status == "running" && percent > 0 && started != null)
-        {
-            var el = (DateTime.UtcNow - started.Value).TotalSeconds;
-            if (el > 0) eta = Math.Round(el / percent * (100 - percent));
-        }
-        return Results.Json(new
-        {
-            status,
-            percent,
-            stage = "issues",
-            project = (string?)null,
-            message = status == "done" ? "Terminé"
-                : status == "error" ? (s.lastError ?? "Erreur")
-                : (s.total > 0 ? $"Extraction des données… ({s.current}/{s.total})" : "Démarrage de l'extraction…"),
-            etaSeconds = eta,
-            counts = new { issues = new[] { s.current, s.total } },
-            error = string.IsNullOrEmpty(s.lastError) ? null : s.lastError,
-        });
-    }
-
-    // --- Résolution de compte / rôles (étape 3) -------------------------
-
-    private Task<IResult> ServeTokenAsync(HttpContext ctx)
-    {
-        var deny = RequireAdmin(ctx);
-        if (deny != null) return Task.FromResult(deny);
-        return Task.FromResult(Results.Json(new TokenPayload { token = ReadCurrentToken() ?? "" }));
-    }
-
-    private IResult? RequireAdmin(HttpContext ctx)
-        => IsAdminLogin(ctx.User.Identity?.Name)
-            ? null
-            : Results.Text("Réservé aux administrateurs.", "text/plain; charset=utf-8", Encoding.UTF8, StatusCodes.Status403Forbidden);
-
-    /// <summary>Accès aux endpoints de l'assistant : OUVERT tant que l'instance n'est pas configurée
-    /// (1re mise en service après un clone), sinon réservé aux admins. Verrouille le bootstrap dès qu'il est fait.</summary>
-    private IResult? RequireSetupAccess(HttpContext ctx)
-        => (!IsConfigured() || IsAdminLogin(ctx.User.Identity?.Name))
-            ? null
-            : Results.Text("Réservé aux administrateurs.", "text/plain; charset=utf-8", Encoding.UTF8, StatusCodes.Status403Forbidden);
-
-    private bool IsAdminLogin(string? login)
-    {
-        if (string.IsNullOrWhiteSpace(login)) return false;
-        // Les admins viennent UNIQUEMENT de Auth.AdminUsers (appsettings.json, fichier serveur).
-        // Volontairement NON modifiable via l'app : SaveConfigAsync préserve la section Auth,
-        // et accounts.json ne peut plus promouvoir d'admin. Seul un accès au serveur change la liste.
-        return _config.Auth.AdminUsers.Any(u => string.Equals(u, login, StringComparison.OrdinalIgnoreCase));
-    }
-
-    // --- Rôles GitLab : accès réservé aux membres du projet ---------------
-    // Cache des access levels (username -> niveau ou null si non-membre), positif ET négatif.
-    private readonly ConcurrentDictionary<string, (int? level, DateTime until)> _memberCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly TimeSpan MemberCacheTtl = TimeSpan.FromMinutes(5);
-
-    /// <summary>
-    /// Access level GitLab de <paramref name="username"/> sur le projet configuré, résolu avec le
-    /// token de SERVICE (le PAT de l'utilisateur n'a besoin que de read_user). null = non membre.
-    /// En cas d'échec du lookup (GitLab injoignable), on prolonge la dernière valeur connue
-    /// (dégradation douce pour les sessions actives) ; un inconnu reste refusé (fail-closed).
-    /// </summary>
-    /// <summary>Comptes techniques GitLab (porteurs des project/group access tokens) : jamais de session.</summary>
-    private static bool IsBotUsername(string username)
-        => Regex.IsMatch(username ?? "", @"^(project|group)_\d+_bot\d*$", RegexOptions.IgnoreCase);
-
-    private const string ServerClaim = "kpi:server";
-
-    // Serveur configuré correspondant à une instance GitLab (par hôte) / à un Id.
-    private ServerConfig? ServerForInstance(string instance)
-    {
-        if (!Uri.TryCreate(instance, UriKind.Absolute, out var iu)) return null;
-        foreach (var s in _config.ResolveServers())
-            if (Uri.TryCreate(s.BaseUrl, UriKind.Absolute, out var su) && string.Equals(su.Host, iu.Host, StringComparison.OrdinalIgnoreCase))
-                return s;
-        return null;
-    }
-    private ServerConfig? ServerById(string? id)
-        => string.IsNullOrEmpty(id) ? null : _config.ResolveServers().FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
-
-    /// <summary>
-    /// Access level max de <paramref name="username"/> sur les PROJETS d'un serveur, résolu avec le
-    /// token de groupe du serveur. null = non membre. Cloisonné : cache par (serveur, username).
-    /// Échec lookup → prolonge la dernière valeur connue (dégradation douce) ; inconnu refusé (fail-closed).
-    /// Les bots (porteurs des tokens) sont traités comme non-membres.
-    /// </summary>
-    private async Task<int?> GetServerAccessLevelAsync(ServerConfig server, string username, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(username) || IsBotUsername(username)) return null;
-        var cacheKey = server.Id + "|" + username;
-        if (_memberCache.TryGetValue(cacheKey, out var hit) && hit.until > DateTime.UtcNow) return hit.level;
-        try
-        {
-            var http = server.AllowSelfSignedCertificates ? _sharedHttpRelaxed : _sharedHttp;
-            int? best = null;
-            foreach (var pid in server.ProjectIds ?? new List<string>())
-            {
-                var url = $"{server.BaseUrl.TrimEnd('/')}/api/v4/projects/{Uri.EscapeDataString(pid)}/members/all?query={Uri.EscapeDataString(username)}&per_page=100";
-                using var req = new HttpRequestMessage(HttpMethod.Get, url);
-                req.Headers.Add("PRIVATE-TOKEN", server.GroupToken);
-                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                using var resp = await http.SendAsync(req, ct);
-                if (!resp.IsSuccessStatusCode) continue;
-                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-                foreach (var m in doc.RootElement.EnumerateArray())
-                    if (m.TryGetProperty("username", out var u) && string.Equals(u.GetString(), username, StringComparison.OrdinalIgnoreCase)
-                        && m.TryGetProperty("access_level", out var al))
-                    { var lvl = al.GetInt32(); if (best == null || lvl > best) best = lvl; break; }
-            }
-            _memberCache[cacheKey] = (best, DateTime.UtcNow.Add(MemberCacheTtl));
-            return best;
-        }
-        catch
-        {
-            if (_memberCache.TryGetValue(cacheKey, out var stale)) { _memberCache[cacheKey] = (stale.level, DateTime.UtcNow.Add(MemberCacheTtl)); return stale.level; }
-            return null;
-        }
-    }
-
-    /// <summary>Session autorisée ? (admin, ou membre des projets du SERVEUR de la session — révocable à chaud.)</summary>
-    private async Task<bool> IsAllowedAsync(HttpContext ctx)
-    {
-        var login = ctx.User.Identity?.Name ?? "";
-        if (IsAdminLogin(login)) return true;
-        var server = ServerById(ctx.User.FindFirst(ServerClaim)?.Value) ?? _config.ResolveServers().FirstOrDefault();
-        if (server == null) return false;
-        return await GetServerAccessLevelAsync(server, login, ctx.RequestAborted) != null;
-    }
-
-    private static bool LeadsContain(JsonNode? account, string login)
-    {
-        var leads = account?["leads"]?.AsArray();
-        if (leads == null) return false;
-        foreach (var l in leads)
-            if (string.Equals(l?.GetValue<string>(), login, StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
-    }
-
-    // Compte résolu (rôle / périmètre / vue) pour une identité GitLab.
-    private sealed class Resolved
-    {
-        public string Login = "";
-        public string Role = "user";       // admin | group | user
-        public string DisplayName = "";
-        public string ScopeType = "user";  // all | team | user
-        public string? ScopeValue;
-        public string? ViewId;
-        public string? DefaultTab;
-        public bool AutoProvisioned;
-        public List<string> Tabs = new();
-        public List<string> Milestones = new();
-        public bool MilestonesLocked;
-        public List<string> Labels = new();
-        public bool LabelsLocked;
-    }
-
-    // Login effectif : un ADMIN peut impersonifier via ?as=<login> (pour prévisualiser une vue).
-    private string EffectiveLogin(HttpContext ctx, out bool impersonating)
-    {
-        impersonating = false;
-        var real = ctx.User.Identity?.Name ?? "";
-        var asUser = ctx.Request.Query["as"].ToString();
-        if (!string.IsNullOrWhiteSpace(asUser) && IsAdminLogin(real)) { impersonating = true; return asUser; }
-        return real;
-    }
-
-    private Resolved ResolveAccount(string login)
-    {
-        var r = new Resolved { Login = login, DisplayName = login };
-        JsonArray? accounts = null, views = null;
-        try
-        {
-            using var s = new FileStream(AccountsPath(), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var root = JsonNode.Parse(s);
-            accounts = root?["accounts"]?.AsArray();
-            views = root?["views"]?.AsArray();
-        }
-        catch { }
-
-        JsonNode? FindView(string? id)
-        {
-            if (views == null || string.IsNullOrEmpty(id)) return null;
-            foreach (var v in views) if ((v?["id"]?.GetValue<string>() ?? "") == id) return v;
-            return null;
-        }
-        var contentTabs = new[] { "dashboard", "charts", "issues", "events", "calendar", "velocity" };
-        void ApplyView(JsonNode? v)
-        {
-            r.ViewId = v?["id"]?.GetValue<string>();
-            r.DefaultTab = v?["defaultTab"]?.GetValue<string>();
-            var vt = v?["tabs"]?.AsArray();
-            r.Tabs = (vt != null && vt.Count > 0)
-                ? vt.Select(t => t?.GetValue<string>() ?? "").Where(s => s.Length > 0).ToList()
-                : contentTabs.ToList();
-            var ms = v?["filters"]?["milestones"];
-            if (ms != null) { r.Milestones = ms["values"]?.AsArray()?.Select(x => x?.GetValue<string>() ?? "").Where(s => s.Length > 0).ToList() ?? new(); r.MilestonesLocked = ms["locked"]?.GetValue<bool>() ?? false; }
-            var lb = v?["filters"]?["labels"];
-            if (lb != null) { r.Labels = lb["values"]?.AsArray()?.Select(x => x?.GetValue<string>() ?? "").Where(s => s.Length > 0).ToList() ?? new(); r.LabelsLocked = lb["locked"]?.GetValue<bool>() ?? false; }
-        }
-
-        if (IsAdminLogin(login))
-        {
-            r.Role = "admin"; r.ScopeType = "all"; r.ScopeValue = null;
-            r.Tabs = contentTabs.Concat(new[] { "options" }).ToList();
-            return r;
-        }
-        if (accounts != null)
-        {
-            foreach (var a in accounts)
-                if ((a?["type"]?.GetValue<string>() ?? "") == "group" && LeadsContain(a, login))
-                {
-                    r.Role = "group"; r.ScopeType = "team"; r.ScopeValue = a?["subject"]?.GetValue<string>();
-                    r.DisplayName = a?["username"]?.GetValue<string>() ?? login;
-                    ApplyView(FindView(a?["viewId"]?.GetValue<string>()));
-                    return r;
-                }
-            foreach (var a in accounts)
-                if ((a?["type"]?.GetValue<string>() ?? "") == "user"
-                    && string.Equals(a?["subject"]?.GetValue<string>(), login, StringComparison.OrdinalIgnoreCase))
-                {
-                    r.Role = "user"; r.ScopeType = "user"; r.ScopeValue = login;
-                    r.DisplayName = a?["username"]?.GetValue<string>() ?? login;
-                    ApplyView(FindView(a?["viewId"]?.GetValue<string>()));
-                    return r;
-                }
-        }
-        // Auto-provision : tout salarié connecté non listé → vue individuelle par défaut.
-        r.Role = "user"; r.ScopeType = "user"; r.ScopeValue = login; r.AutoProvisioned = true;
-        ApplyView(FindView(_config.Auth.DefaultViewId));
-        return r;
-    }
-
-    private object ResolveMe(HttpContext ctx)
-    {
-        if (!(ctx.User.Identity?.IsAuthenticated ?? false) || string.IsNullOrEmpty(ctx.User.Identity?.Name))
-            return new { authenticated = false };
-        var login = EffectiveLogin(ctx, out var impersonating);
-        var r = ResolveAccount(login);
-        return new
-        {
-            authenticated = true,
-            login = r.Login,
-            role = r.Role,
-            displayName = r.DisplayName,
-            scope = new { type = r.ScopeType, value = r.ScopeValue },
-            viewId = r.ViewId,
-            defaultTab = r.DefaultTab,
-            tabs = r.Tabs,
-            filters = new
-            {
-                milestones = new { values = r.Milestones, locked = r.MilestonesLocked },
-                labels = new { values = r.Labels, locked = r.LabelsLocked }
-            },
-            autoProvisioned = r.AutoProvisioned,
-            impersonating,
-            canImpersonate = IsAdminLogin(ctx.User.Identity?.Name) // l'utilisateur RÉELLEMENT connecté est admin
-        };
     }
 
     // /api/data : payload du dashboard RESTREINT au périmètre du compte (filtrage côté serveur).
@@ -1898,7 +701,7 @@ public sealed class WebDashboard
             // ?? new() : même garde que le bloc setup ci-dessus — un JSON édité à la main peut rendre
             // ces propriétés réellement nulles malgré l'annotation (et le ?? voisin fait considérer au
             // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
-            cfg.Export.TrackedTransitions, scopedTeams, cfg.Export.LabelPhases ?? new(), rolePeriods,
+            scopedTeams, cfg.Export.LabelPhases ?? new(), rolePeriods,
             labels, milestones, lastExtracted, setup,
             new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes });
         _payloadCache[cacheKey] = (sig, json);
@@ -1941,16 +744,6 @@ public sealed class WebDashboard
         return (issues, labels, milestones, lastExtracted);
     }
 
-    private static string? ReadCurrentToken()
-    {
-        try
-        {
-            var node = JsonNode.Parse(File.ReadAllText(RuntimeConfigPath()));
-            return node?["GitLab"]?["PrivateToken"]?.GetValue<string>();
-        }
-        catch { return null; }
-    }
-
     private static AppConfig BuildConfig()
     {
         var b = new ConfigurationBuilder()
@@ -1963,6 +756,8 @@ public sealed class WebDashboard
         // IConfiguration découpe les clés sur « : » → LabelPhases (clés « Prod::… ») est corrompu par Bind.
         // On relit ces maps telles quelles depuis le JSON, sinon le dashboard perd le mapping → cycle = 0 j.
         AppConfig.RepairColonKeyedMaps(cfg, AppContext.BaseDirectory);
+        // Secrets au repos (enc:v1:…) → déchiffrés EN MÉMOIRE seulement (GroupToken, ClientSecret).
+        Kpi.Export.SecureStore.UnprotectConfig(cfg);
         return cfg;
     }
 
@@ -2016,12 +811,9 @@ public sealed class WebDashboard
 
     private sealed class RefreshRequest
     {
-        public string? milestone { get; set; }
         public List<string>? milestones { get; set; }
         /// <summary>Id GitLab du projet à ré-extraire (chaîne). Vide/null = tous les projets configurés.</summary>
         public string? project { get; set; }
     }
 
-    private sealed class ConfigPayload { public string content { get; set; } = ""; }
-    private sealed class TokenPayload { public string token { get; set; } = ""; }
 }

@@ -59,6 +59,16 @@
 
     const appearance = { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout, lang, setLang, langs: LANGS };
 
+    // Identité affichée sous la marque : compte connecté (/api/me), jamais de nom en dur.
+    // Repli silencieux (harness / API indisponible) : ligne vide.
+    const [me, setMe] = React.useState(null);
+    React.useEffect(() => {
+      let dead = false;
+      fetch('/api/me').then((r) => r.json()).then((j) => {if (!dead && j && j.authenticated) setMe(j);}).catch(() => {});
+      return () => {dead = true;};
+    }, []);
+    const meLine = me ? ((me.role === 'admin' ? 'Admin · ' : '') + (me.displayName || me.login || '')) : '';
+
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
     const TabComp = {
@@ -107,7 +117,7 @@
         <aside className={'sb' + (sbCollapsed ? ' collapsed' : '')}>
           <div className="sb-brand">
             <div className="sb-mark"><BrandLogo /></div>
-            <div><div className="nm">KPI</div><div className="sub">Admin · Brice M.</div></div>
+            <div><div className="nm">KPI</div><div className="sub">{meLine}</div></div>
           </div>
           <div className="sb-h">{window.t('pilotage')}</div>
           <nav className="sb-nav">

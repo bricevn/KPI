@@ -22,7 +22,6 @@ public sealed class DashboardView
         string outputDirectory,
         string milestone,
         List<IssueExport> exports,
-        IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
         IReadOnlyList<PeriodDefinition> periods,
@@ -33,7 +32,7 @@ public sealed class DashboardView
 
         // Export statique AUTONOME : payload réel inliné + page nouveau design (même rendu que le live).
         var aux = LoadAuxFromDisk(outputDirectory);
-        var payloadJson = BuildPayloadJson(milestone, exports, trackedTransitions, teams, labelPhases, periods, aux.labels, aux.milestones, aux.lastExtracted);
+        var payloadJson = BuildPayloadJson(milestone, exports, teams, labelPhases, periods, aux.labels, aux.milestones, aux.lastExtracted);
         var html = BuildReferencePage(payloadJson);
         var path = Path.Combine(viewsDir, SafeFileName($"release_{(string.IsNullOrEmpty(milestone) ? "all" : milestone)}.html"));
         await File.WriteAllTextAsync(path, html, new UTF8Encoding(false), ct);
@@ -48,7 +47,6 @@ public sealed class DashboardView
     public static string BuildPayloadJson(
         string milestone,
         List<IssueExport> exports,
-        IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
         IReadOnlyList<PeriodDefinition> periods,
@@ -58,7 +56,7 @@ public sealed class DashboardView
         object? setup = null,
         object? workTime = null)
     {
-        var payload = BuildPayload(milestone, exports, trackedTransitions, teams, labelPhases, periods);
+        var payload = BuildPayload(milestone, exports, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
         payload.setup = setup;
         // Fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps) : consommée par le mapper
@@ -95,7 +93,6 @@ public sealed class DashboardView
     private static DashboardPayload BuildPayload(
         string milestone,
         List<IssueExport> exports,
-        IReadOnlyList<LabelTransitionConfig> trackedTransitions,
         IReadOnlyDictionary<string, List<string>> teams,
         IReadOnlyDictionary<string, string> labelPhases,
         IReadOnlyList<PeriodDefinition> periods)
@@ -128,9 +125,6 @@ public sealed class DashboardView
                                   ?? DefaultPrimaryLabel,
             availableLabels = availableLabels,
             availableUsers = availableUsers,
-            transitionsConfig = trackedTransitions
-                .Select(t => new TransitionConfigPayload { from = t.From, to = t.To })
-                .ToList(),
             availableMilestones = exports
                 .Select(e => e.Milestone)
                 .Where(m => !string.IsNullOrEmpty(m))
@@ -177,10 +171,6 @@ public sealed class DashboardView
         milestone = e.Milestone,
         assignees = e.Assignees,
         labels = e.Labels,
-        transitionCounts = e.TransitionCounts,
-        transitionDurations = e.TransitionDurations.ToDictionary(
-            kv => kv.Key,
-            kv => kv.Value.Select(ts => ts.TotalSeconds).ToArray()),
         labelEvents = e.TrackedLabelEvents.Select(ev => new LabelEventPayload
         {
             user = ev.UserUsername,
@@ -189,18 +179,15 @@ public sealed class DashboardView
             at = ev.CreatedAt.ToString("o"),
         }).ToList(),
         commentsCount = e.Comments.Count,
-        commentsByAuthor = e.Comments.ByAuthor,
         mergeRequests = e.MergeRequests.Select(mr => new MergeRequestPayload
         {
             iid = mr.Iid,
             state = mr.State,
             approvers = mr.Approvers.ToArray(),
-            reviewers = mr.Reviewers.ToArray(),
-            isClosing = mr.IsClosing,
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string? payloadJson = null, string lang = "en")
+    public static string BuildReferencePage(string payloadJson, string lang = "en")
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
@@ -211,7 +198,7 @@ public sealed class DashboardView
         sb.AppendLine("<head>");
         sb.AppendLine("  <meta charset=\"utf-8\">");
         sb.AppendLine("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-        sb.AppendLine("  <title>Release 2026-R2 — Dashboard</title>");
+        sb.AppendLine("  <title>KPI — Dashboard</title>");
         sb.AppendLine("  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">");
         sb.AppendLine("  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>");
         sb.AppendLine("  <link href=\"https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap\" rel=\"stylesheet\">");
@@ -228,10 +215,8 @@ public sealed class DashboardView
         sb.AppendLine("  <script data-asset=\"react\">" + A("vendor", "react.js") + "</script>");
         sb.AppendLine("  <script data-asset=\"react-dom\">" + A("vendor", "react-dom.js") + "</script>");
         sb.AppendLine("  <script>" + A("vendor", "babel.js") + "</script>");
-        // Données : si payload réel fourni → window.__DATA__ + mapper, exécutés SYNCHRONEMENT
+        // Données : window.__DATA__ (payload réel) + mapper, exécutés SYNCHRONEMENT
         // (window.APP doit exister AVANT l'éval des .jsx qui font `const A = window.APP`).
-        // Sinon → faux data.js (démo, route /ref).
-        if (payloadJson != null)
         {
             // Défense XSS : le payload est inliné dans un <script>. Neutraliser toute séquence pouvant
             // clore la balise / casser le parseur (titres d'issues contrôlés par les membres du projet).
@@ -241,8 +226,6 @@ public sealed class DashboardView
                 .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
             sb.AppendLine("  <script>window.__DATA__ = " + safeJson + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
         }
-        else
-            sb.AppendLine("  <script>" + A("app", "data.js") + "</script>");
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
@@ -281,7 +264,6 @@ public sealed class DashboardView
         public string defaultPrimaryLabel { get; set; } = "";
         public List<string> availableLabels { get; set; } = new();
         public List<string> availableUsers { get; set; } = new();
-        public List<TransitionConfigPayload> transitionsConfig { get; set; } = new();
         public List<string> availableMilestones { get; set; } = new();
         public Dictionary<string, List<string>> teams { get; set; } = new();
         public Dictionary<string, string> labelPhases { get; set; } = new();
@@ -293,12 +275,6 @@ public sealed class DashboardView
         // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
         public object? setup { get; set; }
         public object? workTime { get; set; }
-    }
-
-    private sealed class TransitionConfigPayload
-    {
-        public string from { get; set; } = "";
-        public string to { get; set; } = "";
     }
 
     private sealed class PeriodPayload
@@ -345,10 +321,7 @@ public sealed class DashboardView
         public string? milestone { get; set; }
         public List<string> assignees { get; set; } = new();
         public List<string> labels { get; set; } = new();
-        public Dictionary<string, int> transitionCounts { get; set; } = new();
-        public Dictionary<string, double[]> transitionDurations { get; set; } = new();
         public int commentsCount { get; set; }
-        public Dictionary<string, int> commentsByAuthor { get; set; } = new();
         public List<LabelEventPayload> labelEvents { get; set; } = new();
         public List<MergeRequestPayload> mergeRequests { get; set; } = new();
     }
@@ -366,8 +339,6 @@ public sealed class DashboardView
         public long iid { get; set; }
         public string state { get; set; } = "";
         public string[] approvers { get; set; } = Array.Empty<string>();
-        public string[] reviewers { get; set; } = Array.Empty<string>();
-        public bool isClosing { get; set; }
     }
 
 }

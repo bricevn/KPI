@@ -8,7 +8,7 @@
   const A = window.APP || {};
   const ACCENTS = [['#2b7fff', 'Bleu'], ['#7A5AE0', 'Violet'], ['#0f9e8e', 'Teal'], ['#e0792e', 'Ambre'], ['#d6336c', 'Magenta']];
   const NUMFONTS = [['grotesk', 'Grotesk'], ['mono', 'Mono'], ['system', 'Système']];
-  const DRILL_LAYOUTS = [['modal', 'Centré'], ['panel', 'Panneau'], ['full', 'Plein écran']];
+  const DRILL_LAYOUTS = ['modal', 'panel', 'full']; // libellés via i18n (DRILL_T)
   const DRILL_T = { modal: 'opt.drillModal', panel: 'opt.drillPanel', full: 'opt.drillFull' };
   const PALETTE = ['#2188ff', '#0ea5e9', '#06b6d4', '#2dd4bf', '#0f9e8e', '#22c55e', '#84cc16', '#eab308', '#c79a06', '#e0792e', '#f97316', '#ef4444', '#d6336c', '#ec4899', '#d946ef', '#a855f7', '#8957e5', '#6366f1', '#64748b', '#94a3b8'];
 
@@ -672,7 +672,7 @@
           <div className="opt-row">
             <div className="lbl">{window.t('opt.drill')}<span>{window.t('opt.drillSub')}</span></div>
             <div className="seg-lg">
-              {DRILL_LAYOUTS.map(([k]) => <button key={k} className={drillLayout === k ? 'on' : ''} onClick={() => setDrillLayout(k)}>{window.t(DRILL_T[k])}</button>)}
+              {DRILL_LAYOUTS.map((k) => <button key={k} className={drillLayout === k ? 'on' : ''} onClick={() => setDrillLayout(k)}>{window.t(DRILL_T[k])}</button>)}
             </div>
           </div>
         </div>

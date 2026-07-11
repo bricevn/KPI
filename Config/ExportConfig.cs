@@ -137,7 +137,7 @@ public sealed class ServerConfig
 /// </summary>
 public sealed class AuthConfig
 {
-    /// <summary>URL de l'instance GitLab (autorité OAuth). Ex : https://gitlab.obvious.tech</summary>
+    /// <summary>URL de l'instance GitLab (autorité OAuth). Ex : https://gitlab.example.com</summary>
     public string Authority { get; set; } = "";
     /// <summary>Application ID de l'app OAuth GitLab.</summary>
     public string ClientId { get; set; } = "";

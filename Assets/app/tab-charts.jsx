@@ -146,7 +146,6 @@
     const cell = (tk, wi) => A.weightMatrix[tk][wi];
     const totalAt = (wi) => types.reduce((s, tk) => s + cell(tk, wi).v + cell(tk, wi).nv, 0);
     const maxRow = Math.max(...FIB.map((_, wi) => totalAt(wi)));
-    const typeTotal = (tk) => A.weightMatrix[tk].reduce((s, c) => s + c.v + c.nv, 0);
     const maxCell = Math.max(...types.flatMap((tk) => A.weightMatrix[tk].map((c) => c.v + c.nv)));
 
     const Legend = () =>
@@ -203,26 +202,6 @@
           </div></div></div>
         }
 
-        {view === 'matrice' &&
-        <div className="pnl"><div className="tbl-scroll"><table className="pw-matrix">
-            <thead><tr><th>{window.t('charts.typeWeight')}</th>{FIB.map((w) => <th key={w} className="num">{w}</th>)}<th className="num">Σ</th></tr></thead>
-            <tbody>
-              {types.map((tk) =>
-                <tr key={tk}>
-                  <td><span className="type"><span className="dot" style={{ background: window.typeColor(tk) }}></span>{A.typeByKey[tk].short}</span></td>
-                  {FIB.map((w, wi) => {
-                    const c = cell(tk, wi);const tot = c.v + c.nv;
-                    return <td key={w} className="pw-cell" title={`${c.v} validé · ${c.nv} non validé`}>
-                    <span className="pw-chip" style={{ background: window.typeColor(tk), opacity: 0.18 + tot / maxCell * 0.72 }}>{tot}</span>
-                    <span className="pw-sub">{c.v}✓</span>
-                  </td>;
-                  })}
-                  <td className="num"><b>{typeTotal(tk)}</b></td>
-                </tr>
-                )}
-            </tbody>
-          </table></div></div>
-        }
       </div>);
   }
 
@@ -290,23 +269,6 @@
           </div></div></div>
         }
 
-        {view === 'matrice' &&
-        <div className="pnl"><div className="tbl-scroll"><table className="pw-matrix">
-            <thead><tr><th>{window.t('charts.typePhase')}</th>{PH.map(({ pk }) => <th key={pk} className="num">{window.PHASE_NAME[pk]}</th>)}<th className="num">{window.t('charts.lead')}</th></tr></thead>
-            <tbody>
-              {types.map((tk) => {
-                  const r = A.pivotByKey[tk];
-                  return <tr key={tk}>
-                <td><span className="type"><span className="dot" style={{ background: window.typeColor(tk) }}></span>{A.typeByKey[tk].short}</span></td>
-                {PH.map(({ k, pk }) => <td key={k} className="pw-cell">
-                  <span className="pw-chip" style={{ background: window.phaseColor(pk), opacity: 0.18 + r[k] / maxPhase * 0.72 }}>{r[k].toFixed(1)}</span>
-                </td>)}
-                <td className="num"><b>{leadOf(r).toFixed(1)}</b></td>
-              </tr>;
-                })}
-            </tbody>
-          </table></div></div>
-        }
       </div>);
   }
 

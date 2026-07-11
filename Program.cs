@@ -19,6 +19,8 @@ configRoot.Bind(appConfig);
 // IConfiguration découpe les clés sur « : » → les maps à clés de labels (« Prod::… ») sont corrompues
 // par Bind. On les relit telles quelles depuis le JSON (sinon cycle = 0 j + associations perdues).
 AppConfig.RepairColonKeyedMaps(appConfig, AppContext.BaseDirectory);
+// Secrets au repos (enc:v1:…) → déchiffrés en mémoire (GroupToken, ClientSecret) pour la CLI aussi.
+Kpi.Export.SecureStore.UnprotectConfig(appConfig);
 // 1c-D : plus de bloc GitLab global → on dérive une config client du 1er serveur pour les chemins mono-serveur.
 var gl = appConfig.PrimaryGitLab();
 
@@ -117,7 +119,6 @@ try
                 appConfig.Export.OutputDirectory,
                 gl.Milestone,
                 exports,
-                appConfig.Export.TrackedTransitions,
                 appConfig.Export.Teams,
                 appConfig.Export.LabelPhases,
                 appConfig.Export.Periods,

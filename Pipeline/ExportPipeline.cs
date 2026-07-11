@@ -107,7 +107,6 @@ public static class ExportPipeline
                 config.Export.OutputDirectory,
                 gl.Milestone,
                 exports,
-                config.Export.TrackedTransitions,
                 config.Export.Teams,
                 config.Export.LabelPhases,
                 config.Export.Periods,

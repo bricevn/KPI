@@ -79,13 +79,13 @@ window.buildAPP = function (D) {
   // Durées de phase (ms ouvré), incluant To fix, + retours.
   function times(iss) {
     var e = evs(iss);
-    var acc = {}, spn = {}, cnt = {}, since = {};
-    PHASE_KEYS.forEach(function (k) { acc[k] = 0; spn[k] = 0; cnt[k] = 0; since[k] = null; });
+    var acc = {}, cnt = {}, since = {};
+    PHASE_KEYS.forEach(function (k) { acc[k] = 0; cnt[k] = 0; since[k] = null; });
     var retours = 0;
     // Anti-bruit : un passage de phase plus court que le seuil (temps RÉEL) est ignoré — élimine
     // les poses/retraits de label accidentels qui polluaient les cycles.
-    // acc = temps TRAVAILLÉ (fenêtre ouvrée) ; spn = temps de TRAVERSÉE (temps réel écoulé).
-    var flush = function (ph, from, to) { if (to > from && (to - from) >= MIN_SEG_MS) { acc[ph] += workingMs(from, to); spn[ph] += (to - from); } };
+    // acc = temps TRAVAILLÉ (fenêtre ouvrée uniquement).
+    var flush = function (ph, from, to) { if (to > from && (to - from) >= MIN_SEG_MS) { acc[ph] += workingMs(from, to); } };
     // Comptage ÉQUILIBRÉ par phase (clés DYNAMIQUES depuis la config) : on accumule le temps ouvré tant
     // qu'au moins un label de la phase est actif. La phase de clé « tofix » → +1 retour à chaque ajout.
     for (var i = 0; i < e.length; i++) {
@@ -93,7 +93,7 @@ window.buildAPP = function (D) {
       if (isNaN(t)) continue;
       var ph = phaseOf(lo);
       if (!ph || !TIMED[ph]) continue;
-      if (acc[ph] === undefined) { acc[ph] = 0; spn[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
+      if (acc[ph] === undefined) { acc[ph] = 0; cnt[ph] = 0; since[ph] = null; } // clé timée hors PHASE_KEYS (sécurité)
       if (add) { if (cnt[ph] === 0) since[ph] = t; cnt[ph]++; if (ph === 'tofix') retours++; }
       else if (cnt[ph] > 0) { cnt[ph]--; if (cnt[ph] === 0 && since[ph] !== null) { flush(ph, since[ph], t); since[ph] = null; } }
     }
@@ -105,10 +105,8 @@ window.buildAPP = function (D) {
       if (!isNaN(endRef)) Object.keys(cnt).forEach(function (k) { if (cnt[k] > 0 && since[k] !== null) { flush(k, since[k], endRef); since[k] = null; cnt[k] = 0; } });
     }
     var days = function (ms) { return ms > 0 ? Math.round(ms / HOURS_PER_DAY_MS * 10) / 10 : 0; };
-    // _work/_span : ms BRUTS par phase (travaillé / traversée) — servent aux agrégats phaseAvg
-    // (moyenne, temps effectif = somme des phases actives) sans mélanger des unités de « jour ».
-    var out = { total: 0, retours: retours, _work: {}, _span: {} };
-    Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; out._work[k] = acc[k]; out._span[k] = spn[k]; });
+    var out = { total: 0, retours: retours };
+    Object.keys(acc).forEach(function (k) { var d = days(acc[k]); out[k] = d; out.total += d; });
     return out;
   }
   // Segment Gantt : même mapping label → phase que les durées (inclut uiux). phaseOf gère config + repli.
@@ -200,7 +198,7 @@ window.buildAPP = function (D) {
   ISSUES.forEach(function (i) { (i.assignees || []).forEach(function (a) { if (a) peopleSet[a] = 1; }); });
   var people = Object.keys(peopleSet).map(function (k) { return peopleById[k]; });
 
-  // ---------- detail (issues façonnées comme data.js) ----------
+  // ---------- detail (issues façonnées pour les vues : forme de référence de window.APP) ----------
   var detail = ISSUES.map(function (iss) {
     var t = typeOf(iss);
     var tm = times(iss);
@@ -293,30 +291,20 @@ window.buildAPP = function (D) {
   var PH = PERIODS.length
     ? PERIODS.filter(function (p) { return TIMED[p.key]; }).map(function (p) { return [p.key, p.name || p.key]; })
     : [['dev', 'Dev'], ['review', 'Review'], ['qawait', 'QA wait'], ['qa', 'QA'], ['tofix', 'To fix'], ['po', 'PO']];
-  // Par phase : days = temps TRAVAILLÉ moyen (jours de fenêtre ouvrée) ; span = temps de TRAVERSÉE
-  // moyen (jours calendaires 24 h, temps réel écoulé dans la phase, usage interne). active = la phase
-  // compte dans le « temps effectif » (EFF_SET) → la vue Effectif du dashboard ne montre que celles-là.
+  // Par phase : days = temps TRAVAILLÉ moyen (jours de fenêtre ouvrée) ; active = la phase compte
+  // dans le « temps effectif » (EFF_SET) → la vue Effectif du dashboard ne montre que celles-là.
   var avg1 = function (arr) { return arr.length ? Math.round(arr.reduce(function (s, x) { return s + x; }, 0) / arr.length * 10) / 10 : 0; };
   var phaseAvg = PH.map(function (p) {
     var arr = detail.map(function (d) { return d._times[p[0]]; }).filter(function (x) { return x > 0; });
-    var spanArr = detail.map(function (d) { return (d._times._span[p[0]] || 0) / 86400000; }).filter(function (x) { return x > 0; });
-    return { key: p[0], name: p[1], days: avg1(arr), span: avg1(spanArr), active: !!EFF_SET[p[0]] };
+    return { key: p[0], name: p[1], days: avg1(arr), active: !!EFF_SET[p[0]] };
   });
-  // Totaux de la section « Temps moyen par phase » : work = Σ des moyennes travaillées (toutes phases) ;
-  // effective = Σ des moyennes des SEULES phases de travail actif (= work − les phases d'attente,
-  // et = somme des barres affichées en vue Effectif) ; span = usage interne.
-  var phaseTotals = (function () {
-    return {
-      work: Math.round(phaseAvg.reduce(function (a, p) { return a + p.days; }, 0) * 10) / 10,
-      span: Math.round(phaseAvg.reduce(function (a, p) { return a + p.span; }, 0) * 10) / 10,
-      effective: Math.round(phaseAvg.reduce(function (a, p) { return a + (p.active ? p.days : 0); }, 0) * 10) / 10
-    };
-  })();
+  // Total de la section « Temps moyen par phase » : effective = Σ des moyennes des SEULES phases de
+  // travail actif (= somme des barres affichées en vue Effectif, hors attentes).
+  var phaseTotals = {
+    effective: Math.round(phaseAvg.reduce(function (a, p) { return a + (p.active ? p.days : 0); }, 0) * 10) / 10
+  };
 
-  // ---------- weight buckets + matrix ----------
-  var weightBuckets = FIB.map(function (w) {
-    var v = 0, nv = 0; detail.forEach(function (d) { if (d.weight === w) { if (d.validated) v++; else nv++; } }); return { w: w, v: v, nv: nv };
-  });
+  // ---------- weight matrix ----------
   var weightMatrix = {};
   Object.keys(pivotByKey).forEach(function (key) {
     weightMatrix[key] = FIB.map(function (w) { var v = 0, nv = 0; detail.forEach(function (d) { if (d.type === key && d.weight === w) { if (d.validated) v++; else nv++; } }); return { w: w, v: v, nv: nv }; });
@@ -419,7 +407,7 @@ window.buildAPP = function (D) {
   // timeline élargie ne doit pas diluer la progression affichée) ; repli sur la timeline sinon.
   var HD_START = isNaN(MS_START) ? START : MS_START, HD_END = isNaN(MS_END) ? END : MS_END;
   // end : plus de suffixe d'année — le format ISO aaaa-mm-jj la porte déjà.
-  var milestone = { name: msName, start: fmtFr(HD_START), end: fmtFr(HD_END - 1), dayPct: Math.max(0, Math.min(100, pct(NOW - HD_START, HD_END - HD_START))), startDay: 0, endDay: DAYS, today: TODAY, weeks: WEEKS };
+  var milestone = { name: msName, start: fmtFr(HD_START), end: fmtFr(HD_END - 1), dayPct: Math.max(0, Math.min(100, pct(NOW - HD_START, HD_END - HD_START))) };
   // URL d'issue + nom de projet DÉRIVÉS du webUrl réel (générique : toute instance/projet GitLab, rien en dur).
   var sampleUrl = ''; for (var su = 0; su < CAT.length; su++) { if (CAT[su].webUrl) { sampleUrl = CAT[su].webUrl; break; } }
   var issueBase = '', projName = 'Project';
@@ -436,7 +424,7 @@ window.buildAPP = function (D) {
     // catalogue des assignés du périmètre (l'onglet Options s'en sert pour lister les membres).
     selectedUsers: D.selectedUsers || null,
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
-    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, phaseTotals: phaseTotals, weightBuckets: weightBuckets,
+    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, phaseTotals: phaseTotals,
     milestone: milestone, meta: meta, FIB: FIB,
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.
@@ -450,12 +438,11 @@ window.buildAPP = function (D) {
       // msStart/msEnd : offsets (jours) des bornes de la milestone sur la timeline — null si inconnues.
       // Consommés par Calendrier/Vélocité pour tracer les barres verticales de début/fin.
       var msOff = function (t) { return isNaN(t) ? null : Math.max(0, Math.min(DAYS, Math.round((t - START) / MS_DAY))); };
-      return { START: S0, DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, msStart: msOff(MS_START), msEnd: msOff(MS_END), dayDate: dayDate, fmtDay: function (d) { return fmtFr(dayDate(d).getTime()); } };
+      return { DAYS: DAYS, TODAY: TODAY, WEEKS: WEEKS, msStart: msOff(MS_START), msEnd: msOff(MS_END), dayDate: dayDate, fmtDay: function (d) { return fmtFr(dayDate(d).getTime()); } };
     })(),
+    // Badges de la sidebar (les libellés d'onglets viennent de l'i18n : t('nav_'+id)).
     tabs: [
-      { id: 'dashboard', label: 'Dashboard' }, { id: 'charts', label: 'Graphiques' },
-      { id: 'anomalies', label: 'Anomalies', count: anomCount }, { id: 'issues', label: 'Issues', count: totals.issues },
-      { id: 'calendar', label: 'Calendrier' }, { id: 'velocity', label: 'Vélocité' }
+      { id: 'anomalies', count: anomCount }, { id: 'issues', count: totals.issues }
     ]
   };
 };

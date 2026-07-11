@@ -79,9 +79,9 @@
       </svg>);
   }
 
-  function DeltaPill({ d, unit, good, big }) {
+  function DeltaPill({ d, unit, good }) {
     if (d === 0) return <span className="cmpv-delta flat">=</span>;
-    return <span className={'cmpv-delta ' + (good ? 'up' : 'down') + (big ? ' big' : '')}>
+    return <span className={'cmpv-delta ' + (good ? 'up' : 'down')}>
       <span className="ar">{d > 0 ? '↑' : '↓'}</span>{(d > 0 ? '+' : '') + round1(d)}{unit}
     </span>;
   }

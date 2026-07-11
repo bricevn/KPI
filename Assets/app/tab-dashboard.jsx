@@ -42,8 +42,8 @@
     })();
     const cycleDelta = (function () { const nz = cycleTrend.filter((x) => x > 0); if (nz.length < 2) return null; return Math.round((nz[nz.length - 1] - nz[0]) / nz[0] * 100); })();
 
-    const Kard = ({ anchor, chip, chipBg, label, value, suffix, pct, color, onClick, cue, bottom, cap }) => (
-      <div className={'kcard' + (onClick ? ' clickable' : '')} data-comment-anchor={anchor} onClick={onClick} title={cue || undefined}>
+    const Kard = ({ chip, chipBg, label, value, suffix, pct, color, onClick, cue, bottom, cap }) => (
+      <div className={'kcard' + (onClick ? ' clickable' : '')} onClick={onClick} title={cue || undefined}>
         {onClick && <span className="kcard-go" aria-hidden="true">{window.ICONS.expand}</span>}
         <div className="top"><span className="kchip" style={{ background: chipBg }}>{chip}</span><span className="lab">{label}</span></div>
         <div className="big">{value}{suffix && <small> {suffix}</small>}</div>
@@ -60,7 +60,7 @@
     return (
       <React.Fragment>
         <div className="kpis">
-          <Kard anchor="1da3d31e09-div-17-11" chip={window.ICONS.issueDot} chipBg="var(--c-done)" label={t('dash.advancement')}
+          <Kard chip={window.ICONS.issueDot} chipBg="var(--c-done)" label={t('dash.advancement')}
             value={K.progress.pct + '%'} pct={K.progress.pct} color={window.pctColor(K.progress.pct)}
             cap={[{ v: K.progress.closed, label: t('dash.closed'), color: 'var(--c-done)' }, { v: T.open, label: t('dash.open') }]}
             cue={t('dash.seeClosed')}

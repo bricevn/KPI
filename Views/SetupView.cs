@@ -1282,7 +1282,10 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // NB : 'baseUrl' VOLONTAIREMENT non persisté → le champ instance est TOUJOURS vide par défaut (placeholder
   // gitlab.com), même si une instance est déjà configurée. Le SSO passant en popup, le wizard ne se recharge
   // plus → pas besoin de le restaurer. L'instance configurée n'est exposée NULLE PART dans la page par défaut.
-  var PKEYS=['step','token','timeout','selfSigned','test','projects','groups','importIds','labels',
+  // ⚠️ SÉCURITÉ : 'token' (group token GitLab) N'EST JAMAIS persisté — un secret en clair dans
+  // localStorage survivrait à la session et serait lisible par tout code de la même origine.
+  // Au rechargement du wizard, le token doit être resaisi (le SSO passe en popup : cas rare).
+  var PKEYS=['step','timeout','selfSigned','test','projects','groups','importIds','labels',
     'labelsDiag','labelsLoaded','labelPhase','phases','phaseScope','phaseProj','phasesByProject',
     'labelPhaseByProject','teams','memberships','exportMilestone'];
   function persistST(){try{var o={};PKEYS.forEach(function(k){o[k]=ST[k];});localStorage.setItem('kpi-setup',JSON.stringify(o));}catch(e){}}

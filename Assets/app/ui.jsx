@@ -9,10 +9,9 @@
     try {const nm = window.APP.typeByKey[k] && window.APP.typeByKey[k].name;const c = gitlabColor(nm);if (c) return c;} catch (e) {}
     return TYPE_VAR[k] || 'var(--ink-faint)';
   };
-  // Couleur RÉELLE d'un label GitLab par son nom (placeholder window.APP.labelColors — voir data.js).
-  // ⚠️ CLAUDE CODE : à brancher sur le champ `color` de l'API GitLab Labels.
+  // Couleur RÉELLE d'un label GitLab par son nom (window.APP.labelColors, alimenté par le mapper
+  // depuis labels.json — champ `color` de l'API GitLab Labels).
   const gitlabColor = (name) => {try {const c = window.APP && window.APP.labelColors && window.APP.labelColors[name];if (c) return c;} catch (e) {}return null;};
-  const labelColor = (name) => gitlabColor(name) || 'var(--ink-faint)';
   const phaseColor = (k) => PHASE_VAR[k] || 'var(--ink-faint)';
   const fmt1 = (n) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
   const pctOf = (a, b) => b ? Math.round(a / b * 100) : 0;
@@ -42,45 +41,11 @@
     clock: <Ic d={<g><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></g>} />
   };
 
-  function Donut({ pct, size = 98, stroke = 13, color = 'var(--c-done)' }) {
-    const r = (size - stroke) / 2,c = 2 * Math.PI * r,on = c * pct / 100,cc = size / 2;
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cc} cy={cc} r={r} fill="none" stroke="var(--panel-2)" strokeWidth={stroke} />
-        <circle cx={cc} cy={cc} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-        strokeDasharray={`${on} ${c - on}`} transform={`rotate(-90 ${cc} ${cc})`} />
-        <text x={cc} y={cc + size * 0.06} textAnchor="middle" className="disp" fontSize={size * 0.23} fontWeight="700" fill="var(--ink)">{pct}%</text>
-      </svg>);
-
-  }
-  // multi-segment donut
-  function DonutMulti({ segments, size = 98, stroke = 13 }) {
-    const r = (size - stroke) / 2,c = 2 * Math.PI * r,cc = size / 2;
-    const tot = segments.reduce((s, x) => s + x.value, 0) || 1;
-    let acc = 0;
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cc} cy={cc} r={r} fill="none" stroke="var(--panel-2)" strokeWidth={stroke} />
-        {segments.map((s, i) => {
-          const len = c * s.value / tot,off = c * acc / tot;acc += s.value;
-          return <circle key={i} cx={cc} cy={cc} r={r} fill="none" stroke={s.color} strokeWidth={stroke}
-          strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-off} transform={`rotate(-90 ${cc} ${cc})`} />;
-        })}
-        <text x={cc} y={cc + size * 0.06} textAnchor="middle" className="disp" fontSize={size * 0.2} fontWeight="700" fill="var(--ink)">{tot}</text>
-      </svg>);
-
-  }
-
   const Avatar = ({ pid, size = 24 }) => {
     const p = window.APP.peopleById[pid];
     if (!p) return null;
     const initials = p.name.split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase();
     return <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.42, background: `var(--av-${p.av})` }} title={p.name}>{initials}</span>;
-  };
-
-  const Spark = ({ data, color }) => {
-    const m = Math.max(...data) || 1;
-    return <div className="spark">{data.map((v, i) => <i key={i} style={{ height: v / m * 100 + '%', background: i === data.length - 1 ? color : 'var(--panel-2)' }}></i>)}</div>;
   };
 
   // progress bar for KPI cards that have a natural 0-100 value
@@ -166,13 +131,11 @@
     </span>;
 
   // GitLab issue hyperlink — used wherever an issue IID appears.
-  // Base d'URL RÉELLE dérivée du webUrl des issues (mapper → meta.issueBase : instance + groupe/projet
-  // exacts, ex. …/obvious/ooda/-/issues/). L'ancienne constante n'est plus qu'un repli pour la démo
-  // /ref (data.js ne pose pas meta.issueBase).
-  const ISSUE_BASE = 'https://gitlab.obvious.tech/hypervisor/-/issues/';
+  // Base d'URL dérivée du webUrl des issues (mapper → meta.issueBase : instance + groupe/projet exacts).
+  // Sans base connue (payload vide), le lien reste inerte ('#') plutôt que de pointer au hasard.
   const issueUrl = (iid) => {
     try {const b = window.APP.meta.issueBase;if (b) return b + iid;} catch (e) {}
-    return ISSUE_BASE + iid;
+    return '#';
   };
   const IssueLink = ({ iid, className }) =>
   <a className={'iid-link' + (className ? ' ' + className : '')} href={issueUrl(iid)} target="_blank" rel="noopener noreferrer"
@@ -281,7 +244,7 @@
     // Données : window.APP courant SANS les fonctions (cal) ni les gros blocs inutiles aux
     // graphiques (detail/vel/anomalies). Tout ce que TabCharts + ses modales lisent y est.
     const KEYS = ['types', 'typeByKey', 'phases', 'periods', 'people', 'peopleById', 'pivot', 'pivotByKey',
-    'superGroups', 'weightMatrix', 'transversal', 'phaseAvg', 'weightBuckets', 'totals', 'kpis',
+    'superGroups', 'weightMatrix', 'transversal', 'phaseAvg', 'totals', 'kpis',
     'milestone', 'meta', 'FIB', 'labelColors', 'filterOptions'];
     const app = {};
     KEYS.forEach((k) => {if (A[k] !== undefined) app[k] = A[k];});
@@ -539,5 +502,7 @@ ${tag(js)}
       </Modal>);
   }
 
-  Object.assign(window, { TYPE_VAR, PHASE_VAR, PHASE_NAME, typeColor, phaseColor, gitlabColor, labelColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, WeightRecap, IssueRowMini, IssueDrill, Donut, DonutMulti, Avatar, Spark, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML, buildChartsExportDoc, chartsExportName });
+  // Contrat window.* : uniquement les symboles réellement consommés par les autres scripts inline
+  // (tabs/shell). Les helpers internes (WeightRecap, buildChartsExportDoc…) restent privés à ce fichier.
+  Object.assign(window, { PHASE_NAME, typeColor, phaseColor, fmt1, pctOf, ICONS, InfoTip, IssueLink, pctColor, Modal, IssueDrill, Avatar, Progress, SparkLine, MultiSelect, useSort, useGanttNav, exportChartsHTML });
 })();

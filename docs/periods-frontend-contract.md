@@ -54,8 +54,6 @@ sont vides, durées et Gantt restent vides (c'est voulu). Une instance non confi
 
 **`Assets/app/tab-issues.jsx`** : `LABEL`/`PHASE_OF` en dur (~l.6-7, 11, 18, 73) → reconstruire `PHASE_OF` (reverse map) depuis `labelPhases` + couleurs depuis `periods`.
 
-**`Assets/app/data.js`** (démo route `/ref`) : `LABELMAP` (~l.30-37, 82-95, 120, 206-210) → ajouter un `periods` de démo, sinon la démo casse après retrait de `DEFAULT_PH`.
-
 **CSS** `Assets/design/shared.css` (~l.26-31, 45-50) + `studio.css` (~l.350, 369) : variables `--p-dev`… en dur → soit couleurs inline via `phaseColor()`, soit injecter des `--p-<key>` au runtime depuis `periods`.
 
 ## 4. Limites / keys réservées

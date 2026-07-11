@@ -25,7 +25,6 @@
 
   window.TabAnomalies = function TabAnomalies() {
     const [open, setOpen] = useState('noAssignee');
-    const totalAnom = CATS.reduce((s, c) => s + A.anomalies[c.key].length, 0);
     return (
       <React.Fragment>
         <div className="anom-short">

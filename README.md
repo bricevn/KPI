@@ -160,12 +160,17 @@ Le mode `--serve` expose, en plus de la page :
 | Méthode | Route | Rôle |
 |---|---|---|
 | `GET` | `/` | Sert le dashboard HTML. |
-| `GET` | `/api/status` | État du refresh en cours (progression, dernière extraction, erreur). |
-| `POST` | `/api/refresh` | Lance une extraction. Body JSON optionnel `{ "milestones": [...] }` (vide = tout le projet). |
-| `POST` | `/api/cancel` | Annule l'extraction en cours. |
-| `GET` | `/api/config` | Renvoie `appsettings.json` (**token masqué** par `********`). |
-| `POST` | `/api/config` | Écrit `appsettings.json` (token masqué → conservé ; sinon remplacé), puis **recharge la config à chaud**. Écrit aussi le fichier source à côté du `.csproj` s'il est trouvé. |
-| `GET` | `/api/config/token` | Renvoie le token **en clair** — seulement sur action explicite (bouton œil de l'éditeur). |
+| `GET` | `/api/status` | État du refresh en cours (progression, erreur). |
+| `POST` | `/api/refresh` | Lance une extraction (admin). Body JSON optionnel `{ "milestones": [...], "project": "id" }` (vide = tout le périmètre). |
+| `POST` | `/api/cancel` | Annule l'extraction en cours (admin). |
+| `GET` | `/api/me` | Compte connecté (login, rôle, périmètre). |
+| `GET` | `/api/data` | Payload du dashboard **filtré selon le compte**. |
+| `GET/POST` | `/api/options/*` | API de l'onglet Options (admin) : projets/labels/milestones GitLab, calcul du temps, sauvegarde de la config. |
+| `GET/POST` | `/api/setup/*` | Assistant `/setup` (ouvert au 1ᵉʳ démarrage, admin ensuite). |
+
+La configuration s'édite via `/setup` et l'onglet Options (ou à la main dans `appsettings.json`) —
+les anciens endpoints `/api/config*` et `/api/accounts` ont été retirés, ainsi que la connexion par
+token personnel (SSO GitLab uniquement).
 
 ### Cycle de travail typique
 
@@ -273,11 +278,17 @@ Checklist prod : HSTS/TLS au proxy · token de service par variable d'env (et ro
 
 ## Sécurité
 
-- **Aucun secret dans le dépôt** : `appsettings.json` (token), `output/` (données + comptes) et `dp-keys/` sont **gitignorés**. Seul `appsettings.example.json` (placeholders) est versionné.
+- **Aucun secret dans le dépôt** : `appsettings.json` (token), `output/` (données) et `dp-keys/` sont **gitignorés**. Seul `appsettings.example.json` (placeholders) est versionné.
+- **Aucun secret en clair au repos** : `Servers[].GroupToken` et `Auth.ClientSecret` sont **chiffrés dans `appsettings.json`** (préfixe `enc:v1:`, clés DataProtection `dp-keys/`, protégées par DPAPI sous Windows). Une valeur collée en clair est migrée (chiffrée) automatiquement au démarrage suivant. Les données extraites (`output/<serveur>/*.json`) sont également chiffrées au repos.
 - Token de service avec **scope minimal** (`read_api`) et **expiration courte** ; fourni de préférence par variable d'environnement en prod.
-- Le token d'un utilisateur qui se connecte (PAT) n'est **jamais stocké** — il sert une fois à valider l'identité contre `{instance}/api/v4/user`.
-- Accès verrouillé aux **membres GitLab du projet** ; admin = `Auth.AdminUsers` (fichier serveur uniquement). En-têtes durcis (CSP, HSTS si https, X-Frame-Options, anti-CSRF), rate-limit du login, garde anti-SSRF sur la connexion par token.
-- Révoquer un token dans GitLab : `{votre-instance}/-/user_settings/personal_access_tokens` dès qu'il n'est plus nécessaire.
+- Connexion **SSO GitLab uniquement** (OAuth, scope `read_user`) ; la session ne contient que le username — aucun token utilisateur ne transite ni n'est stocké.
+- Accès verrouillé aux **membres GitLab du projet** ; admin = `Auth.AdminUsers` (fichier serveur uniquement). En-têtes durcis (CSP, HSTS si https, X-Frame-Options), rate-limit du login.
+- Détail complet (inventaire des données conservées, risques résiduels) : [docs/nettoyage-2026-07/securite-et-donnees.md](docs/nettoyage-2026-07/securite-et-donnees.md).
+
+## Documentation
+
+- **[docs/nettoyage-2026-07/](docs/nettoyage-2026-07/)** — comptes rendus de la passe clean code + sécurité (juillet 2026) : carte d'[architecture](docs/nettoyage-2026-07/architecture.md), [rapport de nettoyage](docs/nettoyage-2026-07/rapport-nettoyage-2026-07.md), [spécificités Obvious](docs/nettoyage-2026-07/rapport-obvious.md), [sécurité & données](docs/nettoyage-2026-07/securite-et-donnees.md).
+- Autres : [contrat front des périodes](docs/periods-frontend-contract.md), [organisation GitLab](docs/organisation-gitlab.md), [migration](docs/MIGRATION.md).
 
 ## Licence
 

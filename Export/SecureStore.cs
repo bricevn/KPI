@@ -1,4 +1,5 @@
 using System.Text;
+using Kpi.Config;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Kpi.Export;
@@ -18,10 +19,56 @@ public static class SecureStore
 {
     private static readonly IDataProtectionProvider _provider = DataProtectionProvider.Create(
         new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "dp-keys")),
-        b => b.SetApplicationName("Kpi"));
+        b =>
+        {
+            b.SetApplicationName("Kpi");
+            // Windows : la clé maîtresse dp-keys est elle-même chiffrée via DPAPI (compte courant).
+            // Sans ça, le XML de clé en clair à côté du binaire rend le chiffrement contournable
+            // par simple lecture du disque. NB : lie les clés à l'UTILISATEUR WINDOWS qui exécute
+            // l'app (serveur ET CLI doivent tourner sous le même compte).
+            if (OperatingSystem.IsWindows()) b.ProtectKeysWithDpapi();
+        });
 
     private static IDataProtector Protector(string serverId) =>
         _provider.CreateProtector("Kpi.AtRest.v1", string.IsNullOrWhiteSpace(serverId) ? "default" : serverId);
+
+    // ---- Secrets de configuration (appsettings.json : GroupToken, ClientSecret) ----
+    // Format au repos : « enc:v1:<base64> ». Transparent : une valeur non préfixée est traitée
+    // comme du clair (migrée au boot par le serveur), une valeur préfixée est déchiffrée au chargement.
+    private const string SecretPrefix = "enc:v1:";
+    private static IDataProtector ConfigProtector() => _provider.CreateProtector("Kpi.Config.v1");
+
+    /// <summary>Chiffre un secret de config pour l'écriture au repos. Idempotent (déjà chiffré ⇒ inchangé).</summary>
+    public static string ProtectSecret(string plaintext)
+    {
+        if (string.IsNullOrEmpty(plaintext) || plaintext.StartsWith(SecretPrefix, StringComparison.Ordinal)) return plaintext;
+        return SecretPrefix + Convert.ToBase64String(ConfigProtector().Protect(Encoding.UTF8.GetBytes(plaintext)));
+    }
+
+    /// <summary>Déchiffre un secret de config lu depuis appsettings.json. Une valeur en clair passe telle
+    /// quelle (rétro-compat) ; une valeur chiffrée indéchiffrable (clés dp-keys perdues) ⇒ "" + erreur loggée.</summary>
+    public static string UnprotectSecret(string stored)
+    {
+        if (string.IsNullOrEmpty(stored) || !stored.StartsWith(SecretPrefix, StringComparison.Ordinal)) return stored;
+        try
+        {
+            var cipher = Convert.FromBase64String(stored.Substring(SecretPrefix.Length));
+            return Encoding.UTF8.GetString(ConfigProtector().Unprotect(cipher));
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[SecureStore] Secret de configuration indéchiffrable (dp-keys changées ?) : " + ex.Message);
+            return "";
+        }
+    }
+
+    /// <summary>Déchiffre EN PLACE les secrets d'une config chargée (Servers[].GroupToken, Auth.ClientSecret).
+    /// À appeler juste après le bind + RepairColonKeyedMaps, côté serveur ET côté CLI.</summary>
+    public static void UnprotectConfig(AppConfig cfg)
+    {
+        foreach (var s in cfg.Servers ?? new()) s.GroupToken = UnprotectSecret(s.GroupToken);
+        cfg.Auth.ClientSecret = UnprotectSecret(cfg.Auth.ClientSecret);
+    }
 
     /// <summary>Écrit du texte CHIFFRÉ de façon atomique (tmp + rename), avec la sous-clé du serveur.</summary>
     public static async Task WriteEncryptedAsync(string serverId, string path, string plaintext, CancellationToken ct = default)

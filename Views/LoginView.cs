@@ -1,17 +1,9 @@
-// LoginView.cs — designed login + welcome pages for the KPI dashboard.
+// LoginView.cs — page de connexion du dashboard KPI.
 //
-// Drop this file in Kpi/Views/ (namespace Kpi.Views).
-// It returns self-contained HTML strings (inline CSS+JS, CSP-safe):
-//   • no external JS (only Google Fonts, already allowed by the dashboard CSP);
-//   • the page talks ONLY to same-origin endpoints (connect-src 'self').
-//
-// Wire it up in WebDashboard.cs — see WebDashboard.auth.patch.md.
-//
-// Security model (matches the "rien stocké" requirement):
-//   • OAuth button  → GET /auth/oauth  → existing AddOAuth("gitlab") challenge.
-//   • Token path    → POST /api/auth/token → server validates the PAT against
-//     {instance}/api/v4/user, then signs a cookie with ONLY the username.
-//     The personal access token is used once and never persisted.
+// HTML autonome (CSS+JS inline, compatible CSP) : aucun JS externe, la page ne parle
+// qu'aux endpoints same-origin. Connexion UNIQUEMENT par SSO GitLab :
+//   bouton OAuth → GET /auth/oauth → challenge AddOAuth("gitlab"). Rien n'est stocké
+//   côté client hormis le cookie de session (username seul).
 //
 using System.Linq;
 using System.Text;
@@ -35,10 +27,6 @@ public static class LoginView
         // Chaînes utilisées par le <script> inline (échappées en JSON valide, sûres en <script>).
         var jsI18n = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
-            ["encryptedTo"] = T("login.encryptedTo"), ["encrypted"] = T("login.encrypted"),
-            ["errNoInstance"] = T("login.errNoInstance"), ["errNoToken"] = T("login.errNoToken"),
-            ["verifying"] = T("login.verifying"), ["signin"] = T("login.signin"),
-            ["cantConnect"] = T("login.cantConnect"), ["unreachable"] = T("login.unreachable"),
             ["frTag1"] = T("login.frTag1"), ["frTag2"] = T("login.frTag2"),
             ["frDesc"] = T("login.frDesc"), ["setupOpening"] = T("login.setupOpening"),
         });
@@ -51,11 +39,9 @@ public static class LoginView
             .Replace("__LANG_OPTIONS__", langOptions)
             .Replace("__T_TAG1__", T("login.tag1")).Replace("__T_TAG2__", T("login.tag2"))
             .Replace("__T_DESC__", T("login.desc")).Replace("__T_ENCRYPTED__", T("login.encrypted"))
-            .Replace("__T_WELCOME__", T("login.welcome")).Replace("__T_WELCOMESUB__", T("login.welcomeSub"))
-            .Replace("__T_INSTANCE__", T("login.instance")).Replace("__T_WITHGITLAB__", T("login.withGitlab"))
+            .Replace("__T_WELCOME__", T("login.welcome"))
+            .Replace("__T_WITHGITLAB__", T("login.withGitlab"))
             .Replace("__T_SSOSUB__", T("login.ssoSub")).Replace("__T_OAUTHREQUIRED__", T("login.oauthRequired"))
-            .Replace("__T_USETOKEN__", T("login.useToken")).Replace("__T_TOKENPERSONAL__", T("login.tokenPersonal"))
-            .Replace("__T_SIGNIN__", T("login.signin")).Replace("__T_TOKENNOTE__", T("login.tokenNote"))
             .Replace("__T_SETUP_CTA__", T("login.setupCta"))
             .Replace("__T_FR_BADGE__", T("login.firstRunBadge"))
             .Replace("__T_FR_TITLE__", T("login.firstRunTitle"))
@@ -65,10 +51,6 @@ public static class LoginView
             .Replace("__T_FR_STEP3__", T("login.firstRunStep3"))
             .Replace("__T_FR_ADMINS__", T("login.firstRunAdmins"));
     }
-
-    /// <summary>Blank success page with a logout button.</summary>
-    public static string Welcome(string? username)
-        => WelcomeHtml.Replace("__USER__", HtmlAttr(username ?? ""));
 
     private static string HtmlAttr(string s) =>
         (s ?? "").Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");
@@ -268,46 +250,6 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
   // Connexion = SSO GitLab : redirection vers la page de login GitLab (identifiant + mot de passe + 2FA).
   oauthBtn.addEventListener('click',function(){oauthBtn.disabled=true;window.location.href='/auth/oauth';});
 })();
-</script>
-</body>
-</html>
-""";
-
-    // -------------------------------------------------------------- welcome
-    private const string WelcomeHtml = """
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connecté · KPI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0a0e13;--panel:#141a22;--line:#222c37;--ink:#e9eef4;--ink-dim:#9aa6b6;--ink-faint:#5f6b7a;--accent:#2b7fff;--c-good:#1f9d6b;--c-good-soft:rgba(31,157,107,.16);--disp:'Space Grotesk',system-ui,sans-serif;--sans:system-ui,'Segoe UI',sans-serif;--mono:ui-monospace,monospace;}
-*{box-sizing:border-box;}
-html,body{margin:0;height:100%;}
-body{background:var(--bg);color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;}
-.card{width:min(92vw,420px);text-align:center;padding:8px;}
-.ring{width:78px;height:78px;border-radius:50%;background:var(--c-good-soft);color:var(--c-good);display:flex;align-items:center;justify-content:center;margin:0 auto 22px;}
-h1{font-family:var(--disp);font-weight:700;font-size:24px;letter-spacing:-.02em;margin:0 0 9px;}
-p{font-size:14px;line-height:1.55;color:var(--ink-dim);margin:0 0 4px;}
-.who{font-family:var(--mono);color:var(--ink);}
-.logout{display:inline-flex;align-items:center;gap:9px;margin-top:28px;height:46px;padding:0 22px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;font-family:var(--disp);font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;transition:border-color .12s,background .12s,transform .12s;}
-.logout:hover{border-color:var(--accent);background:#1b232d;transform:translateY(-1px);}
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="ring"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div>
-  <h1>Connexion réussie</h1>
-  <p>Vous êtes authentifié<span id="asWho"></span>.</p>
-  <p style="color:var(--ink-faint);font-size:12.5px;margin-top:10px">Cette page est volontairement vide. Le tableau de bord viendra ici.</p>
-  <a class="logout" href="/logout"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5M21 12H9"></path></svg> Se déconnecter</a>
-</div>
-<script>
-(function(){var n="__USER__";if(n)document.getElementById('asWho').textContent=' en tant que @'+n;})();
 </script>
 </body>
 </html>

@@ -43,8 +43,6 @@ public sealed class GitLabClient : IDisposable
         _projectIdEncoded = HttpUtility.UrlEncode(config.ProjectId);
     }
 
-    public string ProjectSegment => _projectIdEncoded;
-
     public async Task<List<GitLabIssue>> GetIssuesByMilestoneAsync(string? milestone, CancellationToken ct)
     {
         // milestone null/vide = fetcher TOUTES les issues du projet (toutes milestones confondues).

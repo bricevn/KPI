@@ -55,6 +55,4 @@
 
 /* Tiny shared helper: a status pip that ALSO carries a glyph,
    so meaning never depends on hue alone (daltonien-safe). */
-.kpi-pip { display:inline-flex; align-items:center; justify-content:center;
-  width:14px; height:14px; border-radius:50%; font-size:9px; font-weight:800;
-  color:#fff; flex:none; }
+

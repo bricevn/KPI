@@ -69,9 +69,6 @@ public sealed class CommentsSummary
 {
     /// <summary>Nombre total de commentaires non-system.</summary>
     public int Count { get; set; }
-
-    /// <summary>Compteur par auteur (username GitLab) — trié par count décroissant.</summary>
-    public Dictionary<string, int> ByAuthor { get; set; } = new();
 }
 
 public sealed class MergeRequestSummary
