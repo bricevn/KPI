@@ -245,6 +245,13 @@ public sealed partial class WebDashboard
         ex["ProjectIds"] = new JsonArray(projectIds.Select(i => JsonValue.Create(i)).ToArray());
         ex["LabelPhases"] = JsonSerializer.SerializeToNode(labelPhases);
         ex["TrackedLabels"] = new JsonArray(trackedLabels.Select(s => JsonValue.Create(s)).ToArray());
+        // Labels transversaux (noms exacts, dédoublonnés). Écrits seulement si le client les envoie.
+        if (b?["transversalLabels"] is JsonArray tvArr)
+        {
+            var tv = new JsonArray(); var seenTv = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var n in tvArr) { var s = (Str(n) ?? "").Trim(); if (s.Length > 0 && seenTv.Add(s)) tv.Add(s); }
+            ex["TransversalLabels"] = tv;
+        }
         if (b?["projects"] is JsonArray) ex["Projects"] = projectsArr;
         if (b?["periods"] is JsonArray) ex["Periods"] = periodsArr;
         if (b?["periodsByProject"] is JsonObject pbp)

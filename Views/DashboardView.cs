@@ -54,7 +54,8 @@ public sealed class DashboardView
         IReadOnlyList<Kpi.GitLab.Models.GitLabMilestone> milestones,
         string? lastExtractedAt,
         object? setup = null,
-        object? workTime = null)
+        object? workTime = null,
+        IReadOnlyList<string>? transversalLabels = null)
     {
         var payload = BuildPayload(milestone, exports, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
@@ -62,6 +63,9 @@ public sealed class DashboardView
         // Fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps) : consommée par le mapper
         // client (workingMs). null (export statique/legacy) ⇒ défauts du mapper (9-19, lun-ven).
         payload.workTime = workTime;
+        // Labels transversaux (Options → Configuration) : lus par le mapper (section « Labels transversaux »).
+        // null/vide ⇒ le mapper reprend les labels historiques par défaut.
+        payload.transversalLabels = (transversalLabels ?? new List<string>()).ToList();
         foreach (var lab in labels)
             if (!string.IsNullOrEmpty(lab.Name))
                 payload.labelColors[lab.Name] = new LabelColorPayload { color = lab.Color ?? "", textColor = lab.TextColor ?? "" };
@@ -275,6 +279,7 @@ public sealed class DashboardView
         // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
         public object? setup { get; set; }
         public object? workTime { get; set; }
+        public List<string> transversalLabels { get; set; } = new();
     }
 
     private sealed class PeriodPayload

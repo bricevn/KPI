@@ -63,10 +63,9 @@ public sealed partial class WebDashboard
 
     public static async Task RunAsync(AppConfig config, int port, CancellationToken ct)
     {
-        // Migration « aucun secret en clair au repos » : si appsettings.json contient encore des
-        // GroupToken / ClientSecret en clair (ancienne install, édition manuelle), on les réécrit
-        // chiffrés (enc:v1:…) une bonne fois. La config EN MÉMOIRE reste en clair (déjà déchiffrée).
-        await MigrateConfigSecretsAtRestAsync();
+        // Migrations de config au repos (secrets chiffrés + semis rétro-compat des labels transversaux).
+        // La config EN MÉMOIRE reste exploitable (secrets déjà déchiffrés, transversaux synchronisés).
+        await MigrateConfigAtRestAsync(config);
 
         var self = new WebDashboard(config);
 
@@ -544,9 +543,11 @@ public sealed partial class WebDashboard
 
     private static string RuntimeConfigPath() => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
-    /// <summary>Réécrit appsettings.json avec les secrets chiffrés (enc:v1:…) s'il en reste en clair.
-    /// Idempotent (ProtectSecret ne re-chiffre pas), atomique, best-effort (échec ⇒ log, l'app démarre).</summary>
-    private static async Task MigrateConfigSecretsAtRestAsync()
+    /// <summary>Migrations de config au repos (appsettings.json) au démarrage :
+    /// (1) chiffre les secrets restés en clair (enc:v1:…) ; (2) sème les labels transversaux historiques
+    /// SI la clé est ABSENTE (rétro-compat — une liste vide EXPLICITE = choix admin, respectée).
+    /// Idempotent, atomique, best-effort. Synchronise aussi la config EN MÉMOIRE pour le 1er payload.</summary>
+    private static async Task MigrateConfigAtRestAsync(AppConfig config)
     {
         try
         {
@@ -564,11 +565,23 @@ public sealed partial class WebDashboard
                 foreach (var s in servers)
                     if (s is JsonObject so && so["GroupToken"] != null) Enc(so, "GroupToken");
             if (root["Auth"] is JsonObject auth && auth["ClientSecret"] != null) Enc(auth, "ClientSecret");
+
+            // Semis rétro-compat des labels transversaux : seulement si la CLÉ est absente. Une fois écrite
+            // (même []), on ne re-sème plus → « tout retirer » reste stable au redémarrage.
+            if (root["Export"] is JsonObject ex && ex["TransversalLabels"] == null)
+            {
+                var defaults = new[] { "CONTRACTUAL", "Unplanned", "Surcharge QA" };
+                ex["TransversalLabels"] = new JsonArray(defaults.Select(s => JsonValue.Create(s)).ToArray());
+                config.Export.TransversalLabels = defaults.ToList(); // synchro mémoire (1er payload sans redémarrage)
+                changed = true;
+                Console.WriteLine("[Migration] Labels transversaux : défauts historiques semés (rétro-compat, éditables dans Options).");
+            }
+
             if (!changed) return;
             await WriteFileAtomicAsync(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-            Console.WriteLine("[Sécurité] Secrets de configuration chiffrés au repos (appsettings.json migré).");
+            Console.WriteLine("[Config] appsettings.json migré au repos.");
         }
-        catch (Exception ex) { Console.Error.WriteLine("[Sécurité] Migration des secrets impossible : " + ex.Message); }
+        catch (Exception ex) { Console.Error.WriteLine("[Config] Migration au repos impossible : " + ex.Message); }
     }
 
     private static string? SourceConfigPath()
@@ -694,6 +707,7 @@ public sealed partial class WebDashboard
                 ? (cfg.Export.TeamsByProject ?? new()).ToDictionary(kv => kv.Key.ToString(), kv => (object)kv.Value.Select(t => new { name = t.Key, members = t.Value }).ToList())
                 : new Dictionary<string, object>(),
             trackedLabels = cfg.Export.TrackedLabels ?? new(),
+            transversalLabels = cfg.Export.TransversalLabels ?? new(),
         };
 
         var json = DashboardView.BuildPayloadJson(
@@ -703,7 +717,8 @@ public sealed partial class WebDashboard
             // compilateur qu'elles peuvent l'être → CS8604 sans cette garde).
             scopedTeams, cfg.Export.LabelPhases ?? new(), rolePeriods,
             labels, milestones, lastExtracted, setup,
-            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes });
+            new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes },
+            cfg.Export.TransversalLabels ?? new());
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }

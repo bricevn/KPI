@@ -345,6 +345,10 @@
     const [teamsByProj, setTeamsByProj] = useState(() => mapClone(S.teamsByProject || {}, (arr) => cloneTeams(arr)));
     const [assocProjects, setAssocProjects] = useState((S.projects || []).map((p) => p.name));
     const [teamProjects, setTeamProjects] = useState((S.projects || []).map((p) => p.name));
+    // Labels transversaux (globaux). Pré-remplis avec l'effectif courant (config, sinon repli mapper
+    // exposé via A.transversalNames) → l'admin voit ce qui est actif et l'ajuste.
+    const [transversal, setTransversal] = useState(() =>
+      ((S.transversalLabels && S.transversalLabels.length) ? S.transversalLabels : ((A.transversalNames) || [])).slice());
     const [labelsCache, setLabelsCache] = useState({});
     const [saving, setSaving] = useState('idle'); // idle | busy | done | err
     const [err, setErr] = useState('');
@@ -412,10 +416,14 @@
     const phaseColorOf = (key) => key === 'none' ? '#5f6b7a' : ((phases.find((p) => p.key === key) || {}).color || '#5f6b7a');
 
     const filterImport = (obj) => { const o = {}; Object.keys(obj || {}).forEach((k) => { if (importIds.indexOf(+k) >= 0) o[k] = obj[k]; }); return o; };
+    // Options du sélecteur de labels transversaux : les labels présents dans les données + ceux déjà
+    // sélectionnés (pour qu'un label absent des données extraites reste visible et retirable).
+    const tvOptions = [...new Set((((A.filterOptions || {}).labels) || []).concat(transversal))].sort();
     const payload = () => ({
       projectIds: importIds,
       projects: projList.filter((p) => importIds.indexOf(p.id) >= 0).map((p) => ({ id: p.id, name: p.name, group: p.groupFull || p.group || '' })),
       periods: phases.map((p) => ({ key: p.key, name: p.name, color: p.color, role: p.role || 'active' })),
+      transversalLabels: transversal,
       labelPhases: lpGlobal,
       labelPhasesByProject: filterImport(lpByProj),
       teams: teamsGlobal.map(orderTeam),
@@ -473,6 +481,13 @@
               </div>}
         </div>
 
+        {/* ---- Labels transversaux (globaux) : recoupent plusieurs types, affichés à part au dashboard.
+             Ligne standard (label + contrôle sur la même ligne), comme « Projets importés ». ---- */}
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.transversalLabels')}<span>{window.t('opt.transversalLabelsSub')}</span></div>
+          <window.MultiSelect label="" options={tvOptions} value={transversal} onChange={setTransversal} />
+        </div>
+
         {/* ---- Équipes (portée par projet) ---- */}
         <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
@@ -519,6 +534,11 @@
         <div className="opt-map">
           {prodLabels.length ? prodLabels.map((l) => { const k = lp[l] || 'none'; return <div className="opt-maprow" key={l}><span className="opt-dot" style={{ background: phaseColorOf(k) }}></span><span className="opt-mlabel">{l}</span><span style={{ fontSize: 12, color: 'var(--ink-faint)', marginLeft: 'auto' }}>{phaseName(k)}</span></div>; }) : <p className="opt-note">{window.t('opt.noLabels')}</p>}
         </div>
+        <div className="opt-sub">{window.t('opt.transversalLabels')} <span style={subGrey}>· {window.t('opt.transversalLabelsSub')}</span></div>
+        {(() => { const tv = (S.transversalLabels && S.transversalLabels.length) ? S.transversalLabels : ((A.transversalNames) || []);
+          return tv.length
+            ? <div className="opt-map">{tv.map((l) => <div className="opt-maprow" key={l}><span className="opt-mlabel">{l}</span></div>)}</div>
+            : <p className="opt-note">{window.t('opt.noLabels')}</p>; })()}
         <div className="opt-sub">{window.t('opt.teams')} <span style={subGrey}>· {window.t('opt.teamsSub')}</span></div>
         <TeamsEditor teams={teams} setTeams={() => {}} readOnly={true} />
       </div>);

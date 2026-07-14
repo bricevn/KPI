@@ -279,10 +279,19 @@ window.buildAPP = function (D) {
   };
 
   // ---------- transversaux ----------
-  var TRANSV = [['contractual', 'CONTRACTUAL'], ['unplanned', 'Unplanned'], ['surchargeqa', 'Surcharge QA']];
-  var transversal = TRANSV.map(function (tv) {
-    var g = Object.assign({ key: tv[0], name: tv[1] }, blankAgg());
-    detail.forEach(function (d) { if (d.labels.some(function (l) { return l.toLowerCase() === tv[1].toLowerCase(); })) addToAgg(g, d); });
+  // Labels transversaux CONFIGURABLES (Options → Configuration → payload.transversalLabels).
+  // Chaque nom de label devient un groupe (clé = slug, pour la key React). Repli sur les labels
+  // historiques si non configuré (rétro-compat + export statique CLI qui n'émet pas le champ).
+  var DEFAULT_TRANSVERSAL = ['CONTRACTUAL', 'Unplanned', 'Surcharge QA'];
+  // Config AUTORITAIRE : un tableau (même VIDE) est respecté tel quel → l'admin peut tout retirer
+  // (0 groupe transversal). Le repli sur les défauts ne sert que si le champ est ABSENT du payload
+  // (export statique/legacy qui ne le fournit pas).
+  var transversalNames = Array.isArray(D.transversalLabels) ? D.transversalLabels : DEFAULT_TRANSVERSAL;
+  var tvSlug = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '') || 'tv'; };
+  var transversal = transversalNames.map(function (name) {
+    var lo = String(name).toLowerCase();
+    var g = Object.assign({ key: tvSlug(name), name: name }, blankAgg());
+    detail.forEach(function (d) { if (d.labels.some(function (l) { return l.toLowerCase() === lo; })) addToAgg(g, d); });
     finishAgg(g); g.ratio = pct(g.issues, totals.issues); return g;
   }).filter(function (g) { return g.issues > 0; });
 
@@ -424,7 +433,7 @@ window.buildAPP = function (D) {
     // catalogue des assignés du périmètre (l'onglet Options s'en sert pour lister les membres).
     selectedUsers: D.selectedUsers || null,
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
-    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, phaseAvg: phaseAvg, phaseTotals: phaseTotals,
+    superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, transversalNames: transversalNames, phaseAvg: phaseAvg, phaseTotals: phaseTotals,
     milestone: milestone, meta: meta, FIB: FIB,
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.

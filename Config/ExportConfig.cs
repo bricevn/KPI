@@ -176,6 +176,12 @@ public sealed class ExportConfig
     public List<string> TrackedLabels { get; set; } = new();
     public List<LabelTransitionConfig> TrackedTransitions { get; set; } = new();
 
+    /// <summary>Labels « transversaux » (noms exacts) recoupant plusieurs types, affichés à part dans la
+    /// section « Labels transversaux » du dashboard. Configurable dans Options → Configuration.
+    /// Vide ⇒ repli mapper sur les labels historiques (CONTRACTUAL / Unplanned / Surcharge QA).
+    /// Valeurs (pas des clés) ⇒ pas concerné par la corruption « : » de <see cref="RepairColonKeyedMaps"/>.</summary>
+    public List<string> TransversalLabels { get; set; } = new();
+
     /// <summary>
     /// Groupes d'utilisateurs (équipes). Clé = nom d'équipe, valeur = liste de usernames GitLab.
     /// Utilisé par le filtre "Équipe" du dashboard pour cocher/décocher en bloc.
