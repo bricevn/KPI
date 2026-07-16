@@ -108,3 +108,25 @@
   border-top: 1px solid var(--color-line-1); font-size: var(--text-sm); }
 .kpi-phasebars-total .nm { font-weight: 700; color: var(--color-ink-1); }
 .kpi-phasebars-total .v { margin-left: auto; font-family: var(--font-display); font-weight: 700; font-size: var(--text-h3); }
+
+/* GanttChart — amorce timeline (segments de phase datés) */
+.kpi-gantt { border: 1px solid var(--color-line-1); border-radius: var(--radius-2xl); background: var(--color-surface-1); overflow: hidden; }
+.kpi-gantt-scroll { overflow-x: auto; }
+.kpi-gantt-grid { min-width: 620px; }
+.kpi-gantt-axis { display: flex; padding: 9px 0 8px; border-bottom: 1px solid var(--color-line-1); }
+.kpi-gantt-corner { width: 190px; flex: none; padding-left: 16px; display: flex; align-items: center;
+  font-size: var(--text-eyebrow); text-transform: uppercase; letter-spacing: .06em; color: var(--color-ink-3); font-weight: 700; }
+.kpi-gantt-axis .day { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-align: center;
+  font-size: 10px; color: var(--color-ink-3); font-weight: 600; }
+.kpi-gantt-axis .day.we { opacity: .45; }
+.kpi-gantt-axis .day.m1 { border-left: 1px solid var(--color-line-1); }
+.kpi-gantt-row { display: flex; align-items: center; border-bottom: 1px solid var(--color-line-2); min-height: 40px; }
+.kpi-gantt-row:last-child { border-bottom: 0; }
+.kpi-gantt-label { width: 190px; flex: none; padding: 6px 14px 6px 16px; display: flex; align-items: center; gap: 9px;
+  font-size: var(--text-sm); overflow: hidden; }
+.kpi-gantt-label .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-1); }
+.kpi-gantt-track { flex: 1; position: relative; height: 40px; }
+.kpi-gantt-seg { position: absolute; top: 11px; height: 18px; border-radius: 5px; min-width: 3px; }
+.kpi-gantt-mark { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 2; }
+.kpi-gantt-mark.today { background: var(--color-accent); }
+.kpi-gantt-mark.ms { background: var(--color-ink-3); opacity: .5; }
