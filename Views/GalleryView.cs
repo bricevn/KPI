@@ -15,7 +15,7 @@ public static class GalleryView
     private static readonly string[] ComponentFiles = {
         "Button.jsx", "StatusBadge.jsx", "Avatar.jsx",
         "Chip.jsx", "DeltaBadge.jsx", "ProgressBar.jsx", "Sparkline.jsx", "Donut.jsx",
-        "KpiCard.jsx",
+        "KpiCard.jsx", "DataTable.jsx",
     };
 
     public static string Page()
