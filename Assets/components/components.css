@@ -1,0 +1,17 @@
+/* ============================================================================
+   components.css — styles des composants isolés (au-delà des boutons, qui sont
+   dans charte-buttons.css). Tout passe par les tokens de charte-tokens.css.
+   ============================================================================ */
+
+/* StatusBadge — statut coloré + glyphe (daltonien-safe) */
+.kpi-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body); font-size: var(--text-caption); font-weight: 700;
+  padding: 4px 11px; border-radius: var(--radius-pill); white-space: nowrap;
+}
+.kpi-badge svg { width: 13px; height: 13px; flex: none; }
+.kpi-badge.is-good    { color: var(--color-good);    background: color-mix(in srgb, var(--color-good) 15%, transparent); }
+.kpi-badge.is-warn    { color: var(--color-warn);    background: color-mix(in srgb, var(--color-warn) 16%, transparent); }
+.kpi-badge.is-bad     { color: var(--color-bad);     background: color-mix(in srgb, var(--color-bad) 16%, transparent); }
+.kpi-badge.is-done    { color: var(--color-done);    background: color-mix(in srgb, var(--color-done) 16%, transparent); }
+.kpi-badge.is-neutral { color: var(--color-neutral); background: color-mix(in srgb, var(--color-neutral) 16%, transparent); }

@@ -302,6 +302,9 @@ public sealed partial class WebDashboard
 
         app.MapGet("/", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
         app.MapGet("/index.html", (Func<HttpContext, Task<IResult>>)(ctx => self.ServeHtmlAsync(ctx)));
+        // Banc d'isolation des composants — DEV uniquement, données fictives (fixtures), aucun secret.
+        if (app.Environment.IsDevelopment())
+            app.MapGet("/gallery", () => Results.Content(Kpi.Views.GalleryView.Page(), "text/html; charset=utf-8")).AllowAnonymous();
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
         app.MapPost("/api/cancel", (HttpContext ctx) => self.CancelAsync(ctx));
         app.MapPost("/api/refresh", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshAsync(ctx)));

@@ -22,6 +22,9 @@
     <None Update="Assets\design\charte-tokens.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Assets\design\charte-buttons.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Assets\design\studio.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -35,6 +38,10 @@
     <Content Include="Assets\app\*.jsx" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\app\*.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\vendor\*.js" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Bibliothèque de composants isolés (galerie /gallery). -->
+    <Content Include="Assets\components\*.jsx" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\components\*.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\components\*.css" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
