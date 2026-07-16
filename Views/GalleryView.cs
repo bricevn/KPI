@@ -50,9 +50,13 @@ public static class GalleryView
         // Registre + utilitaires (plain JS, exécutés avant les scripts babel).
         sb.AppendLine("  <script>" + A("components", "registry.js") + "</script>");
         sb.AppendLine("  <script>" + A("components", "charte-complement.js") + "</script>");
-        // Composants (s'auto-enregistrent), puis la galerie qui les monte.
+        // Fixtures du dashboard modulaire : window.KPIData (adaptateurs démo) + window.__DEMO_PAGE.
+        sb.AppendLine("  <script>" + A("components", "page-fixtures.js") + "</script>");
+        // Composants (s'auto-enregistrent).
         foreach (var f in ComponentFiles)
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("components", f) + "</script>");
+        // Renderer modulaire (window.PageRenderer) puis la galerie qui monte composants + page démo.
+        sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("app", "page-renderer.jsx") + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">" + A("components", "gallery.jsx") + "</script>");
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
@@ -64,7 +68,9 @@ public static class GalleryView
     .gx.app { display: flex; min-height: 100vh; background: var(--color-bg); color: var(--color-ink-1); }
     .gx-sb { width: 240px; flex: none; background: var(--color-sidebar); border-right: 1px solid var(--color-line-1);
       padding: var(--space-5); height: 100vh; position: sticky; top: 0; overflow: auto; }
-    .gx-brand { font-family: var(--font-display); font-weight: 700; font-size: var(--text-h3); margin-bottom: var(--space-5); }
+    .gx-brand { font-family: var(--font-display); font-weight: 700; font-size: var(--text-h3); margin-bottom: var(--space-4); }
+    .gx-modes { width: 100%; margin-bottom: var(--space-5); }
+    .gx-modes button { flex: 1; }
     .gx-cat { margin-bottom: var(--space-4); }
     .gx-cat-h { font-size: var(--text-eyebrow); text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
       color: var(--color-ink-3); margin-bottom: var(--space-2); }

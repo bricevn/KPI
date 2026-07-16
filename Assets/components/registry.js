@@ -27,6 +27,7 @@
       reg.push(spec);
     },
     all() { return reg.slice(); },
+    get(name) { return reg.find((s) => s.name === name) || null; },
     categories() { return [...new Set(reg.map((s) => s.category || 'Autres'))]; },
   };
 })();

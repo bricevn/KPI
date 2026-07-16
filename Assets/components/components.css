@@ -130,3 +130,14 @@
 .kpi-gantt-mark { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 2; }
 .kpi-gantt-mark.today { background: var(--color-accent); }
 .kpi-gantt-mark.ms { background: var(--color-ink-3); opacity: .5; }
+
+/* PageRenderer — grille de widgets d'une page modulaire */
+.page-grid { width: 100%; }
+.widget-cell { min-width: 0; }
+.widget-missing, .widget-error {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 80px; padding: var(--space-5); border-radius: var(--radius-xl);
+  border: 1px dashed var(--color-line-1); background: var(--color-surface-2);
+  font-size: var(--text-caption); color: var(--color-ink-3);
+}
+.widget-error { border-color: color-mix(in srgb, var(--color-bad) 45%, transparent); color: var(--color-bad); }

@@ -8,6 +8,7 @@
   function Gallery() {
     const specs = (window.KPIGallery && window.KPIGallery.all()) || [];
     const cats = (window.KPIGallery && window.KPIGallery.categories()) || [];
+    const [mode, setMode] = useState('components'); // 'components' | 'pages'
     const [sel, setSel] = useState(specs.length ? specs[0].name : null);
     const [theme, setTheme] = useState('dark');
     const [accent, setAccent] = useState('#2b7fff');
@@ -26,8 +27,13 @@
     return (
       <div className={'app kpi-root gx' + (compact ? ' compact' : '')} data-theme={theme} style={rootStyle}>
         <aside className="gx-sb">
-          <div className="gx-brand">Composants KPI</div>
-          {cats.map((c) => (
+          <div className="gx-brand">KPI · Design</div>
+          <div className="gx-seg gx-modes">
+            {[['components', 'Composants'], ['pages', 'Pages']].map(([k, l]) => (
+              <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>
+            ))}
+          </div>
+          {mode === 'components' && cats.map((c) => (
             <div key={c} className="gx-cat">
               <div className="gx-cat-h">{c}</div>
               {specs.filter((s) => (s.category || 'Autres') === c).map((s) => (
@@ -52,7 +58,15 @@
             <label className="gx-toggle"><input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} /> Compact</label>
           </div>
 
-          {current ? (
+          {mode === 'pages' ? (
+            <div className="gx-canvas">
+              <h1 className="gx-title">Page modulaire — démo</h1>
+              <p className="gx-notes">Rendue par window.PageRenderer depuis un modèle JSON (window.__DEMO_PAGE) : chaque widget est résolu par type → window.KPI et alimenté par un adaptateur window.KPIData (fixtures). Preuve du contrat renderer + binding + isolation d'erreur, sans pipeline réel.</p>
+              {window.PageRenderer
+                ? React.createElement(window.PageRenderer, { page: window.__DEMO_PAGE, ctx: { t: window.t || ((k) => k), icon: () => null } })
+                : <div className="gx-empty">PageRenderer non chargé.</div>}
+            </div>
+          ) : current ? (
             <div className="gx-canvas">
               <h1 className="gx-title">{current.name}</h1>
               {current.notes && <p className="gx-notes">{current.notes}</p>}
