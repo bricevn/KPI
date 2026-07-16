@@ -14,12 +14,16 @@
 // ============================================================================
 (function () {
   const reg = [];
+  // Namespace de composition : tout composant enregistré est aussi exposé sous window.KPI.<Nom>,
+  // pour qu'un composant puisse en réutiliser un autre (ex. KpiCard compose ProgressBar + Sparkline).
+  window.KPI = window.KPI || {};
   window.KPIGallery = {
     register(spec) {
       if (!spec || !spec.name || typeof spec.render !== 'function') {
         console.warn('KPIGallery.register : spec invalide', spec);
         return;
       }
+      window.KPI[spec.name] = spec.render;
       reg.push(spec);
     },
     all() { return reg.slice(); },
