@@ -96,3 +96,15 @@
 }
 .kpi-table td.is-left { text-align: left; font-family: var(--font-body); color: var(--color-ink-1); }
 .kpi-table tr.is-total td { background: var(--color-surface-2); font-weight: 700; color: var(--color-ink-1); }
+
+/* PhaseBars — temps par phase (nom | barre | valeur) + total */
+.kpi-phasebars { display: flex; flex-direction: column; }
+.kpi-phasebar { display: flex; align-items: center; gap: 11px; margin: 11px 0; font-size: var(--text-meta); }
+.kpi-phasebar-nm { width: 72px; flex: none; color: var(--color-ink-2); }
+.kpi-phasebar-tr { flex: 1; height: 10px; border-radius: 6px; background: var(--color-surface-2); overflow: hidden; }
+.kpi-phasebar-tr > i { display: block; height: 100%; border-radius: 6px; }
+.kpi-phasebar-v { width: 52px; text-align: right; font-family: var(--font-display); font-weight: 600; color: var(--color-ink-2); }
+.kpi-phasebars-total { display: flex; align-items: center; gap: 11px; margin-top: 10px; padding-top: 11px;
+  border-top: 1px solid var(--color-line-1); font-size: var(--text-sm); }
+.kpi-phasebars-total .nm { font-weight: 700; color: var(--color-ink-1); }
+.kpi-phasebars-total .v { margin-left: auto; font-family: var(--font-display); font-weight: 700; font-size: var(--text-h3); }
