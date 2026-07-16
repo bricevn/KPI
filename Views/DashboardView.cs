@@ -207,6 +207,10 @@ public sealed class DashboardView
         sb.AppendLine("  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>");
         sb.AppendLine("  <link href=\"https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap\" rel=\"stylesheet\">");
         sb.AppendLine("  <style>");
+        // Charte graphique — source de vérité des tokens (chargée AVANT shared/studio pour que ses
+        // variables cascadent). Additif : shared/studio conservent leurs anciens tokens (mêmes valeurs)
+        // le temps de la migration progressive en alias.
+        sb.AppendLine(A("design", "charte-tokens.css"));
         sb.AppendLine(A("design", "shared.css"));
         sb.AppendLine(A("design", "studio.css"));
         sb.AppendLine("  html, body { margin: 0; } body { background: #0a0e13; }");

@@ -102,6 +102,8 @@
     const rootStyle = {
       '--accent': accent, '--accent-2': accent,
       '--accent-soft': `color-mix(in srgb, ${accent} 15%, transparent)`,
+      // Pont charte : --accent-hue pilote --color-accent (et --color-accent-soft dérivé) des tokens.
+      '--accent-hue': accent,
       '--disp-font': NUM_FONTS[numFont] || NUM_FONTS.grotesk
     };
     // Couleurs de phase pilotées par la config (Export.Periods) : surcharge les --p-<key> du CSS.

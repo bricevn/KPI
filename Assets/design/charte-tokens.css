@@ -1,0 +1,186 @@
+/* ============================================================================
+   KPI — Charte graphique. Source de vérité des tokens.
+   Convention de nommage :
+     --color-<catégorie>-<rôle>[-<variante>]   couleurs sémantiques
+     --space-N        échelle d'espacement (base 4)
+     --radius-<t>     rayons nommés
+     --text-<niveau>  taille de police nommée
+     --font-<rôle>    famille de police
+     --shadow-<t>     élévation (clair) ; en sombre, l'élévation passe par --color-line
+     --dur-* / --ease-*  mouvement
+   Les valeurs reprennent EXACTEMENT le socle en production (studio.css / shared.css),
+   réorganisées en échelles régulières. Rien n'est inventé, tout est nommé.
+   ============================================================================ */
+
+:root {
+  /* ---- Familles ---- */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;   /* chiffres, titres */
+  --font-body: system-ui, 'Segoe UI', sans-serif;           /* corps */
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;    /* labels techniques */
+
+  /* ---- Échelle typographique (nommée) ---- */
+  --text-display: 32px;   /* KPI géant · 700 · ls -.02em · lh 1 */
+  --text-stat: 30px;      /* nombre de carte · 700 */
+  --text-h1: 21px;        /* titre de page · 700 */
+  --text-value: 20px;     /* valeur de drill / stat · 700 */
+  --text-h2: 15px;        /* titre de section · 700 */
+  --text-h3: 14px;        /* sous-titre · 700 */
+  --text-body: 14px;      /* corps · 400-500 · lh 1.45 */
+  --text-sm: 13px;        /* tableau · 500-700 */
+  --text-meta: 12px;      /* meta · 500-600 */
+  --text-caption: 11px;   /* petit · 500 */
+  --text-eyebrow: 10.5px; /* label · 700 · uppercase · ls .06em */
+
+  /* ---- Espacement (base 4) ---- */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 24px;
+  --space-8: 32px;
+  --space-9: 40px;
+  --space-10: 48px;
+
+  /* ---- Rayons (nommés) ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 9px;    /* input, petit bouton */
+  --radius-lg: 11px;   /* bouton */
+  --radius-xl: 14px;   /* carte */
+  --radius-2xl: 16px;  /* panneau */
+  --radius-3xl: 18px;  /* modale */
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
+  /* ---- Mouvement ---- */
+  --dur-fast: .13s;
+  --dur-base: .16s;
+  --dur-panel: .2s;
+  --ease-out: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---- Dimensions de layout ---- */
+  --sidebar-w: 228px;
+  --sidebar-w-collapsed: 68px;
+
+  /* ---- Accent (surchargeable par l'utilisateur au runtime) ---- */
+  --accent-hue: #1f6feb;
+  --accent-complement: #e0792e;
+}
+
+/* ============================================================================
+   THÈME CLAIR (défaut)
+   ============================================================================ */
+:root, [data-theme="light"] {
+  /* surfaces & chrome */
+  --color-bg: #eef1f6;
+  --color-surface-1: #ffffff;   /* panel */
+  --color-surface-2: #f3f6fb;   /* hover, pills, inputs */
+  --color-surface-3: #e9eef6;   /* tracks, fills vides */
+  --color-sidebar: #ffffff;
+
+  --color-ink-1: #0f1722;       /* texte principal */
+  --color-ink-2: #56627a;       /* secondaire */
+  --color-ink-3: #8b97ad;       /* tertiaire / labels */
+
+  --color-line-1: #e6ebf3;      /* bordures */
+  --color-line-2: #eef2f8;      /* bordures internes */
+
+  --color-accent: var(--accent-hue);
+  --color-accent-hover: #155bcc;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-link: #1a63d6;
+
+  --color-contractual: #0969da;
+  --color-contractual-soft: rgba(9, 105, 218, .07);
+
+  /* sémantique data — statuts (Okabe-Ito, jamais seuls) */
+  --color-good: #008A63;
+  --color-warn: #C77F00;
+  --color-bad: #D55E00;
+  --color-done: #0072B2;
+  --color-neutral: #6B7682;
+
+  /* types d'issue */
+  --color-feature: #9400d3;
+  --color-enh: #c77dff;
+  --color-bug: #e5392f;
+  --color-clientbug: #a51d16;
+  --color-regression: #ff8f6b;
+
+  /* phases (seed — dynamiques via générateur) */
+  --p-in-progress: #2188ff;
+  --p-code-review: #8957e5;
+  --p-qa-backlog: #b8800a;
+  --p-qa: #c79a06;
+  --p-to-fix: #ec4899;
+  --p-po-validation: #0f9e8e;
+
+  /* élévation : ombres actives */
+  --shadow-sm: 0 1px 2px rgba(15, 30, 60, .06);
+  --shadow-md: 0 2px 4px rgba(15, 30, 60, .05), 0 8px 24px rgba(15, 30, 60, .05);
+  --shadow-popover: 0 12px 32px rgba(15, 30, 60, .18);
+  --shadow-dropdown: 0 16px 40px rgba(15, 30, 60, .22);
+  --shadow-modal: 0 24px 64px rgba(15, 30, 60, .28);
+
+  color-scheme: light;
+}
+
+/* ============================================================================
+   THÈME SOMBRE — surfaces distinctes ; élévation par bordures, ombres neutralisées
+   ============================================================================ */
+[data-theme="dark"] {
+  --accent-hue: #2b7fff;
+  --accent-complement: #e0792e;
+
+  --color-bg: #0a0e13;
+  --color-surface-1: #141a22;
+  --color-surface-2: #1b232d;
+  --color-surface-3: #222c37;
+  --color-sidebar: #10151c;
+
+  --color-ink-1: #e9eef4;
+  --color-ink-2: #9aa6b6;
+  --color-ink-3: #5f6b7a;
+
+  --color-line-1: #222c37;
+  --color-line-2: #1b232d;
+
+  --color-accent: var(--accent-hue);
+  --color-accent-hover: #4d97ff;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --color-link: #5aa2ff;
+
+  --color-contractual: #58a6ff;
+  --color-contractual-soft: rgba(88, 166, 255, .11);
+
+  --color-good: #2FB88E;
+  --color-warn: #F2B441;
+  --color-bad: #F0813B;
+  --color-done: #4DA3E0;
+  --color-neutral: #8893A0;
+
+  --color-feature: #b86fe0;
+  --color-enh: #dcb3ff;
+  --color-bug: #ff6f63;
+  --color-clientbug: #c75b50;
+  --color-regression: #ffb59a;
+
+  --p-in-progress: #58a6ff;
+  --p-code-review: #a978f0;
+  --p-qa-backlog: #f0a13b;
+  --p-qa: #eab308;
+  --p-to-fix: #f472b6;
+  --p-po-validation: #2dd4bf;
+
+  /* élévation par bordures : ombres portées neutralisées, dropdown/modal gardent une ombre profonde */
+  --shadow-sm: 0 0 0 1px var(--color-line-1);
+  --shadow-md: 0 0 0 1px var(--color-line-1);
+  --shadow-popover: 0 0 0 1px var(--color-line-1), 0 12px 32px rgba(0, 0, 0, .5);
+  --shadow-dropdown: 0 0 0 1px var(--color-line-1), 0 16px 40px rgba(0, 0, 0, .5);
+  --shadow-modal: 0 0 0 1px var(--color-line-1), 0 24px 64px rgba(0, 0, 0, .55);
+
+  color-scheme: dark;
+}
