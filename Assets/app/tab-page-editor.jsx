@@ -23,6 +23,9 @@
     const [pages, setPages] = useState(() => clone(srcPages()) || []);
     const [sel, setSel] = useState(() => { const s = srcPages(); return (s[0] && s[0].id) || null; });
     const [status, setStatus] = useState(''); // '' | 'saving' | 'saved' | 'err:<msg>'
+    // Drag & drop natif (HTML5) : index en cours de glissement + index survolé (indicateur de dépôt).
+    const [dragW, setDragW] = useState(null); const [overW, setOverW] = useState(null); const [trashOver, setTrashOver] = useState(false);
+    const [dragP, setDragP] = useState(null); const [overP, setOverP] = useState(null);
     const page = pages.find((p) => p.id === sel) || null;
 
     const mutate = (fn) => { setStatus(''); setPages((ps) => { const n = clone(ps); const p = n.find((x) => x.id === sel); if (p) fn(p); return n; }); };
@@ -40,7 +43,16 @@
       p.widgets.push({ id: nextWid(p), type, data: (spec.data && spec.data[0]) || '', layout: { w: spec.defaultW || 4, h: 1, x: -1, y: -1 }, params: {} });
     });
     const setWidgetType = (wi, type) => mutate((p) => { const w = p.widgets[wi]; w.type = type; const spec = CATALOG()[type] || {}; if (!spec.data || spec.data.indexOf(w.data) < 0) w.data = (spec.data && spec.data[0]) || ''; if (spec.defaultW) w.layout.w = spec.defaultW; });
-    const move = (wi, d) => mutate((p) => { const j = wi + d; if (j < 0 || j >= p.widgets.length) return; const a = p.widgets; const t = a[wi]; a[wi] = a[j]; a[j] = t; });
+    // Widgets : réordonner (glisser une poignée sur une autre ligne) + supprimer (glisser vers la corbeille).
+    const moveWidget = (from, to) => mutate((p) => { const a = p.widgets; if (from == null || to == null || from === to || to < 0 || to >= a.length) return; const [x] = a.splice(from, 1); a.splice(to, 0, x); });
+    const delWidgetAt = (i) => mutate((p) => { if (i != null && i >= 0 && i < p.widgets.length) p.widgets.splice(i, 1); });
+    // Pages : réordonner par glissement → renumérote nav.order pour que l'ordre persiste (la nav trie par order).
+    const reorderPages = (from, to) => {
+      if (from == null || to == null || from === to) return;
+      setStatus('');
+      setPages((ps) => { const a = clone(ps); const [x] = a.splice(from, 1); a.splice(to, 0, x); a.forEach((pg, idx) => { pg.nav = pg.nav || {}; pg.nav.order = (idx + 1) * 10; }); return a; });
+    };
+    const dt = (e, v) => { try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(v)); } catch (x) {} };
 
     // Persiste une liste de pages (POST /api/my-pages) puis recharge. Partagé par « Enregistrer » et la
     // suppression (qui doit persister immédiatement, y compris quand la liste devient vide).
@@ -64,13 +76,21 @@
           <h3>Pages</h3>
           <p className="lead">Vos pages personnelles.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-            {pages.length ? pages.map((p) =>
-              <button key={p.id} className={'gx-item' + (p.id === sel ? ' on' : '')} style={{ borderRadius: 9, padding: 9, textAlign: 'left', border: 0, cursor: 'pointer', background: p.id === sel ? 'var(--accent-soft)' : 'transparent', color: p.id === sel ? 'var(--accent)' : 'var(--ink-dim)', fontWeight: p.id === sel ? 600 : 500 }} onClick={() => setSel(p.id)}>
-                {(p.nav && p.nav.label) || p.id} <span style={{ color: 'var(--ink-faint)', fontSize: 11 }}>· {p.widgets ? p.widgets.length : 0} widgets</span>
+            {pages.length ? pages.map((p, pi) =>
+              <button key={p.id} draggable
+                className={'gx-item pe-pitem' + (p.id === sel ? ' on' : '') + (overP === pi && dragP !== pi ? ' dragover' : '') + (dragP === pi ? ' dragging' : '')}
+                style={{ borderRadius: 9, padding: 9, textAlign: 'left', border: 0, cursor: 'grab', background: p.id === sel ? 'var(--accent-soft)' : 'transparent', color: p.id === sel ? 'var(--accent)' : 'var(--ink-dim)', fontWeight: p.id === sel ? 600 : 500 }}
+                onClick={() => setSel(p.id)}
+                onDragStart={(e) => { setDragP(pi); dt(e, pi); }}
+                onDragEnd={() => { setDragP(null); setOverP(null); }}
+                onDragOver={(e) => { if (dragP != null) { e.preventDefault(); if (overP !== pi) setOverP(pi); } }}
+                onDrop={(e) => { if (dragP != null) { e.preventDefault(); reorderPages(dragP, pi); } setDragP(null); setOverP(null); }}>
+                <span className="opt-grip" style={{ marginRight: 6 }}>⠿</span>{(p.nav && p.nav.label) || p.id} <span style={{ color: 'var(--ink-faint)', fontSize: 11 }}>· {p.widgets ? p.widgets.length : 0} widgets</span>
               </button>
             ) : <div className="opt-note">Aucune page. Créez-en une.</div>}
           </div>
           <button className="btn btn-sm" onClick={addPage}>{window.ICONS ? window.ICONS.plus : '+'} Nouvelle page</button>
+          {pages.length > 1 && <p className="opt-note" style={{ margin: '8px 0 0' }}>Glissez une page pour la réordonner.</p>}
         </div>
 
         {/* Colonne droite : éditeur de la page sélectionnée + aperçu */}
@@ -95,7 +115,14 @@
                   const spec = CATALOG()[w.type] || {};
                   const dataOpts = spec.data || (w.data ? [w.data] : []);
                   return (
-                    <div key={w.id} className="opt-maprow" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <div key={w.id}
+                      className={'opt-maprow pe-wrow' + (overW === wi && dragW !== wi ? ' dragover' : '') + (dragW === wi ? ' dragging' : '')}
+                      style={{ gap: 8, flexWrap: 'wrap' }}
+                      onDragOver={(e) => { if (dragW != null) { e.preventDefault(); if (overW !== wi) setOverW(wi); } }}
+                      onDrop={(e) => { if (dragW != null) { e.preventDefault(); moveWidget(dragW, wi); } setDragW(null); setOverW(null); }}>
+                      <span className="opt-grip" draggable title="Glisser pour réordonner" style={{ cursor: 'grab' }}
+                        onDragStart={(e) => { setDragW(wi); dt(e, wi); }}
+                        onDragEnd={() => { setDragW(null); setOverW(null); setTrashOver(false); }}>⠿</span>
                       <select value={w.type} onChange={(e) => setWidgetType(wi, e.target.value)} style={selStyle}>
                         {types.map((t) => <option key={t} value={t}>{(CATALOG()[t] || {}).label || t}</option>)}
                       </select>
@@ -104,13 +131,20 @@
                       </select>
                       <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>larg.</span>
                       {num((w.layout && w.layout.w) || 4, (v) => mutate((p) => { p.widgets[wi].layout.w = v; }), 1, (page.layout && page.layout.cols) || 12)}
-                      <button className="btn btn-sm" title="Monter" onClick={() => move(wi, -1)}>↑</button>
-                      <button className="btn btn-sm" title="Descendre" onClick={() => move(wi, 1)}>↓</button>
-                      <button className="btn btn-sm" title="Retirer" onClick={() => mutate((p) => { p.widgets.splice(wi, 1); })}>✕</button>
+                      <button className="btn btn-sm" title="Retirer" onClick={() => delWidgetAt(wi)}>✕</button>
                     </div>
                   );
                 })}
-                <div style={{ marginTop: 10 }}><button className="btn btn-sm" onClick={addWidget}>{window.ICONS ? window.ICONS.plus : '+'} Ajouter un widget</button></div>
+                <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn btn-sm" onClick={addWidget}>{window.ICONS ? window.ICONS.plus : '+'} Ajouter un widget</button>
+                  {(page.widgets || []).length > 1 && <span className="opt-note" style={{ margin: 0 }}>Glissez la poignée ⠿ pour réordonner.</span>}
+                </div>
+                <div className={'pe-trash' + (dragW != null ? ' active' : '') + (trashOver ? ' over' : '')}
+                  onDragOver={(e) => { if (dragW != null) { e.preventDefault(); if (!trashOver) setTrashOver(true); } }}
+                  onDragLeave={() => setTrashOver(false)}
+                  onDrop={(e) => { if (dragW != null) { e.preventDefault(); delWidgetAt(dragW); } setDragW(null); setOverW(null); setTrashOver(false); }}>
+                  🗑 Glissez un widget ici pour le supprimer
+                </div>
               </div>
 
               <div className="opt-sec" style={{ marginBottom: 14 }}>

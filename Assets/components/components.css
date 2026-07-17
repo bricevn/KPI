@@ -141,3 +141,16 @@
   font-size: var(--text-caption); color: var(--color-ink-3);
 }
 .widget-error { border-color: color-mix(in srgb, var(--color-bad) 45%, transparent); color: var(--color-bad); }
+
+/* Éditeur de pages — drag & drop (HTML5 natif) : indicateur de dépôt + corbeille */
+.pe-wrow, .pe-pitem { transition: box-shadow .1s, opacity .1s; }
+.pe-wrow.dragging, .pe-pitem.dragging { opacity: .45; }
+.pe-wrow.dragover, .pe-pitem.dragover { box-shadow: inset 0 2px 0 0 var(--color-accent); }
+.pe-trash {
+  display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 10px; padding: 12px;
+  border: 1.5px dashed var(--color-line-1); border-radius: var(--radius-lg);
+  color: var(--color-ink-3); font-size: var(--text-caption);
+  opacity: .5; transition: opacity .12s, border-color .12s, color .12s, background .12s;
+}
+.pe-trash.active { opacity: 1; }
+.pe-trash.over { border-color: var(--color-bad); color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 10%, transparent); }

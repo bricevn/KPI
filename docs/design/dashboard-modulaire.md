@@ -76,7 +76,7 @@ Il n'y a **pas** de pages partagées/globales. Chaque utilisateur a ses propres 
 | Lecture | `GET /api/my-pages` (utilisateur connecté) ; injection `window.__USER_PAGES__` **par requête**, HORS du payload mis en cache (jamais mélangé entre comptes) |
 | Écriture | `POST /api/my-pages` : écrit UNIQUEMENT sous le username courant (`ctx.User.Identity.Name`) — impossible d'écrire pour autrui |
 | Nav | `shell.jsx` liste `window.__USER_PAGES__`, trié par `nav.order` |
-| Édition | onglet « Éditeur de pages » (tout utilisateur connecté) : réglages page + widgets + **aperçu live**, `POST /api/my-pages` puis reload |
+| Édition | onglet « Éditeur de pages » (tout utilisateur connecté) : réglages page + widgets + **aperçu live** ; **drag-and-drop** (HTML5 natif) pour réordonner pages et widgets, corbeille pour supprimer un widget ; `POST /api/my-pages` puis reload |
 
 Validation serveur (`NormalizeDashboard`, légère) : id slug unique ≠ onglets natifs (`ReservedPageIds`),
 type `[A-Za-z0-9_]`, `w` borné à `[1..cols]`, clés de params sans « : ». La validation profonde
