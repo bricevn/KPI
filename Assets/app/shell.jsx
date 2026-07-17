@@ -32,7 +32,13 @@
   window.Shell = function Shell() {
     const A = window.APP;
     const [t, setTweak] = window.useTweaks(CHART_TWEAKS);
-    const [tab, setTab] = useState(() => {try {return localStorage.getItem('app-tab') || 'dashboard';} catch (e) {return 'dashboard';}});
+    // Onglet initial : préférence mémorisée si présente ; sinon 1re page perso ; sinon l'ÉDITEUR
+    // (démarrage « interface vide » — un nouvel utilisateur commence par créer sa vue).
+    const [tab, setTab] = useState(() => {
+      try { const saved = localStorage.getItem('app-tab'); if (saved) return saved; } catch (e) {}
+      const up = ((window.__USER_PAGES__) || []).filter((p) => p && p.id && p.kind === 'modular');
+      return up.length ? up[0].id : 'pageeditor';
+    });
     const [theme, setTheme] = useState(() => load('app-theme', 'dark'));
     const [accent, setAccent] = useState(() => load('app-accent', '#2b7fff'));
     const [numFont, setNumFont] = useState(() => load('app-numfont', 'grotesk'));
