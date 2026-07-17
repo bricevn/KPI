@@ -55,6 +55,9 @@
     useEffect(() => {try {localStorage.setItem('app-tab', tab);} catch (e) {}}, [tab]);
     useEffect(() => {try {localStorage.setItem('app-theme', theme);} catch (e) {}}, [theme]);
     useEffect(() => {try {localStorage.setItem('app-accent', accent);} catch (e) {}}, [accent]);
+    // Charte §11 : le bouton secondaire = complémentaire chromatique de l'accent (--accent-complement).
+    // Recalculé à chaque changement d'accent (au boot inclus, via la valeur initiale de `accent`).
+    useEffect(() => {try {if (window.updateAccentComplement) window.updateAccentComplement(accent);} catch (e) {}}, [accent]);
     useEffect(() => {try {localStorage.setItem('app-numfont', numFont);} catch (e) {}}, [numFont]);
     useEffect(() => {try {localStorage.setItem('app-compact', compact ? '1' : '0');} catch (e) {}}, [compact]);
     useEffect(() => {try {localStorage.setItem('app-sb', sbCollapsed ? '1' : '0');} catch (e) {}}, [sbCollapsed]);

@@ -219,8 +219,10 @@ public sealed class DashboardView
         sb.AppendLine(A("design", "charte-tokens.css"));
         sb.AppendLine(A("design", "shared.css"));
         sb.AppendLine(A("design", "studio.css"));
-        // Styles des composants isolés (classes .kpi-* / .page-grid — namespacées, aucune collision
-        // avec le CSS existant). charte-buttons.css NON chargé ici (éviter de restyler les .btn de l'app).
+        // Boutons 3 niveaux de la charte (primaire/secondaire=complément/tertiaire) : app-wide. Chargé APRÈS
+        // studio.css ; components.css (après) réasserte les variantes existantes (.btn-sm, .btn-outline-accent).
+        sb.AppendLine(A("design", "charte-buttons.css"));
+        // Styles des composants isolés (classes .kpi-* / .page-grid) + réconciliation des boutons.
         sb.AppendLine(A("components", "components.css"));
         sb.AppendLine("  html, body { margin: 0; } body { background: #0a0e13; }");
         sb.AppendLine("  </style>");
@@ -264,6 +266,9 @@ public sealed class DashboardView
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"page-renderer.jsx\">" + A("app", "page-renderer.jsx") + "</script>");
         foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "page-data.jsx", "tab-page-editor.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
+        // Pont de migration : onglets natifs (window.Tab*) exposés comme widgets « vues natives ». APRÈS les
+        // tab-*.jsx (dépend de window.Tab*), avant le rendu. Live uniquement (pas dans la galerie).
+        sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"native-widgets.jsx\">" + A("components", "native-widgets.jsx") + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");

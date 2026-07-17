@@ -8,6 +8,14 @@
     PhaseBars: { label: 'Barres de phase', data: ['phase.worked', 'phase.effective', 'phase.wait'],            defaultW: 6 },
     Donut:     { label: 'Camembert',       data: ['types.distribution'],                                        defaultW: 6 },
     DataTable: { label: 'Tableau',         data: ['pivot.byType'],                                              defaultW: 12 },
+    // Vues natives (pont de migration) : onglet entier, sans source de données (lit window.APP), pleine largeur.
+    NativeDashboard: { label: 'Vue Dashboard (native)', data: [], defaultW: 12, native: true },
+    NativeCharts: { label: 'Graphiques (native)', data: [], defaultW: 12, native: true },
+    NativeAnomalies: { label: 'Anomalies (native)', data: [], defaultW: 12, native: true },
+    NativeIssues: { label: 'Issues (native)', data: [], defaultW: 12, native: true },
+    NativeCalendar: { label: 'Calendrier / Gantt (native)', data: [], defaultW: 12, native: true },
+    NativeVelocity: { label: 'Vélocité (native)', data: [], defaultW: 12, native: true },
+    NativeComparison: { label: 'Évolution / Comparaison (native)', data: [], defaultW: 12, native: true },
   };
   // Libellés lisibles des sources de données (clés window.KPIData).
   window.KPIDataCatalog = {

@@ -43,6 +43,9 @@ public sealed partial class WebDashboard
         static string ParamVal(JsonNode? n) => n is JsonValue v ? (v.TryGetValue<string>(out var s) ? s : v.ToJsonString()) : "";
         static string Trunc(string? s, int max) { s = (s ?? "").Trim(); return s.Length > max ? s.Substring(0, max) : s; }
 
+        // Body attendu : objet { schemaVersion, defaultPageId, pages:[] }. Un tableau/scalaire → erreur propre
+        // (sinon l'indexeur par nom lève sur un JsonArray → 500 non maîtrisé). null toléré (dashboard vide).
+        if (b is not null and not JsonObject) return (null, "Corps de requête invalide (objet JSON attendu).");
         var schemaVersion = Int(b?["schemaVersion"], 1);
         var defaultPageId = Trunc(Str(b?["defaultPageId"]), 64);
         var pagesIn = (b?["pages"] as JsonArray) ?? new JsonArray();

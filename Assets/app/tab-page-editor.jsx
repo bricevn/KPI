@@ -26,6 +26,7 @@
     // Drag & drop natif (HTML5) : index en cours de glissement + index survolé (indicateur de dépôt).
     const [dragW, setDragW] = useState(null); const [overW, setOverW] = useState(null); const [trashOver, setTrashOver] = useState(false);
     const [dragP, setDragP] = useState(null); const [overP, setOverP] = useState(null);
+    const [dragNew, setDragNew] = useState(null); const [addOver, setAddOver] = useState(false); // type glissé depuis le catalogue
     const page = pages.find((p) => p.id === sel) || null;
 
     const mutate = (fn) => { setStatus(''); setPages((ps) => { const n = clone(ps); const p = n.find((x) => x.id === sel); if (p) fn(p); return n; }); };
@@ -38,8 +39,9 @@
       setPages((ps) => [...ps, np]); setSel(id); setStatus('');
     };
     const delPage = () => { if (!page) return; const next = pages.filter((p) => p.id !== sel); setPages(next); setSel((next[0] && next[0].id) || null); persist(next); };
-    const addWidget = () => mutate((p) => {
-      const type = types[0] || 'KpiCard'; const spec = CATALOG()[type] || {};
+    const addWidget = (type) => mutate((p) => {
+      type = (typeof type === 'string' && type) || types[0] || 'KpiCard';
+      const spec = CATALOG()[type] || {};
       p.widgets.push({ id: nextWid(p), type, data: (spec.data && spec.data[0]) || '', layout: { w: spec.defaultW || 4, h: 1, x: -1, y: -1 }, params: {} });
     });
     const setWidgetType = (wi, type) => mutate((p) => { const w = p.widgets[wi]; w.type = type; const spec = CATALOG()[type] || {}; if (!spec.data || spec.data.indexOf(w.data) < 0) w.data = (spec.data && spec.data[0]) || ''; if (spec.defaultW) w.layout.w = spec.defaultW; });
@@ -110,7 +112,16 @@
 
               <div className="opt-sec" style={{ marginBottom: 14 }}>
                 <h3>Widgets</h3>
-                <p className="lead">Chaque widget = un composant + une source de données + une largeur (colonnes).</p>
+                <p className="lead">Chaque widget = un composant + une source de données + une largeur (colonnes). Glissez un widget du catalogue dans la zone, ou cliquez « Ajouter ».</p>
+                {/* Catalogue : chips glissables vers la zone de dépôt ci-dessous. */}
+                <div className="pe-palette">
+                  {types.map((t) => (
+                    <span key={t} className="pe-chip" draggable
+                      onDragStart={(e) => { setDragNew(t); dt(e, 'new:' + t); }}
+                      onDragEnd={() => { setDragNew(null); setAddOver(false); }}
+                      title="Glisser dans la zone pour ajouter">{(CATALOG()[t] || {}).label || t}</span>
+                  ))}
+                </div>
                 {(page.widgets || []).map((w, wi) => {
                   const spec = CATALOG()[w.type] || {};
                   const dataOpts = spec.data || (w.data ? [w.data] : []);
@@ -126,17 +137,26 @@
                       <select value={w.type} onChange={(e) => setWidgetType(wi, e.target.value)} style={selStyle}>
                         {types.map((t) => <option key={t} value={t}>{(CATALOG()[t] || {}).label || t}</option>)}
                       </select>
-                      <select value={w.data} onChange={(e) => mutate((p) => { p.widgets[wi].data = e.target.value; })} style={{ ...selStyle, flex: 1, minWidth: 140 }}>
-                        {dataOpts.map((d) => <option key={d} value={d}>{DATALABEL(d)}</option>)}
-                      </select>
+                      {dataOpts.length
+                        ? <select value={w.data} onChange={(e) => mutate((p) => { p.widgets[wi].data = e.target.value; })} style={{ ...selStyle, flex: 1, minWidth: 140 }}>
+                            {dataOpts.map((d) => <option key={d} value={d}>{DATALABEL(d)}</option>)}
+                          </select>
+                        : <span style={{ flex: 1, minWidth: 140, fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic' }}>— vue native (pas de source) —</span>}
                       <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>larg.</span>
                       {num((w.layout && w.layout.w) || 4, (v) => mutate((p) => { p.widgets[wi].layout.w = v; }), 1, (page.layout && page.layout.cols) || 12)}
                       <button className="btn btn-sm" title="Retirer" onClick={() => delWidgetAt(wi)}>✕</button>
                     </div>
                   );
                 })}
+                {/* Zone de dépôt : glisser un widget du catalogue ici pour l'ajouter. */}
+                <div className={'pe-drop' + (dragNew ? ' active' : '') + (addOver ? ' over' : '')}
+                  onDragOver={(e) => { if (dragNew) { e.preventDefault(); if (!addOver) setAddOver(true); } }}
+                  onDragLeave={() => setAddOver(false)}
+                  onDrop={(e) => { if (dragNew) { e.preventDefault(); addWidget(dragNew); } setDragNew(null); setAddOver(false); }}>
+                  + Glissez un widget du catalogue ici pour l'ajouter
+                </div>
                 <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button className="btn btn-sm" onClick={addWidget}>{window.ICONS ? window.ICONS.plus : '+'} Ajouter un widget</button>
+                  <button className="btn btn-sm" onClick={() => addWidget()}>{window.ICONS ? window.ICONS.plus : '+'} Ajouter un widget</button>
                   {(page.widgets || []).length > 1 && <span className="opt-note" style={{ margin: 0 }}>Glissez la poignée ⠿ pour réordonner.</span>}
                 </div>
                 <div className={'pe-trash' + (dragW != null ? ' active' : '') + (trashOver ? ' over' : '')}
