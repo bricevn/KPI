@@ -315,9 +315,12 @@ public sealed partial class WebDashboard
         app.MapGet("/api/options/milestones", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsMilestonesAsync(ctx)));
         app.MapPost("/api/options/worktime", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveWorkTimeAsync(ctx)));
         app.MapPost("/api/options", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveOptionsAsync(ctx)));
-        // Dashboard modulaire : lecture/écriture des pages (ADMIN). Écrit UNIQUEMENT la section Dashboard.
+        // Dashboard modulaire : pages PARTAGÉES (ADMIN). Écrit UNIQUEMENT la section Dashboard d'appsettings.
         app.MapGet("/api/pages", (HttpContext ctx) => self.ServePages(ctx));
         app.MapPost("/api/pages", (Func<HttpContext, Task<IResult>>)(ctx => self.SavePagesAsync(ctx)));
+        // Pages PAR UTILISATEUR (tout utilisateur connecté ; indexées par son compte, store séparé).
+        app.MapGet("/api/my-pages", (HttpContext ctx) => self.ServeMyPages(ctx));
+        app.MapPost("/api/my-pages", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveMyPagesAsync(ctx)));
         // Identité résolue de l'utilisateur courant (rôle/périmètre/vue).
         app.MapGet("/api/me", (HttpContext ctx) => Results.Json(self.ResolveMe(ctx)));
         // Données du dashboard FILTRÉES selon le compte (cœur de la restriction côté serveur).
@@ -436,7 +439,10 @@ public sealed partial class WebDashboard
         // inliné et window.APP est construit par le mapper AVANT le rendu React.
         var json = await BuildScopedPayloadAsync(ctx);
         var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName; // "fr"/"en" (posée par UseRequestLocalization)
-        return Results.Content(DashboardView.BuildReferencePage(json, lang), "text/html; charset=utf-8");
+        // Pages perso de l'utilisateur connecté : injectées SÉPARÉMENT du payload (qui est mis en cache
+        // et partagé par périmètre) → jamais mélangées entre comptes.
+        var userPagesJson = UserPagesJson(ctx.User.Identity?.Name);
+        return Results.Content(DashboardView.BuildReferencePage(json, lang, userPagesJson), "text/html; charset=utf-8");
     }
 
     private IResult CancelAsync(HttpContext ctx)

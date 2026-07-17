@@ -195,7 +195,7 @@ public sealed class DashboardView
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string payloadJson, string lang = "en")
+    public static string BuildReferencePage(string payloadJson, string lang = "en", string? userPagesJson = null)
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
@@ -240,6 +240,13 @@ public sealed class DashboardView
                 .Replace("<", "\\u003C").Replace(">", "\\u003E").Replace("&", "\\u0026")
                 .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
             sb.AppendLine("  <script>window.__DATA__ = " + safeJson + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+        }
+        // Pages PAR UTILISATEUR (injectées à part du payload partagé). Même échappement XSS que le payload
+        // (labels/params saisis par l'utilisateur). Absent ⇒ [] (aucune page perso).
+        {
+            var upj = string.IsNullOrWhiteSpace(userPagesJson) ? "[]" : userPagesJson;
+            upj = upj.Replace("<", "\u003C").Replace(">", "\u003E").Replace("&", "\u0026");
+            sb.AppendLine("  <script>window.__USER_PAGES__ = " + upj + ";</script>");
         }
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.

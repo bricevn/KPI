@@ -203,14 +203,13 @@ public sealed partial class WebDashboard
         });
     }
 
-    // POST /api/pages → écrit la section Dashboard (pages modulaires). ADMIN. Calqué sur SaveWorkTime :
-    // n'écrit QUE la section Dashboard (préserve tout le reste), runtime + source, hot-reload.
-    // Validation légère côté serveur (structure/ids/bornes) ; la validation profonde (type ∈ window.KPI,
-    // data ∈ window.KPIData) est faite côté éditeur JS — le serveur ne peut pas exécuter le registre.
-    private async Task<IResult> SavePagesAsync(HttpContext ctx)
+    // Valide + normalise un modèle de dashboard (body JSON) en JsonObject camelCase (id/nav/layout/widgets).
+    // Retourne (dash, null) ou (null, message). Partagé par /api/pages (global) et /api/my-pages (perso).
+    // Validation légère (structure/ids/bornes) ; la validation profonde (type ∈ window.KPI, data ∈
+    // window.KPIData) est faite côté éditeur JS — le serveur ne peut pas exécuter le registre.
+    // camelCase : côté appsettings, IConfiguration bind sans tenir compte de la casse.
+    private static (JsonObject? dash, string? error) NormalizeDashboard(JsonNode? b)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
-        var b = await ReadJsonBody(ctx);
         static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
         static int Int(JsonNode? n, int def) => n is JsonValue v && v.TryGetValue<int>(out var i) ? i : def;
         static bool Bool(JsonNode? n, bool def) => n is JsonValue v && v.TryGetValue<bool>(out var x) ? x : def;
@@ -224,30 +223,27 @@ public sealed partial class WebDashboard
         {
             if (pn is not JsonObject po) continue;
             var id = (Str(po["id"]) ?? "").Trim().ToLowerInvariant();
-            if (!Regex.IsMatch(id, @"^[a-z0-9][a-z0-9-]{0,63}$"))
-                return Results.Json(new { ok = false, error = $"Id de page invalide : « {id} » (minuscules, chiffres, tirets)." });
-            if (ReservedPageIds.Contains(id))
-                return Results.Json(new { ok = false, error = $"Id de page réservé (conflit avec un onglet natif) : « {id} »." });
-            if (!seenIds.Add(id))
-                return Results.Json(new { ok = false, error = $"Id de page en double : « {id} »." });
+            if (!Regex.IsMatch(id, @"^[a-z0-9][a-z0-9-]{0,63}$")) return (null, $"Id de page invalide : « {id} » (minuscules, chiffres, tirets).");
+            if (ReservedPageIds.Contains(id)) return (null, $"Id de page réservé (conflit avec un onglet natif) : « {id} ».");
+            if (!seenIds.Add(id)) return (null, $"Id de page en double : « {id} ».");
 
             var navIn = po["nav"] as JsonObject ?? new JsonObject();
             var layIn = po["layout"] as JsonObject ?? new JsonObject();
             var cols = Math.Clamp(Int(layIn["cols"], 12), 1, 24);
             var nav = new JsonObject
             {
-                ["Label"] = (Str(navIn["label"]) ?? "").Trim(),
-                ["LabelKey"] = (Str(navIn["labelKey"]) ?? "").Trim(),
-                ["Icon"] = (Str(navIn["icon"]) ?? "").Trim(),
-                ["Order"] = Int(navIn["order"], 100),
-                ["ShowFilters"] = Bool(navIn["showFilters"], true),
-                ["BadgeSource"] = (Str(navIn["badgeSource"]) ?? "").Trim(),
+                ["label"] = (Str(navIn["label"]) ?? "").Trim(),
+                ["labelKey"] = (Str(navIn["labelKey"]) ?? "").Trim(),
+                ["icon"] = (Str(navIn["icon"]) ?? "").Trim(),
+                ["order"] = Int(navIn["order"], 100),
+                ["showFilters"] = Bool(navIn["showFilters"], true),
+                ["badgeSource"] = (Str(navIn["badgeSource"]) ?? "").Trim(),
             };
             var layout = new JsonObject
             {
-                ["Cols"] = cols,
-                ["Gap"] = (Str(layIn["gap"]) ?? "var(--space-4)").Trim(),
-                ["RowUnit"] = Math.Clamp(Int(layIn["rowUnit"], 88), 24, 400),
+                ["cols"] = cols,
+                ["gap"] = (Str(layIn["gap"]) ?? "var(--space-4)").Trim(),
+                ["rowUnit"] = Math.Clamp(Int(layIn["rowUnit"], 88), 24, 400),
             };
 
             var widgetsOut = new JsonArray();
@@ -257,40 +253,37 @@ public sealed partial class WebDashboard
                 if (wn is not JsonObject wo) continue;
                 var wid = (Str(wo["id"]) ?? "").Trim();
                 if (wid.Length == 0) wid = "w" + (widgetsOut.Count + 1);
-                if (!seenW.Add(wid))
-                    return Results.Json(new { ok = false, error = $"Id de widget en double dans « {id} » : « {wid} »." });
+                if (!seenW.Add(wid)) return (null, $"Id de widget en double dans « {id} » : « {wid} ».");
                 var type = (Str(wo["type"]) ?? "").Trim();
-                if (!Regex.IsMatch(type, @"^[A-Za-z0-9_]{1,64}$"))
-                    return Results.Json(new { ok = false, error = $"Type de widget invalide dans « {id} » : « {type} »." });
+                if (!Regex.IsMatch(type, @"^[A-Za-z0-9_]{1,64}$")) return (null, $"Type de widget invalide dans « {id} » : « {type} ».");
                 var data = (Str(wo["data"]) ?? "").Trim();
                 var wlIn = wo["layout"] as JsonObject ?? new JsonObject();
-                var wl = new JsonObject
-                {
-                    ["W"] = Math.Clamp(Int(wlIn["w"], 4), 1, cols),
-                    ["H"] = Math.Clamp(Int(wlIn["h"], 1), 1, 24),
-                    ["X"] = Int(wlIn["x"], -1),
-                    ["Y"] = Int(wlIn["y"], -1),
-                };
+                var wl = new JsonObject { ["w"] = Math.Clamp(Int(wlIn["w"], 4), 1, cols), ["h"] = Math.Clamp(Int(wlIn["h"], 1), 1, 24), ["x"] = Int(wlIn["x"], -1), ["y"] = Int(wlIn["y"], -1) };
                 var paramsOut = new JsonObject();
                 foreach (var kv in (wo["params"] as JsonObject) ?? new JsonObject())
                 {
-                    if (kv.Key.Contains(':'))
-                        return Results.Json(new { ok = false, error = $"Clé de paramètre invalide (« : » interdit) : « {kv.Key} »." });
+                    if (kv.Key.Contains(':')) return (null, $"Clé de paramètre invalide (« : » interdit) : « {kv.Key} ».");
                     paramsOut[kv.Key] = ParamVal(kv.Value);
                 }
-                widgetsOut.Add(new JsonObject { ["Id"] = wid, ["Type"] = type, ["Data"] = data, ["Layout"] = wl, ["Params"] = paramsOut });
+                widgetsOut.Add(new JsonObject { ["id"] = wid, ["type"] = type, ["data"] = data, ["layout"] = wl, ["params"] = paramsOut });
             }
-            outPages.Add(new JsonObject { ["Id"] = id, ["Kind"] = "modular", ["Nav"] = nav, ["Layout"] = layout, ["Widgets"] = widgetsOut });
+            outPages.Add(new JsonObject { ["id"] = id, ["kind"] = "modular", ["nav"] = nav, ["layout"] = layout, ["widgets"] = widgetsOut });
         }
-        if (defaultPageId.Length > 0 && !seenIds.Contains(defaultPageId))
-            return Results.Json(new { ok = false, error = $"defaultPageId inconnu : « {defaultPageId} »." });
+        if (defaultPageId.Length > 0 && !seenIds.Contains(defaultPageId)) return (null, $"defaultPageId inconnu : « {defaultPageId} ».");
+        return (new JsonObject { ["schemaVersion"] = schemaVersion, ["defaultPageId"] = defaultPageId, ["pages"] = outPages }, null);
+    }
 
-        var dashObj = new JsonObject { ["SchemaVersion"] = schemaVersion, ["DefaultPageId"] = defaultPageId, ["Pages"] = outPages };
-
+    // POST /api/pages → écrit la section Dashboard (pages PARTAGÉES, admin). Calqué sur SaveWorkTime :
+    // n'écrit QUE la section Dashboard (préserve tout le reste), runtime + source, hot-reload.
+    private async Task<IResult> SavePagesAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var (dash, error) = NormalizeDashboard(await ReadJsonBody(ctx));
+        if (error != null) return Results.Json(new { ok = false, error });
         JsonObject root;
         try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
         catch { root = new JsonObject(); }
-        root["Dashboard"] = dashObj; // n'écrit QUE cette section, préserve tout le reste
+        root["Dashboard"] = dash; // n'écrit QUE cette section, préserve tout le reste
         var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         try
         {
@@ -302,7 +295,52 @@ public sealed partial class WebDashboard
         catch (Exception e) { Console.Error.WriteLine("SavePages KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
         try { _config = BuildConfig(); _payloadCache.Clear(); }
         catch (Exception e) { Console.Error.WriteLine("SavePages reload KO : " + e); }
-        return Results.Json(new { ok = true, pages = outPages.Count });
+        return Results.Json(new { ok = true, pages = (dash!["pages"] as JsonArray)?.Count ?? 0 });
+    }
+
+    // --- Pages PAR UTILISATEUR (store séparé, indexé par username ; portable entre appareils) ----------
+    private static string UserPagesPath() => Path.Combine(AppContext.BaseDirectory, "user-pages.json");
+    private static readonly SemaphoreSlim _userPagesLock = new(1, 1);
+    private static JsonObject ReadUserPagesRoot()
+    {
+        try { return (JsonNode.Parse(File.ReadAllText(UserPagesPath())) as JsonObject) ?? new JsonObject(); }
+        catch { return new JsonObject(); }
+    }
+    // Tableau camelCase des pages perso d'un utilisateur (pour injection window.__USER_PAGES__). "[]" si aucune.
+    private static string UserPagesJson(string? user)
+    {
+        if (string.IsNullOrWhiteSpace(user)) return "[]";
+        var mine = ReadUserPagesRoot()[user] as JsonObject;
+        return ((mine?["pages"] as JsonArray) ?? new JsonArray()).ToJsonString();
+    }
+
+    // GET /api/my-pages → { ok, dashboard } : pages PERSO de l'utilisateur connecté (tout utilisateur).
+    private IResult ServeMyPages(HttpContext ctx)
+    {
+        var user = ctx.User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(user)) return Results.Json(new { ok = false, error = "Non authentifié." }, statusCode: 401);
+        var mine = ReadUserPagesRoot()[user] as JsonObject;
+        return Results.Json(new { ok = true, dashboard = mine ?? new JsonObject { ["schemaVersion"] = 1, ["defaultPageId"] = "", ["pages"] = new JsonArray() } });
+    }
+
+    // POST /api/my-pages → écrit les pages PERSO de l'utilisateur CONNECTÉ (indexées par son username,
+    // jamais pour un autre compte). Store à part (user-pages.json) : n'impacte ni appsettings ni les autres.
+    private async Task<IResult> SaveMyPagesAsync(HttpContext ctx)
+    {
+        var user = ctx.User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(user)) return Results.Json(new { ok = false, error = "Non authentifié." }, statusCode: 401);
+        var (dash, error) = NormalizeDashboard(await ReadJsonBody(ctx));
+        if (error != null) return Results.Json(new { ok = false, error });
+        await _userPagesLock.WaitAsync();
+        try
+        {
+            var root = ReadUserPagesRoot();
+            root[user] = dash;
+            await WriteFileAtomicAsync(UserPagesPath(), root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveMyPages KO : " + e); return Results.Json(new { ok = false, error = "Écriture impossible." }); }
+        finally { _userPagesLock.Release(); }
+        return Results.Json(new { ok = true, pages = (dash!["pages"] as JsonArray)?.Count ?? 0 });
     }
 
     // Rôle d'une période à l'écriture (Piste 2) : lit `role` (active|wait|nogc) ; repli sur `timed` si un

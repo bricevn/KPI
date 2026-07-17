@@ -78,10 +78,15 @@
     }[tab];
     const isAdmin = !!(((window.__DATA__) || {}).setup || {}).isAdmin;
 
-    // Pages MODULAIRES (config Dashboard.Pages → A.pages) : additif, triées par nav.order. Vide ⇒
-    // nav = onglets historiques (comportement identique). L'onglet courant peut être une page.
-    const PAGES = (A.pages || []).filter((p) => p && p.id && p.kind === 'modular')
-      .slice().sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
+    // Pages MODULAIRES : pages PARTAGÉES (config Dashboard.Pages → A.pages) + pages PERSO de l'utilisateur
+    // (window.__USER_PAGES__, injectées par compte). Dédoublonnées par id (la perso prime → un utilisateur
+    // peut surcharger une page partagée), triées par nav.order. Vide ⇒ nav = onglets historiques.
+    const okPage = (p) => p && p.id && p.kind === 'modular';
+    const _byId = {};
+    (A.pages || []).filter(okPage).forEach((p) => { _byId[p.id] = p; });
+    ((window.__USER_PAGES__) || []).filter(okPage).forEach((p) => { _byId[p.id] = p; });
+    const PAGES = Object.keys(_byId).map((k) => _byId[k])
+      .sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
     const pageDef = PAGES.find((p) => p.id === tab);
     const navTitle = pageDef ? ((pageDef.nav && (pageDef.nav.labelKey ? window.t(pageDef.nav.labelKey) : pageDef.nav.label)) || pageDef.id)
       : tab === 'pageeditor' ? 'Éditeur de pages' : window.t('nav_' + tab);
@@ -149,7 +154,7 @@
             )}
           </nav>
           <div className="sb-sp"></div>
-          {isAdmin && <button className={'sb-item' + (tab === 'pageeditor' ? ' on' : '')} onClick={() => setTab('pageeditor')} title="Éditeur de pages">{window.ICONS.dashboard}<span>Éditeur de pages</span></button>}
+          <button className={'sb-item' + (tab === 'pageeditor' ? ' on' : '')} onClick={() => setTab('pageeditor')} title="Éditeur de pages">{window.ICONS.dashboard}<span>Éditeur de pages</span></button>
           <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} title={window.t('nav_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
           <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} title={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
           <button className="sb-collapse" onClick={() => setSbCollapsed((c) => !c)} title={sbCollapsed ? window.t('expandT') : window.t('reduceT')}>

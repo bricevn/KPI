@@ -9,3 +9,4 @@ dp-keys/
 appsettings.json
 appsettings.*.json
 !appsettings.example.json
+user-pages.json
