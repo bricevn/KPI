@@ -68,7 +68,8 @@
     };
   };
 
-  // Modèle de page de démo (le format persisté dans appsettings Dashboard.Pages[]).
+  // Modèle de page de démo (même forme que les pages persistées dans user-pages.json, injectées via
+  // window.__USER_PAGES__).
   window.__DEMO_PAGE = {
     id: 'demo', kind: 'modular',
     nav: { label: 'Démo', icon: 'dashboard' },

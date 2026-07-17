@@ -76,7 +76,6 @@
       issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions,
       pageeditor: window.TabPageEditor
     }[tab];
-    const isAdmin = !!(((window.__DATA__) || {}).setup || {}).isAdmin;
 
     // Pages MODULAIRES : uniquement les pages PERSO de l'utilisateur (window.__USER_PAGES__, injectées par
     // compte). Modèle « tout par utilisateur » : chacun ne voit/édite que ses propres pages. Triées par

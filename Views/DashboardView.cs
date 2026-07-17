@@ -55,15 +55,11 @@ public sealed class DashboardView
         string? lastExtractedAt,
         object? setup = null,
         object? workTime = null,
-        IReadOnlyList<string>? transversalLabels = null,
-        object? dashboard = null)
+        IReadOnlyList<string>? transversalLabels = null)
     {
         var payload = BuildPayload(milestone, exports, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
         payload.setup = setup;
-        // Dashboard modulaire (pages configurables) : objet camelCase construit côté serveur ; null ⇒
-        // pas de pages ⇒ nav = onglets historiques (non-cassant).
-        payload.dashboard = dashboard;
         // Fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps) : consommée par le mapper
         // client (workingMs). null (export statique/legacy) ⇒ défauts du mapper (9-19, lun-ven).
         payload.workTime = workTime;
@@ -195,6 +191,12 @@ public sealed class DashboardView
         }).ToList(),
     };
 
+    // Neutralise un JSON inline dans un <script> : < > & (peuvent clore la balise) +
+    // U+2028/U+2029 (terminateurs de ligne JS illegaux en litteral). Anti-XSS commun payload/pages.
+    private static string EscapeForInlineScript(string json) => json
+        .Replace("<", "\\u003C").Replace(">", "\\u003E").Replace("&", "\\u0026")
+        .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
+
     public static string BuildReferencePage(string payloadJson, string lang = "en", string? userPagesJson = null)
     {
         var baseDir = AppContext.BaseDirectory;
@@ -236,16 +238,13 @@ public sealed class DashboardView
             // Défense XSS : le payload est inliné dans un <script>. Neutraliser toute séquence pouvant
             // clore la balise / casser le parseur (titres d'issues contrôlés par les membres du projet).
             // Ces caractères n'apparaissent que dans des littéraux de chaîne JSON → \uXXXX y est décodé à l'identique.
-            var safeJson = payloadJson
-                .Replace("<", "\\u003C").Replace(">", "\\u003E").Replace("&", "\\u0026")
-                .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
-            sb.AppendLine("  <script>window.__DATA__ = " + safeJson + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+            // payload echappe a l'inlining ci-dessous
+            sb.AppendLine("  <script>window.__DATA__ = " + EscapeForInlineScript(payloadJson) + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
         }
         // Pages PAR UTILISATEUR (injectées à part du payload partagé). Même échappement XSS que le payload
         // (labels/params saisis par l'utilisateur). Absent ⇒ [] (aucune page perso).
         {
-            var upj = string.IsNullOrWhiteSpace(userPagesJson) ? "[]" : userPagesJson;
-            upj = upj.Replace("<", "\u003C").Replace(">", "\u003E").Replace("&", "\u0026");
+            var upj = EscapeForInlineScript(string.IsNullOrWhiteSpace(userPagesJson) ? "[]" : userPagesJson);
             sb.AppendLine("  <script>window.__USER_PAGES__ = " + upj + ";</script>");
         }
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
@@ -307,7 +306,6 @@ public sealed class DashboardView
         // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
         public object? setup { get; set; }
         public object? workTime { get; set; }
-        public object? dashboard { get; set; }
         public List<string> transversalLabels { get; set; } = new();
     }
 

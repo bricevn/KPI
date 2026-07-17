@@ -1,7 +1,7 @@
-// tab-page-editor — éditeur VISUEL des pages modulaires (admin). Créer/éditer/supprimer des pages,
-// composer des widgets (type + source de données + largeur), réordonner, avec APERÇU LIVE, puis
-// POST /api/pages. Réutilise les classes UI existantes (.opt-*, .field, .btn) pour rester cohérent
-// avec l'onglet Options. window.TabPageEditor.
+// tab-page-editor — éditeur VISUEL des pages modulaires PAR UTILISATEUR. Accessible à TOUT utilisateur
+// connecté ; agit uniquement sur SES pages (écrites sous son propre compte). Créer/éditer/supprimer des
+// pages, composer des widgets (type + source de données + largeur), réordonner, avec APERÇU LIVE, puis
+// POST /api/my-pages. Réutilise les classes UI existantes (.opt-*, .field, .btn). window.TabPageEditor.
 (function () {
   const { useState } = React;
   const CATALOG = () => window.KPIWidgets || {};
@@ -34,7 +34,7 @@
       const np = { id, kind: 'modular', nav: { label: 'Nouvelle page', labelKey: '', icon: 'dashboard', order: 100, showFilters: true, badgeSource: '' }, layout: { cols: 12, gap: 'var(--space-4)', rowUnit: 88 }, widgets: [] };
       setPages((ps) => [...ps, np]); setSel(id); setStatus('');
     };
-    const delPage = () => { if (!page) return; setPages((ps) => ps.filter((p) => p.id !== sel)); setSel(null); setStatus(''); };
+    const delPage = () => { if (!page) return; const next = pages.filter((p) => p.id !== sel); setPages(next); setSel((next[0] && next[0].id) || null); persist(next); };
     const addWidget = () => mutate((p) => {
       const type = types[0] || 'KpiCard'; const spec = CATALOG()[type] || {};
       p.widgets.push({ id: nextWid(p), type, data: (spec.data && spec.data[0]) || '', layout: { w: spec.defaultW || 4, h: 1, x: -1, y: -1 }, params: {} });
@@ -42,14 +42,17 @@
     const setWidgetType = (wi, type) => mutate((p) => { const w = p.widgets[wi]; w.type = type; const spec = CATALOG()[type] || {}; if (!spec.data || spec.data.indexOf(w.data) < 0) w.data = (spec.data && spec.data[0]) || ''; if (spec.defaultW) w.layout.w = spec.defaultW; });
     const move = (wi, d) => mutate((p) => { const j = wi + d; if (j < 0 || j >= p.widgets.length) return; const a = p.widgets; const t = a[wi]; a[wi] = a[j]; a[j] = t; });
 
-    const save = () => {
+    // Persiste une liste de pages (POST /api/my-pages) puis recharge. Partagé par « Enregistrer » et la
+    // suppression (qui doit persister immédiatement, y compris quand la liste devient vide).
+    const persist = (list) => {
       setStatus('saving');
-      fetch('/api/my-pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schemaVersion: 1, defaultPageId: '', pages }) })
+      fetch('/api/my-pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schemaVersion: 1, defaultPageId: '', pages: list }) })
         .then((r) => r.json()).then((j) => {
           if (j.ok) { setStatus('saved'); setTimeout(() => window.location.reload(), 600); }
           else setStatus('err:' + (j.error || 'inconnue'));
         }).catch(() => setStatus('err:réseau'));
     };
+    const save = () => persist(pages);
 
     const selStyle = { border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel-2)', color: 'var(--ink)', font: '13px system-ui,sans-serif', padding: '6px 9px', outline: 'none' };
     const num = (v, on, min, max) => <input type="number" value={v} min={min} max={max} onChange={(e) => on(Math.max(min, Math.min(max, +e.target.value || min)))} style={{ ...selStyle, width: 64 }} />;

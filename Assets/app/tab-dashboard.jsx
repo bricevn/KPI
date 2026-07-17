@@ -35,14 +35,10 @@
       : A.phaseAvg;
     const phShownTotal = phPhases.reduce((s, p) => s + p.days, 0);
     const phVMax = Math.max(0.1, ...phPhases.map((p) => p.days));
-    // tendance RÉELLE du cycle : moyenne du temps de cycle (_times.total) des issues regroupées
-    // par jour de complétion (d.end) en 6 tranches sur la fenêtre. Delta = dernière vs première tranche non vide.
-    const cycleTrend = (function () {
-      const N = 6, span = Math.max(1, A.cal.DAYS), buckets = Array.from({ length: N }, () => []);
-      A.detail.forEach((d) => { const tot = d._times && d._times.total; if (!(tot > 0)) return; const bi = Math.min(N - 1, Math.max(0, Math.floor(d.end / span * N))); buckets[bi].push(tot); });
-      return buckets.map((b) => b.length ? Math.round(b.reduce((s, x) => s + x, 0) / b.length * 10) / 10 : 0);
-    })();
-    const cycleDelta = (function () { const nz = cycleTrend.filter((x) => x > 0); if (nz.length < 2) return null; return Math.round((nz[nz.length - 1] - nz[0]) / nz[0] * 100); })();
+    // tendance RÉELLE du cycle : dérivation PARTAGÉE (window.KPICompute) — même calcul que les pages
+    // modulaires (page-data.jsx), pas de duplication.
+    const _cyc = window.KPICompute.cycleTrend(A);
+    const cycleTrend = _cyc.trend, cycleDelta = _cyc.delta;
 
     const Kard = ({ chip, chipBg, label, value, suffix, pct, color, onClick, cue, bottom, cap }) => (
       <div className={'kcard' + (onClick ? ' clickable' : '')} onClick={onClick} title={cue || undefined}>

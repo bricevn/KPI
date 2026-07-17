@@ -27,15 +27,12 @@
   };
   window.KPIData['kpi.cycle'] = function (A) {
     const K = A.kpis;
-    // Tendance réelle du cycle (copie de tab-dashboard.jsx : moyenne du temps de cycle par tranche).
-    const N = 6, span = Math.max(1, A.cal.DAYS), buckets = Array.from({ length: N }, () => []);
-    A.detail.forEach((d) => { const tot = d._times && d._times.total; if (!(tot > 0)) return; const bi = Math.min(N - 1, Math.max(0, Math.floor(d.end / span * N))); buckets[bi].push(tot); });
-    const trend = buckets.map((b) => b.length ? Math.round(b.reduce((s, x) => s + x, 0) / b.length * 10) / 10 : 0);
-    const nz = trend.filter((x) => x > 0);
-    const delta = nz.length < 2 ? null : Math.round((nz[nz.length - 1] - nz[0]) / nz[0] * 100);
+    // Dérivation PARTAGÉE (window.KPICompute) — même calcul que l'onglet natif (tab-dashboard.jsx).
+    const { trend, delta } = window.KPICompute.cycleTrend(A);
     const out = { icon: ICON('clock'), iconBg: 'var(--p-qawait)', label: t('dash.avgCycle'), value: K.cycle.days, suffix: t('unit_day'),
       caption: [{ value: K.cycle.p50 + ' ' + t('unit_day'), label: 'P50', color: 'var(--p-qawait)' }, { value: K.cycle.p85 + ' ' + t('unit_day'), label: 'P85' }] };
-    if (trend.some((x) => x > 0)) out.trend = { data: trend, color: 'var(--p-qawait)', delta: (delta != null ? (delta > 0 ? '+' : '') + delta + ' %' : ''), deltaGood: delta == null || delta <= 0 };
+    // delta null (et non '') quand indéterminable → KpiCard n'affiche pas la flèche (test trend.delta != null).
+    if (trend.some((x) => x > 0)) out.trend = { data: trend, color: 'var(--p-qawait)', delta: (delta != null ? (delta > 0 ? '+' : '') + delta + ' %' : null), deltaGood: delta == null || delta <= 0 };
     return out;
   };
   const phaseProps = (phs, label) => ({

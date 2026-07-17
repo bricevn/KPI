@@ -49,7 +49,9 @@ Il n'y a **aucune étape de build front**. `DashboardView.BuildReferencePage` in
 | `ui.jsx` | Bibliothèque partagée : icônes, InfoTip, Modal, IssueDrill, MultiSelect, tris, navigation Gantt, export HTML des graphiques. |
 | `tab-*.jsx` | Un fichier par onglet (`window.Tab<Nom>`). |
 | `tweaks-panel.jsx` | Panneau « Tweaks » (styles alternatifs de l'onglet Graphiques). |
-| `shell.jsx` | Coquille : sidebar, filtres globaux (synchro équipe→utilisateurs), thème, montage des onglets. |
+| `shell.jsx` | Coquille : sidebar (onglets natifs + pages modulaires par utilisateur), filtres globaux (synchro équipe→utilisateurs), thème, montage des onglets/pages. |
+| `Assets/components/*.jsx` + `registry.js` | **Dashboard modulaire** : composants isolés (fonctions pures, `window.KPI`), banc d'isolation `/gallery`. Détail : [dashboard-modulaire.md](../design/dashboard-modulaire.md). |
+| `page-renderer.jsx` / `page-data.jsx` / `tab-page-editor.jsx` | Renderer de page (`window.PageRenderer`), adaptateurs de données (`window.KPIData`), éditeur de pages par utilisateur. |
 
 ## Le serveur : `WebDashboard` en classe partielle
 
@@ -59,6 +61,7 @@ Il n'y a **aucune étape de build front**. `DashboardView.BuildReferencePage` in
 | `Server/WebDashboard.Auth.cs` | `RequireAdmin`, rôles GitLab (cache des access levels, fail-closed), `ResolveAccount` (accounts.json), `/api/me`, impersonation. |
 | `Server/WebDashboard.Setup.cs` | Assistant `/setup` : test de connexion, labels, OAuth, sauvegarde (écrit `appsettings.json`, secrets chiffrés), extraction initiale. |
 | `Server/WebDashboard.Options.cs` | API de l'onglet Options : catalogue GitLab en direct (projets/labels/milestones), calcul du temps (fenêtre ouvrée, fériés, anti-bruit), sauvegarde phases/équipes (rôles). |
+| `Server/WebDashboard.Pages.cs` | Dashboard modulaire : pages **par utilisateur** (`user-pages.json`), `NormalizeDashboard`, `GET/POST /api/my-pages`. Détail : [dashboard-modulaire.md](../design/dashboard-modulaire.md). |
 
 Autres briques : `Config/ExportConfig.cs` (modèle de config + `RepairColonKeyedMaps` — ⚠️ `.Bind()`
 corrompt les clés contenant `:`), `Export/SecureStore.cs` (chiffrement au repos + secrets de config

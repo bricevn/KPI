@@ -28,7 +28,7 @@ composant **isolé et réutilisable**, testé seul dans la galerie (`/gallery`, 
 
 1. Créer `Assets/components/MonComposant.jsx` (voir `Button.jsx` comme gabarit).
 2. Ajouter ses styles éventuels dans `components.css` (tokens uniquement).
-3. L'ajouter à la liste des fichiers chargés dans `Views/GalleryView.cs`.
+3. L'ajouter au tableau `ComponentFiles` de `Views/DashboardAssets.cs` (liste partagée galerie + dashboard live).
 4. `dotnet build`, ouvrir `/gallery`, valider en clair + sombre + accents.
 
 ## Fichiers

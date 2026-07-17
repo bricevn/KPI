@@ -11,9 +11,6 @@ public sealed class AppConfig
     public List<ServerConfig> Servers { get; set; } = new();
     public ExportConfig Export { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
-    /// <summary>Dashboard MODULAIRE (pages configurables). Vide ⇒ nav = onglets historiques (non-cassant).
-    /// Section de 1er niveau (pas sous Export) : Export = extraction GitLab, Dashboard = présentation.</summary>
-    public DashboardConfig Dashboard { get; set; } = new();
 
     /// <summary>Serveurs configurés. Plus de repli legacy : <see cref="Servers"/> est l'unique source.</summary>
     public List<ServerConfig> ResolveServers() => Servers ?? new();
@@ -281,75 +278,6 @@ public sealed class ExportConfig
     /// vieilles configs (période sans Role → Role dérivé de Timed + cette liste). Plus jamais écrit.
     /// Repli si vide : dev/review/qa/tofix. Pas de « : » ⇒ Bind sûr.</summary>
     public List<string> EffectivePhases { get; set; } = new();
-}
-
-// ---- Dashboard MODULAIRE : pages configurables (nav de gauche + widgets par page) ----
-// Sérialisable, forward-compatible pour un futur éditeur (w/h portés, x/y réservés). Params ne
-// portent QUE des valeurs sérialisables (clés d'icône/couleur/i18n, presets) — jamais de code.
-
-/// <summary>Racine du dashboard modulaire. Vide ⇒ nav = onglets historiques.</summary>
-public sealed class DashboardConfig
-{
-    public int SchemaVersion { get; set; } = 1;
-    /// <summary>Id de la page ouverte par défaut (vide ⇒ 1er onglet historique).</summary>
-    public string DefaultPageId { get; set; } = "";
-    public List<PageDefinition> Pages { get; set; } = new();
-}
-
-/// <summary>Une page modulaire : entrée de nav + grille de widgets.</summary>
-public sealed class PageDefinition
-{
-    /// <summary>Slug unique, DIFFÉRENT des ids d'onglets historiques (validé au save).</summary>
-    public string Id { get; set; } = "";
-    public string Kind { get; set; } = "modular";
-    public NavDefinition Nav { get; set; } = new();
-    public LayoutDefinition Layout { get; set; } = new();
-    public List<WidgetDefinition> Widgets { get; set; } = new();
-}
-
-/// <summary>Métadonnées de nav d'une page (libellé, icône, ordre, filtres).</summary>
-public sealed class NavDefinition
-{
-    /// <summary>Libellé brut (pages utilisateur).</summary>
-    public string Label { get; set; } = "";
-    /// <summary>Clé i18n optionnelle (window.t) ; prioritaire sur Label si renseignée.</summary>
-    public string LabelKey { get; set; } = "";
-    /// <summary>Clé d'icône (window.ICONS[...]) ; repli sur une icône générique si inconnue.</summary>
-    public string Icon { get; set; } = "";
-    public int Order { get; set; } = 100;
-    public bool ShowFilters { get; set; } = true;
-    /// <summary>Clé window.KPIData alimentant un badge de nav (optionnel).</summary>
-    public string BadgeSource { get; set; } = "";
-}
-
-/// <summary>Grille de la page (12 colonnes par défaut).</summary>
-public sealed class LayoutDefinition
-{
-    public int Cols { get; set; } = 12;
-    public string Gap { get; set; } = "var(--space-4)";
-    public int RowUnit { get; set; } = 88;
-}
-
-/// <summary>Instance de widget : composant (Type) + source de données (Data) + placement + params.</summary>
-public sealed class WidgetDefinition
-{
-    public string Id { get; set; } = "";
-    /// <summary>Nom du composant = clé window.KPI[Type] (identité type = spec.name).</summary>
-    public string Type { get; set; } = "";
-    /// <summary>Clé de l'adaptateur = window.KPIData[Data].</summary>
-    public string Data { get; set; } = "";
-    public CellLayout Layout { get; set; } = new();
-    /// <summary>Paramètres SÉRIALISABLES (clés = noms de prop, jamais de « : » ⇒ hors RepairColonKeyedMaps).</summary>
-    public Dictionary<string, string> Params { get; set; } = new();
-}
-
-/// <summary>Placement d'un widget dans la grille (w/h = étendue ; x/y réservés éditeur DnD).</summary>
-public sealed class CellLayout
-{
-    public int W { get; set; } = 4;
-    public int H { get; set; } = 1;
-    public int X { get; set; } = -1;
-    public int Y { get; set; } = -1;
 }
 
 /// <summary>Référence d'un projet importé : id GitLab + nom affichable + namespace (full_path du groupe).</summary>
