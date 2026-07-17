@@ -178,7 +178,7 @@ public sealed partial class WebDashboard
     // Ids d'onglets NATIFS (shell.jsx NAV_IDS + options) : une page modulaire ne peut pas les réutiliser
     // (sinon conflit de routage). Validé au save.
     private static readonly HashSet<string> ReservedPageIds = new(StringComparer.OrdinalIgnoreCase)
-    { "dashboard", "charts", "anomalies", "issues", "calendar", "velocity", "comparison", "options" };
+    { "dashboard", "charts", "anomalies", "issues", "calendar", "velocity", "comparison", "options", "pageeditor" };
 
     // GET /api/pages → { ok, dashboard } (ADMIN) : la config des pages modulaires, pour l'éditeur.
     private IResult ServePages(HttpContext ctx)

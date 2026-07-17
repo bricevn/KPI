@@ -251,10 +251,12 @@ public sealed class DashboardView
         // en dépendent. registry.js + charte-complement.js en JS pur (avant les scripts babel).
         sb.AppendLine("  <script>" + A("components", "registry.js") + "</script>");
         sb.AppendLine("  <script>" + A("components", "charte-complement.js") + "</script>");
+        // Catalogue des widgets (métadonnées pour l'éditeur de pages, Phase 5).
+        sb.AppendLine("  <script>" + A("components", "widgets-catalog.js") + "</script>");
         foreach (var f in DashboardAssets.ComponentFiles)
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("components", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"page-renderer.jsx\">" + A("app", "page-renderer.jsx") + "</script>");
-        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "page-data.jsx", "shell.jsx" })
+        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "page-data.jsx", "tab-page-editor.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");

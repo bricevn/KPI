@@ -73,18 +73,21 @@
 
     const TabComp = {
       dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
-      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
+      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions,
+      pageeditor: window.TabPageEditor
     }[tab];
+    const isAdmin = !!(((window.__DATA__) || {}).setup || {}).isAdmin;
 
     // Pages MODULAIRES (config Dashboard.Pages → A.pages) : additif, triées par nav.order. Vide ⇒
     // nav = onglets historiques (comportement identique). L'onglet courant peut être une page.
     const PAGES = (A.pages || []).filter((p) => p && p.id && p.kind === 'modular')
       .slice().sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
     const pageDef = PAGES.find((p) => p.id === tab);
-    const navTitle = pageDef ? ((pageDef.nav && (pageDef.nav.labelKey ? window.t(pageDef.nav.labelKey) : pageDef.nav.label)) || pageDef.id) : window.t('nav_' + tab);
+    const navTitle = pageDef ? ((pageDef.nav && (pageDef.nav.labelKey ? window.t(pageDef.nav.labelKey) : pageDef.nav.label)) || pageDef.id)
+      : tab === 'pageeditor' ? 'Éditeur de pages' : window.t('nav_' + tab);
     const pageCtx = { t: window.t, icon: (k) => (window.ICONS ? window.ICONS[k] : null), lang, appearance };
 
-    const showFilters = tab !== 'options' && (!pageDef || (pageDef.nav && pageDef.nav.showFilters !== false));
+    const showFilters = tab !== 'options' && tab !== 'pageeditor' && (!pageDef || (pageDef.nav && pageDef.nav.showFilters !== false));
     const isCharts = tab === 'charts';
     const filtersActive = fLabel.length > 0 || fTeam.length > 0 || fUser.length > 0;
     const clearFilters = () => {setFLabel([]);setFTeam([]);setFUser([]);};
@@ -146,6 +149,7 @@
             )}
           </nav>
           <div className="sb-sp"></div>
+          {isAdmin && <button className={'sb-item' + (tab === 'pageeditor' ? ' on' : '')} onClick={() => setTab('pageeditor')} title="Éditeur de pages">{window.ICONS.dashboard}<span>Éditeur de pages</span></button>}
           <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} title={window.t('nav_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
           <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} title={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
           <button className="sb-collapse" onClick={() => setSbCollapsed((c) => !c)} title={sbCollapsed ? window.t('expandT') : window.t('reduceT')}>
