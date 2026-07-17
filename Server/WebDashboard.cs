@@ -315,6 +315,9 @@ public sealed partial class WebDashboard
         app.MapGet("/api/options/milestones", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsMilestonesAsync(ctx)));
         app.MapPost("/api/options/worktime", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveWorkTimeAsync(ctx)));
         app.MapPost("/api/options", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveOptionsAsync(ctx)));
+        // Dashboard modulaire : lecture/écriture des pages (ADMIN). Écrit UNIQUEMENT la section Dashboard.
+        app.MapGet("/api/pages", (HttpContext ctx) => self.ServePages(ctx));
+        app.MapPost("/api/pages", (Func<HttpContext, Task<IResult>>)(ctx => self.SavePagesAsync(ctx)));
         // Identité résolue de l'utilisateur courant (rôle/périmètre/vue).
         app.MapGet("/api/me", (HttpContext ctx) => Results.Json(self.ResolveMe(ctx)));
         // Données du dashboard FILTRÉES selon le compte (cœur de la restriction côté serveur).

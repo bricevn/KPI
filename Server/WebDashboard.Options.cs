@@ -175,6 +175,136 @@ public sealed partial class WebDashboard
         return Results.Json(new { ok = true });
     }
 
+    // Ids d'onglets NATIFS (shell.jsx NAV_IDS + options) : une page modulaire ne peut pas les réutiliser
+    // (sinon conflit de routage). Validé au save.
+    private static readonly HashSet<string> ReservedPageIds = new(StringComparer.OrdinalIgnoreCase)
+    { "dashboard", "charts", "anomalies", "issues", "calendar", "velocity", "comparison", "options" };
+
+    // GET /api/pages → { ok, dashboard } (ADMIN) : la config des pages modulaires, pour l'éditeur.
+    private IResult ServePages(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var d = _config.Dashboard ?? new DashboardConfig();
+        return Results.Json(new
+        {
+            ok = true,
+            dashboard = new
+            {
+                schemaVersion = d.SchemaVersion,
+                defaultPageId = d.DefaultPageId ?? "",
+                pages = (d.Pages ?? new()).Select(p => new
+                {
+                    id = p.Id, kind = p.Kind,
+                    nav = new { label = p.Nav.Label, labelKey = p.Nav.LabelKey, icon = p.Nav.Icon, order = p.Nav.Order, showFilters = p.Nav.ShowFilters, badgeSource = p.Nav.BadgeSource },
+                    layout = new { cols = p.Layout.Cols, gap = p.Layout.Gap, rowUnit = p.Layout.RowUnit },
+                    widgets = (p.Widgets ?? new()).Select(w => new { id = w.Id, type = w.Type, data = w.Data, layout = new { w = w.Layout.W, h = w.Layout.H, x = w.Layout.X, y = w.Layout.Y }, @params = w.Params ?? new() }),
+                }),
+            },
+        });
+    }
+
+    // POST /api/pages → écrit la section Dashboard (pages modulaires). ADMIN. Calqué sur SaveWorkTime :
+    // n'écrit QUE la section Dashboard (préserve tout le reste), runtime + source, hot-reload.
+    // Validation légère côté serveur (structure/ids/bornes) ; la validation profonde (type ∈ window.KPI,
+    // data ∈ window.KPIData) est faite côté éditeur JS — le serveur ne peut pas exécuter le registre.
+    private async Task<IResult> SavePagesAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+        static int Int(JsonNode? n, int def) => n is JsonValue v && v.TryGetValue<int>(out var i) ? i : def;
+        static bool Bool(JsonNode? n, bool def) => n is JsonValue v && v.TryGetValue<bool>(out var x) ? x : def;
+        static string ParamVal(JsonNode? n) => n is JsonValue v ? (v.TryGetValue<string>(out var s) ? s : v.ToJsonString()) : "";
+
+        var schemaVersion = Int(b?["schemaVersion"], 1);
+        var defaultPageId = (Str(b?["defaultPageId"]) ?? "").Trim();
+        var outPages = new JsonArray();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pn in (b?["pages"] as JsonArray) ?? new JsonArray())
+        {
+            if (pn is not JsonObject po) continue;
+            var id = (Str(po["id"]) ?? "").Trim().ToLowerInvariant();
+            if (!Regex.IsMatch(id, @"^[a-z0-9][a-z0-9-]{0,63}$"))
+                return Results.Json(new { ok = false, error = $"Id de page invalide : « {id} » (minuscules, chiffres, tirets)." });
+            if (ReservedPageIds.Contains(id))
+                return Results.Json(new { ok = false, error = $"Id de page réservé (conflit avec un onglet natif) : « {id} »." });
+            if (!seenIds.Add(id))
+                return Results.Json(new { ok = false, error = $"Id de page en double : « {id} »." });
+
+            var navIn = po["nav"] as JsonObject ?? new JsonObject();
+            var layIn = po["layout"] as JsonObject ?? new JsonObject();
+            var cols = Math.Clamp(Int(layIn["cols"], 12), 1, 24);
+            var nav = new JsonObject
+            {
+                ["Label"] = (Str(navIn["label"]) ?? "").Trim(),
+                ["LabelKey"] = (Str(navIn["labelKey"]) ?? "").Trim(),
+                ["Icon"] = (Str(navIn["icon"]) ?? "").Trim(),
+                ["Order"] = Int(navIn["order"], 100),
+                ["ShowFilters"] = Bool(navIn["showFilters"], true),
+                ["BadgeSource"] = (Str(navIn["badgeSource"]) ?? "").Trim(),
+            };
+            var layout = new JsonObject
+            {
+                ["Cols"] = cols,
+                ["Gap"] = (Str(layIn["gap"]) ?? "var(--space-4)").Trim(),
+                ["RowUnit"] = Math.Clamp(Int(layIn["rowUnit"], 88), 24, 400),
+            };
+
+            var widgetsOut = new JsonArray();
+            var seenW = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var wn in (po["widgets"] as JsonArray) ?? new JsonArray())
+            {
+                if (wn is not JsonObject wo) continue;
+                var wid = (Str(wo["id"]) ?? "").Trim();
+                if (wid.Length == 0) wid = "w" + (widgetsOut.Count + 1);
+                if (!seenW.Add(wid))
+                    return Results.Json(new { ok = false, error = $"Id de widget en double dans « {id} » : « {wid} »." });
+                var type = (Str(wo["type"]) ?? "").Trim();
+                if (!Regex.IsMatch(type, @"^[A-Za-z0-9_]{1,64}$"))
+                    return Results.Json(new { ok = false, error = $"Type de widget invalide dans « {id} » : « {type} »." });
+                var data = (Str(wo["data"]) ?? "").Trim();
+                var wlIn = wo["layout"] as JsonObject ?? new JsonObject();
+                var wl = new JsonObject
+                {
+                    ["W"] = Math.Clamp(Int(wlIn["w"], 4), 1, cols),
+                    ["H"] = Math.Clamp(Int(wlIn["h"], 1), 1, 24),
+                    ["X"] = Int(wlIn["x"], -1),
+                    ["Y"] = Int(wlIn["y"], -1),
+                };
+                var paramsOut = new JsonObject();
+                foreach (var kv in (wo["params"] as JsonObject) ?? new JsonObject())
+                {
+                    if (kv.Key.Contains(':'))
+                        return Results.Json(new { ok = false, error = $"Clé de paramètre invalide (« : » interdit) : « {kv.Key} »." });
+                    paramsOut[kv.Key] = ParamVal(kv.Value);
+                }
+                widgetsOut.Add(new JsonObject { ["Id"] = wid, ["Type"] = type, ["Data"] = data, ["Layout"] = wl, ["Params"] = paramsOut });
+            }
+            outPages.Add(new JsonObject { ["Id"] = id, ["Kind"] = "modular", ["Nav"] = nav, ["Layout"] = layout, ["Widgets"] = widgetsOut });
+        }
+        if (defaultPageId.Length > 0 && !seenIds.Contains(defaultPageId))
+            return Results.Json(new { ok = false, error = $"defaultPageId inconnu : « {defaultPageId} »." });
+
+        var dashObj = new JsonObject { ["SchemaVersion"] = schemaVersion, ["DefaultPageId"] = defaultPageId, ["Pages"] = outPages };
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        root["Dashboard"] = dashObj; // n'écrit QUE cette section, préserve tout le reste
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SavePages KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SavePages reload KO : " + e); }
+        return Results.Json(new { ok = true, pages = outPages.Count });
+    }
+
     // Rôle d'une période à l'écriture (Piste 2) : lit `role` (active|wait|nogc) ; repli sur `timed` si un
     // vieux client ne l'envoie pas encore (timed:true → active, timed:false → nogc). Le `Timed` persisté
     // en est dérivé (Role != "nogc").
