@@ -16,20 +16,14 @@
   }
 
   window.TabPageEditor = function TabPageEditor() {
-    const A = window.APP || {};
-    const S = (window.__DATA__ || {}).setup || {}; // setup vit sur __DATA__ (cf. tab-options.jsx)
-    const isAdmin = !!S.isAdmin;
-    // Portée : 'mine' = mes pages perso (window.__USER_PAGES__, tout utilisateur) ; 'shared' = pages
-    // partagées de l'espace (A.pages, admin uniquement). Non-admin : toujours 'mine'.
-    const srcFor = (sc) => (sc === 'shared' ? (A.pages || []) : ((window.__USER_PAGES__) || []));
+    // Modèle « tout par utilisateur » : chacun n'édite QUE ses propres pages (window.__USER_PAGES__),
+    // sauvegardées par compte (/api/my-pages). Pas de couche partagée/admin.
+    const srcPages = () => ((window.__USER_PAGES__) || []);
 
-    const [scope, setScope] = useState('mine');
-    const [pages, setPages] = useState(() => clone(srcFor('mine')) || []);
-    const [sel, setSel] = useState(() => { const s = srcFor('mine'); return (s[0] && s[0].id) || null; });
+    const [pages, setPages] = useState(() => clone(srcPages()) || []);
+    const [sel, setSel] = useState(() => { const s = srcPages(); return (s[0] && s[0].id) || null; });
     const [status, setStatus] = useState(''); // '' | 'saving' | 'saved' | 'err:<msg>'
     const page = pages.find((p) => p.id === sel) || null;
-
-    const switchScope = (sc) => { setScope(sc); const s = clone(srcFor(sc)) || []; setPages(s); setSel((s[0] && s[0].id) || null); setStatus(''); };
 
     const mutate = (fn) => { setStatus(''); setPages((ps) => { const n = clone(ps); const p = n.find((x) => x.id === sel); if (p) fn(p); return n; }); };
     const types = Object.keys(CATALOG());
@@ -50,8 +44,7 @@
 
     const save = () => {
       setStatus('saving');
-      const url = scope === 'shared' ? '/api/pages' : '/api/my-pages'; // perso vs partagé (admin)
-      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schemaVersion: 1, defaultPageId: '', pages }) })
+      fetch('/api/my-pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schemaVersion: 1, defaultPageId: '', pages }) })
         .then((r) => r.json()).then((j) => {
           if (j.ok) { setStatus('saved'); setTimeout(() => window.location.reload(), 600); }
           else setStatus('err:' + (j.error || 'inconnue'));
@@ -66,12 +59,7 @@
         {/* Colonne gauche : liste des pages */}
         <div className="opt-sec" style={{ width: 240, flex: 'none', marginBottom: 0 }}>
           <h3>Pages</h3>
-          {isAdmin
-            ? <div className="seg-lg" style={{ marginBottom: 10 }}>
-                {[['mine', 'Mes pages'], ['shared', 'Partagées']].map(([k, l]) =>
-                  <button key={k} className={scope === k ? 'on' : ''} onClick={() => switchScope(k)}>{l}</button>)}
-              </div>
-            : <p className="lead">Vos pages personnelles.</p>}
+          <p className="lead">Vos pages personnelles.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
             {pages.length ? pages.map((p) =>
               <button key={p.id} className={'gx-item' + (p.id === sel ? ' on' : '')} style={{ borderRadius: 9, padding: 9, textAlign: 'left', border: 0, cursor: 'pointer', background: p.id === sel ? 'var(--accent-soft)' : 'transparent', color: p.id === sel ? 'var(--accent)' : 'var(--ink-dim)', fontWeight: p.id === sel ? 600 : 500 }} onClick={() => setSel(p.id)}>

@@ -78,15 +78,12 @@
     }[tab];
     const isAdmin = !!(((window.__DATA__) || {}).setup || {}).isAdmin;
 
-    // Pages MODULAIRES : pages PARTAGÉES (config Dashboard.Pages → A.pages) + pages PERSO de l'utilisateur
-    // (window.__USER_PAGES__, injectées par compte). Dédoublonnées par id (la perso prime → un utilisateur
-    // peut surcharger une page partagée), triées par nav.order. Vide ⇒ nav = onglets historiques.
+    // Pages MODULAIRES : uniquement les pages PERSO de l'utilisateur (window.__USER_PAGES__, injectées par
+    // compte). Modèle « tout par utilisateur » : chacun ne voit/édite que ses propres pages. Triées par
+    // nav.order. Vide ⇒ nav = onglets historiques.
     const okPage = (p) => p && p.id && p.kind === 'modular';
-    const _byId = {};
-    (A.pages || []).filter(okPage).forEach((p) => { _byId[p.id] = p; });
-    ((window.__USER_PAGES__) || []).filter(okPage).forEach((p) => { _byId[p.id] = p; });
-    const PAGES = Object.keys(_byId).map((k) => _byId[k])
-      .sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
+    const PAGES = ((window.__USER_PAGES__) || []).filter(okPage)
+      .slice().sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
     const pageDef = PAGES.find((p) => p.id === tab);
     const navTitle = pageDef ? ((pageDef.nav && (pageDef.nav.labelKey ? window.t(pageDef.nav.labelKey) : pageDef.nav.label)) || pageDef.id)
       : tab === 'pageeditor' ? 'Éditeur de pages' : window.t('nav_' + tab);
