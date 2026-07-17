@@ -76,7 +76,15 @@
       issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
     }[tab];
 
-    const showFilters = tab !== 'options';
+    // Pages MODULAIRES (config Dashboard.Pages → A.pages) : additif, triées par nav.order. Vide ⇒
+    // nav = onglets historiques (comportement identique). L'onglet courant peut être une page.
+    const PAGES = (A.pages || []).filter((p) => p && p.id && p.kind === 'modular')
+      .slice().sort((a, b) => ((a.nav && a.nav.order) || 100) - ((b.nav && b.nav.order) || 100));
+    const pageDef = PAGES.find((p) => p.id === tab);
+    const navTitle = pageDef ? ((pageDef.nav && (pageDef.nav.labelKey ? window.t(pageDef.nav.labelKey) : pageDef.nav.label)) || pageDef.id) : window.t('nav_' + tab);
+    const pageCtx = { t: window.t, icon: (k) => (window.ICONS ? window.ICONS[k] : null), lang, appearance };
+
+    const showFilters = tab !== 'options' && (!pageDef || (pageDef.nav && pageDef.nav.showFilters !== false));
     const isCharts = tab === 'charts';
     const filtersActive = fLabel.length > 0 || fTeam.length > 0 || fUser.length > 0;
     const clearFilters = () => {setFLabel([]);setFTeam([]);setFUser([]);};
@@ -130,6 +138,12 @@
                 {id === 'issues' && <span className="cnt">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
               </button>
             )}
+            {PAGES.map((p) =>
+            <button key={p.id} className={'sb-item' + (tab === p.id ? ' on' : '')} onClick={() => setTab(p.id)}>
+                {(window.ICONS && (window.ICONS[p.nav && p.nav.icon] || window.ICONS.dashboard))}
+                <span>{(p.nav && (p.nav.labelKey ? window.t(p.nav.labelKey) : p.nav.label)) || p.id}</span>
+              </button>
+            )}
           </nav>
           <div className="sb-sp"></div>
           <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} title={window.t('nav_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
@@ -142,7 +156,7 @@
         <main className="main">
           <div className="hd">
             <div>
-              <h1 className="disp">{realMs.length === 0 ? window.t('whole_project') : realMs.length === 1 ? realMs[0] : realMs.length <= 3 ? realMs.join(' · ') : realMs.length + ' ' + window.t('f_milestone').toLowerCase()} · {window.t('nav_' + tab)}</h1>
+              <h1 className="disp">{realMs.length === 0 ? window.t('whole_project') : realMs.length === 1 ? realMs[0] : realMs.length <= 3 ? realMs.join(' · ') : realMs.length + ' ' + window.t('f_milestone').toLowerCase()} · {navTitle}</h1>
               <div className="meta">{A.meta.project} · {window.t('hd_gen')} {A.meta.generated} · {A.totals.issues} {window.t('issues')}</div>
             </div>
             <div className="hd-ms">
@@ -176,7 +190,9 @@
             </div>
           }
 
-          {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} /> : <Stub name={window.t('nav_' + tab)} />}
+          {pageDef
+          ? <window.PageRenderer page={pageDef} ctx={pageCtx} />
+          : TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} /> : <Stub name={navTitle} />}
         </main>
 
         {isCharts &&

@@ -435,6 +435,9 @@ window.buildAPP = function (D) {
     detail: detail, vel: vel, anomalies: anomalies, totals: totals, kpis: kpis, pivot: pivot, pivotByKey: pivotByKey,
     superGroups: superGroups, weightMatrix: weightMatrix, transversal: transversal, transversalNames: transversalNames, phaseAvg: phaseAvg, phaseTotals: phaseTotals,
     milestone: milestone, meta: meta, FIB: FIB,
+    // Dashboard modulaire (config Dashboard, payload window.__DATA__.dashboard). Vide ⇒ nav historique.
+    pages: (D.dashboard && D.dashboard.pages) || [],
+    defaultPageId: (D.dashboard && D.dashboard.defaultPageId) || null,
     filterOptions: { projects: projName ? [projName] : [], milestones: D.availableMilestones || [], labels: D.availableLabels || [], teams: Object.keys(D.teams || {}), users: D.availableUsers || people.map(function (p) { return p.id; }) },
     // Couleurs RÉELLES des labels GitLab (payload .NET : { name: { color, textColor } }) → map name → couleur.
     labelColors: (function () { var m = {}, lc = D.labelColors || {}; for (var k in lc) { var v = lc[k]; m[k] = (v && (typeof v === 'string' ? v : v.color)) || ''; } return m; })(),

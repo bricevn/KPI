@@ -10,13 +10,9 @@ namespace Kpi.Views;
 /// </summary>
 public static class GalleryView
 {
-    // Fichiers de composants chargés (ordre libre — chacun s'auto-enregistre). Ajouter ici
-    // tout nouveau composant. Chargés en text/babel après le registre.
-    private static readonly string[] ComponentFiles = {
-        "Button.jsx", "StatusBadge.jsx", "Avatar.jsx",
-        "Chip.jsx", "DeltaBadge.jsx", "ProgressBar.jsx", "Sparkline.jsx", "Donut.jsx",
-        "KpiCard.jsx", "DataTable.jsx", "PhaseBars.jsx", "GanttChart.jsx",
-    };
+    // Liste partagée avec le dashboard live (anti-divergence) : DashboardAssets.ComponentFiles.
+    // Ajouter tout nouveau composant là-bas.
+    private static string[] ComponentFiles => DashboardAssets.ComponentFiles;
 
     public static string Page()
     {

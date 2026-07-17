@@ -55,11 +55,15 @@ public sealed class DashboardView
         string? lastExtractedAt,
         object? setup = null,
         object? workTime = null,
-        IReadOnlyList<string>? transversalLabels = null)
+        IReadOnlyList<string>? transversalLabels = null,
+        object? dashboard = null)
     {
         var payload = BuildPayload(milestone, exports, teams, labelPhases, periods);
         payload.lastExtractedAt = lastExtractedAt ?? "";
         payload.setup = setup;
+        // Dashboard modulaire (pages configurables) : objet camelCase construit côté serveur ; null ⇒
+        // pas de pages ⇒ nav = onglets historiques (non-cassant).
+        payload.dashboard = dashboard;
         // Fenêtre de temps ouvré + anti-bruit (Options → Calcul du temps) : consommée par le mapper
         // client (workingMs). null (export statique/legacy) ⇒ défauts du mapper (9-19, lun-ven).
         payload.workTime = workTime;
@@ -213,6 +217,9 @@ public sealed class DashboardView
         sb.AppendLine(A("design", "charte-tokens.css"));
         sb.AppendLine(A("design", "shared.css"));
         sb.AppendLine(A("design", "studio.css"));
+        // Styles des composants isolés (classes .kpi-* / .page-grid — namespacées, aucune collision
+        // avec le CSS existant). charte-buttons.css NON chargé ici (éviter de restyler les .btn de l'app).
+        sb.AppendLine(A("components", "components.css"));
         sb.AppendLine("  html, body { margin: 0; } body { background: #0a0e13; }");
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
@@ -239,7 +246,15 @@ public sealed class DashboardView
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
             + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
         sb.AppendLine("  <script data-asset=\"i18n\">" + A("app", "i18n.js") + "</script>");
-        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
+        // Bibliothèque de composants isolés + renderer modulaire (window.KPI / window.PageRenderer).
+        // Chargés AVANT les onglets/shell : la nav pilotée par données (shell) et les pages modulaires
+        // en dépendent. registry.js + charte-complement.js en JS pur (avant les scripts babel).
+        sb.AppendLine("  <script>" + A("components", "registry.js") + "</script>");
+        sb.AppendLine("  <script>" + A("components", "charte-complement.js") + "</script>");
+        foreach (var f in DashboardAssets.ComponentFiles)
+            sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("components", f) + "</script>");
+        sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"page-renderer.jsx\">" + A("app", "page-renderer.jsx") + "</script>");
+        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "page-data.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");
@@ -283,6 +298,7 @@ public sealed class DashboardView
         // Construit côté serveur (objet anonyme camelCase) ; null pour les chemins statiques/CLI.
         public object? setup { get; set; }
         public object? workTime { get; set; }
+        public object? dashboard { get; set; }
         public List<string> transversalLabels { get; set; } = new();
     }
 

@@ -713,6 +713,26 @@ public sealed partial class WebDashboard
             transversalLabels = cfg.Export.TransversalLabels ?? new(),
         };
 
+        // Dashboard modulaire → objet camelCase pour le payload (mapper : window.APP.pages). Vide ⇒ pages [].
+        var dash = cfg.Dashboard ?? new DashboardConfig();
+        var dashboard = new
+        {
+            schemaVersion = dash.SchemaVersion,
+            defaultPageId = dash.DefaultPageId ?? "",
+            pages = (dash.Pages ?? new()).Select(p => new
+            {
+                id = p.Id, kind = p.Kind,
+                nav = new { label = p.Nav.Label, labelKey = p.Nav.LabelKey, icon = p.Nav.Icon, order = p.Nav.Order, showFilters = p.Nav.ShowFilters, badgeSource = p.Nav.BadgeSource },
+                layout = new { cols = p.Layout.Cols, gap = p.Layout.Gap, rowUnit = p.Layout.RowUnit },
+                widgets = (p.Widgets ?? new()).Select(w => new
+                {
+                    id = w.Id, type = w.Type, data = w.Data,
+                    layout = new { w = w.Layout.W, h = w.Layout.H, x = w.Layout.X, y = w.Layout.Y },
+                    @params = w.Params ?? new(),
+                }).ToList(),
+            }).ToList(),
+        };
+
         var json = DashboardView.BuildPayloadJson(
             "", filtered.ToList(), // v2 : pas de milestone global (filtre UI) ; le payload couvre toutes les issues du périmètre
             // ?? new() : même garde que le bloc setup ci-dessus — un JSON édité à la main peut rendre
@@ -721,7 +741,8 @@ public sealed partial class WebDashboard
             scopedTeams, cfg.Export.LabelPhases ?? new(), rolePeriods,
             labels, milestones, lastExtracted, setup,
             new { startHour = cfg.Export.WorkStartHour, endHour = cfg.Export.WorkEndHour, workingDaysOnly = cfg.Export.WorkingDaysOnly, holidays = cfg.Export.Holidays ?? new(), minPhaseMinutes = cfg.Export.MinPhaseMinutes },
-            cfg.Export.TransversalLabels ?? new());
+            cfg.Export.TransversalLabels ?? new(),
+            dashboard);
         _payloadCache[cacheKey] = (sig, json);
         return json;
     }
