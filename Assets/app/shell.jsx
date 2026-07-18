@@ -1,7 +1,9 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
-  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
+  // Navigation ENTIÈREMENT modulaire : plus d'onglets natifs en dur. La nav = pages perso de
+  // l'utilisateur (window.__USER_PAGES__) + Éditeur + Options. Les vues natives (Dashboard,
+  // Graphiques, etc.) restent disponibles comme WIDGETS de page (cf. native-widgets.jsx).
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
 
@@ -35,8 +37,11 @@
     // Onglet initial : préférence mémorisée si présente ; sinon 1re page perso ; sinon l'ÉDITEUR
     // (démarrage « interface vide » — un nouvel utilisateur commence par créer sa vue).
     const [tab, setTab] = useState(() => {
-      try { const saved = localStorage.getItem('app-tab'); if (saved) return saved; } catch (e) {}
       const up = ((window.__USER_PAGES__) || []).filter((p) => p && p.id && p.kind === 'modular');
+      // Destinations valides = pages perso + Éditeur + Options (plus aucun onglet natif routable).
+      // Une préférence mémorisée pointant vers un ancien onglet natif est ignorée.
+      const valid = new Set(up.map((p) => p.id).concat(['pageeditor', 'options']));
+      try { const saved = localStorage.getItem('app-tab'); if (saved && valid.has(saved)) return saved; } catch (e) {}
       return up.length ? up[0].id : 'pageeditor';
     });
     const [theme, setTheme] = useState(() => load('app-theme', 'dark'));
@@ -80,11 +85,9 @@
 
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
-    const TabComp = {
-      dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
-      issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions,
-      pageeditor: window.TabPageEditor
-    }[tab];
+    // Seuls Options et Éditeur sont des vues « shell » routables. Tout le reste passe par des pages
+    // modulaires (PageRenderer) ; les vues natives ne sont plus routables en top-level (widgets uniquement).
+    const TabComp = { options: window.TabOptions, pageeditor: window.TabPageEditor }[tab];
 
     // Pages MODULAIRES : uniquement les pages PERSO de l'utilisateur (window.__USER_PAGES__, injectées par
     // compte). Modèle « tout par utilisateur » : chacun ne voit/édite que ses propres pages. Triées par
@@ -144,13 +147,10 @@
           </div>
           <div className="sb-h">{window.t('pilotage')}</div>
           <nav className="sb-nav">
-            {NAV_IDS.map((id) =>
-            <button key={id} className={'sb-item' + (tab === id ? ' on' : '')} onClick={() => setTab(id)}>
-                {window.ICONS[id]}<span>{window.t('nav_' + id)}</span>
-                {id === 'anomalies' && <span className="badge">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
-                {id === 'issues' && <span className="cnt">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
-              </button>
-            )}
+            {PAGES.length === 0 &&
+            <div className="sb-empty" style={{ padding: '8px 12px', fontSize: 'var(--text-caption)', color: 'var(--color-ink-3)', opacity: .85, lineHeight: 1.4 }}>
+                {lang === 'en' ? 'No page yet — create one in the Editor below.' : 'Aucune page — créez-en une dans l’Éditeur ci-dessous.'}
+              </div>}
             {PAGES.map((p) =>
             <button key={p.id} className={'sb-item' + (tab === p.id ? ' on' : '')} onClick={() => setTab(p.id)}>
                 {(window.ICONS && (window.ICONS[p.nav && p.nav.icon] || window.ICONS.dashboard))}
