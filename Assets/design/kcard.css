@@ -1,0 +1,62 @@
+/* ============================================================================
+   kcard.css — Cartouche KPI (prefab). Charte §13.
+   Dépend de charte-tokens.css (--color-*, --space-*, --radius-*, --text-*, --font-*,
+   --shadow-*, --dur-*, --ease-*). Aucune valeur en dur.
+   ============================================================================ */
+
+.kcard {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-line-1);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+/* ---- en-tête : icône + titre + (option) affordance popup ---- */
+.kcard .ktop { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.kcard .kchip {
+  width: 28px; height: 28px; flex: none;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;                       /* la teinte de fond est passée en style inline */
+}
+.kcard .kchip svg { width: 16px; height: 16px; }
+.kcard .klab {
+  font-size: var(--text-caption); font-weight: 600;
+  color: var(--color-ink-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* ---- valeur ---- */
+.kcard .kbig {
+  font-family: var(--font-display);
+  font-size: var(--text-stat); font-weight: 700;
+  letter-spacing: -.01em; line-height: 1;
+  margin-bottom: var(--space-4);
+}
+.kcard .kbig small { font-size: 14px; font-weight: 500; color: var(--color-ink-3); }
+
+/* ---- barre de progression ---- */
+.kbar { height: 7px; border-radius: var(--radius-pill); background: var(--color-surface-3); overflow: hidden; }
+.kbar > i { display: block; height: 100%; border-radius: inherit; }
+
+/* ---- infos optionnelles sous la barre ---- */
+.kcard .kcap {
+  display: flex; gap: var(--space-2); align-items: center;
+  font-size: var(--text-caption); color: var(--color-ink-3);
+  margin-top: var(--space-3);
+}
+.kcard .kcap b { font-family: var(--font-mono); color: var(--color-ink-1); }
+
+/* ---- état cliquable (une popup est configurée) ---- */
+.kcard.clickable { cursor: pointer; transition: border-color var(--dur-base) var(--ease-out); }
+.kcard.clickable:hover { border-color: var(--color-accent); }
+.kcard .kexp { margin-left: auto; color: var(--color-ink-3); display: none; }
+.kcard .kexp svg { width: 15px; height: 15px; display: block; }
+.kcard.clickable .kexp { display: inline-flex; }
+.kcard.clickable:hover .kexp { color: var(--color-accent); }
+.kcard.clickable:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ---- variante : sparkline en barres à la place de la barre de progression ---- */
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.spark > i { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; }

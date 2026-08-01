@@ -1,7 +1,7 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
-  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
+  const NAV_IDS = ['indicateurs', 'dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
 
@@ -72,6 +72,7 @@
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
     const TabComp = {
+      indicateurs: window.TabIndicateurs,
       dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
       issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
     }[tab];

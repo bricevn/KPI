@@ -38,7 +38,8 @@
     issueDot: <Ic d={<g><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h6M8 12h8M8 16h5" /></g>} />,
     weight: <Ic d={<g><circle cx="12" cy="5" r="2.6" /><path d="M7 8.5h10l1.7 10.8a2 2 0 01-2 2.2H7.3a2 2 0 01-2-2.2L7 8.5z" /></g>} />,
     approve: <Ic d={<g><circle cx="12" cy="12" r="9" /><path d="M8.3 12.4l2.4 2.4 4.8-5.2" /></g>} />,
-    clock: <Ic d={<g><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></g>} />
+    clock: <Ic d={<g><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></g>} />,
+    indicateurs: <Ic d={<g><path d="M12 13l4-3" /><path d="M4.3 17.5a9 9 0 1 1 15.4 0" /></g>} />
   };
 
   const Avatar = ({ pid, size = 24 }) => {

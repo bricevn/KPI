@@ -209,6 +209,10 @@ public sealed class DashboardView
         sb.AppendLine("  <style>");
         sb.AppendLine(A("design", "shared.css"));
         sb.AppendLine(A("design", "studio.css"));
+        // Cartouche KPI (page Indicateurs) : tokens de charte PUIS styles kcard (kcard dépend des tokens).
+        // Espace de noms de tokens distinct (--color-*) → aucun conflit avec studio.css (--ink/--accent…).
+        sb.AppendLine(A("design", "charte-tokens.css"));
+        sb.AppendLine(A("design", "kcard.css"));
         sb.AppendLine("  html, body { margin: 0; } body { background: #0a0e13; }");
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
@@ -239,7 +243,7 @@ public sealed class DashboardView
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
             + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
         sb.AppendLine("  <script data-asset=\"i18n\">" + A("app", "i18n.js") + "</script>");
-        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
+        foreach (var f in new[] { "ui.jsx", "kard.jsx", "tab-indicateurs.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");

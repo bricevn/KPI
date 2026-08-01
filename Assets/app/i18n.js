@@ -6,6 +6,10 @@
     fr: {
       'common.search': 'Rechercher…', 'common.none': 'Aucun résultat',
       // ===== chrome (sidebar / en-tête / filtres) =====
+      nav_indicateurs: 'Indicateurs',
+      'kpi.ackTitle': 'Acknowledge Time', 'kpi.patchTitle': 'Patch Success', 'kpi.bugResTitle': 'Bug Resolution',
+      'kpi.answered': 'répondus', 'kpi.zeroReturn': 'sans retour', 'kpi.bugsClosed': 'bugs fermés', 'kpi.clientBugs': 'client bugs',
+      'kpi.noCanny': 'Connectez Canny (Options) pour afficher le temps de réponse.',
       nav_dashboard: 'Dashboard', nav_charts: 'Graphiques', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendrier', nav_velocity: 'Vélocité', nav_options: 'Options', nav_comparison: 'Évolution',
       'cmpv.closed': 'Issues fermées', 'cmpv.anomalies': 'Anomalies', 'cmpv.returns': 'Retours', 'cmpv.noData': "Aucun jalon dans les données extraites — lancez une extraction pour comparer l'évolution.",
@@ -139,6 +143,10 @@
     },
     en: {
       'common.search': 'Search…', 'common.none': 'No results',
+      nav_indicateurs: 'Indicators',
+      'kpi.ackTitle': 'Acknowledge Time', 'kpi.patchTitle': 'Patch Success', 'kpi.bugResTitle': 'Bug Resolution',
+      'kpi.answered': 'answered', 'kpi.zeroReturn': 'no return', 'kpi.bugsClosed': 'bugs closed', 'kpi.clientBugs': 'client bugs',
+      'kpi.noCanny': 'Connect Canny (Options) to show response time.',
       nav_dashboard: 'Dashboard', nav_charts: 'Charts', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendar', nav_velocity: 'Velocity', nav_options: 'Options', nav_comparison: 'Evolution',
       'cmpv.closed': 'Closed issues', 'cmpv.anomalies': 'Anomalies', 'cmpv.returns': 'Returns', 'cmpv.noData': 'No milestone in the extracted data — run an extraction to compare evolution.',

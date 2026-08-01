@@ -25,6 +25,13 @@
     <None Update="Assets\design\shared.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Cartouche KPI (page Indicateurs) : tokens de charte + styles kcard. -->
+    <None Update="Assets\design\charte-tokens.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\design\kcard.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
