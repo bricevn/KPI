@@ -350,6 +350,66 @@ public sealed partial class WebDashboard
         return Results.Json(new { ok = true, refetch });
     }
 
+    // POST /api/options/canny { apiKey, subdomain? } → connexion externe Canny (ADMIN). Valide la clé auprès
+    // de l'API Canny AVANT de la chiffrer/persister (enc:v1:). Clé vide + clé existante = conservée (permet de
+    // modifier le sous-domaine sans re-saisir). La clé n'est JAMAIS renvoyée au client. Hot-reload.
+    private async Task<IResult> SaveCannyAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        return await WriteCannyConnectionAsync(ctx);
+    }
+
+    // Cœur PARTAGÉ (Options admin + étape « Connexions externes » du /setup) : valide la clé auprès de
+    // l'API Canny, la chiffre (enc:v1:) et l'enregistre. La garde d'accès est faite par l'appelant.
+    private async Task<IResult> WriteCannyConnectionAsync(HttpContext ctx)
+    {
+        var b = await ReadJsonBody(ctx);
+        var apiKey = (b?["apiKey"]?.GetValue<string>() ?? "").Trim();
+        var subdomain = (b?["subdomain"]?.GetValue<string>() ?? "").Trim();
+        var hasExisting = _config.ExternalConnections?.Canny?.Configured ?? false;
+        if (apiKey.Length == 0 && !hasExisting)
+            return Results.Json(new { ok = false, error = "Clé API Canny requise." });
+
+        // Valide la clé fournie auprès de l'API Canny (un simple boards/list) avant de l'enregistrer.
+        if (apiKey.Length > 0)
+        {
+            try
+            {
+                using var client = new Kpi.Canny.CannyClient(new Kpi.Config.CannyConfig { ApiKey = apiKey, RequestTimeoutSeconds = 20 });
+                await client.ListSimpleAsync<Kpi.Canny.CannyBoardRaw>("boards/list", "boards", ctx.RequestAborted);
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("SaveCanny test KO : " + e.Message);
+                return Results.Json(new { ok = false, error = "Connexion Canny refusée (clé API invalide ?)." });
+            }
+        }
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var ext = root["ExternalConnections"] as JsonObject ?? new JsonObject(); root["ExternalConnections"] = ext;
+        var canny = ext["Canny"] as JsonObject ?? new JsonObject(); ext["Canny"] = canny;
+        // Clé fournie → chiffrée ; sinon on conserve la valeur déjà stockée (chiffrée) telle quelle.
+        if (apiKey.Length > 0) canny["ApiKey"] = SecureStore.ProtectSecret(apiKey);
+        if (subdomain.Length > 0) canny["Subdomain"] = subdomain;
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveCanny write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveCanny reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        return Results.Json(new { ok = true, connected = _config.ExternalConnections?.Canny?.Configured ?? false });
+    }
+
     // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority
     // dans appsettings.json, recharge la config, et INVALIDE le cache des options OAuth → reconfiguration À CHAUD
     // (le bouton SSO devient actif sans redémarrage). Le Secret n'est pas renvoyé au client.

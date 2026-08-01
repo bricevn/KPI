@@ -46,6 +46,9 @@ public sealed partial class WebDashboard
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private CancellationTokenSource? _refreshCts;
     private readonly object _ctsLock = new();
+    // État de refresh Canny SÉPARÉ du refresh GitLab (verrou + état indépendants → suivi distinct via /api/canny-status).
+    private readonly RefreshState _cannyState = new();
+    private readonly SemaphoreSlim _cannyLock = new(1, 1);
 
     // HTTP partagé (réutilise le pool de connexions) pour les appels GitLab par requête (login token,
     // résolution des membres) : un HttpClient neuf par requête épuise les sockets sous charge.
@@ -305,6 +308,10 @@ public sealed partial class WebDashboard
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
         app.MapPost("/api/cancel", (HttpContext ctx) => self.CancelAsync(ctx));
         app.MapPost("/api/refresh", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshAsync(ctx)));
+        // Connexion externe Canny : refresh (extraction chiffrée) + statut, indépendants du refresh GitLab.
+        app.MapPost("/api/refresh-canny", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshCannyAsync(ctx)));
+        app.MapGet("/api/canny-status", () => Results.Json(self._cannyState.Snapshot()));
+        app.MapPost("/api/options/canny", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveCannyAsync(ctx)));
         // Édition de la config depuis le dashboard (ADMIN, cf. RequireAdmin) : listing live des projets/labels
         // (via le token de groupe STOCKÉ) + sauvegarde des sections Export.* (projets/phases/labels).
         app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
@@ -330,6 +337,7 @@ public sealed partial class WebDashboard
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/oauth",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupOAuthSaveAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup/canny",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupCannySaveAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx))).AllowAnonymous();
         app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx)).AllowAnonymous();
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
@@ -430,7 +438,9 @@ public sealed partial class WebDashboard
         // inliné et window.APP est construit par le mapper AVANT le rendu React.
         var json = await BuildScopedPayloadAsync(ctx);
         var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName; // "fr"/"en" (posée par UseRequestLocalization)
-        return Results.Content(DashboardView.BuildReferencePage(json, lang), "text/html; charset=utf-8");
+        // Dataset Canny (feedback/roadmap) déchiffré, injecté dans la page à côté du payload GitLab. null si non extrait.
+        var cannyJson = Kpi.Canny.CannyService.TryReadDatasetJson(_config);
+        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson), "text/html; charset=utf-8");
     }
 
     private IResult CancelAsync(HttpContext ctx)
@@ -539,6 +549,53 @@ public sealed partial class WebDashboard
         }
     }
 
+    // --- Refresh Canny (connexion externe) ------------------------------
+
+    /// <summary>POST /api/refresh-canny : (ré)extraction Canny en tâche de fond (ADMIN). 409 si déjà en cours,
+    /// 400 si Canny non configuré. Suivi via /api/canny-status (état séparé du refresh GitLab).</summary>
+    private async Task<IResult> RefreshCannyAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        if (!(_config.ExternalConnections?.Canny?.Configured ?? false))
+            return Results.Text("Connexion Canny non configurée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400);
+        if (!await _cannyLock.WaitAsync(0))
+            return Results.Text("Une extraction Canny est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
+
+        var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
+        var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
+        _ = Task.Run(() => RunCannyRefreshAsync(serverCt));
+        return Results.Text("Extraction Canny démarrée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 202);
+    }
+
+    private async Task RunCannyRefreshAsync(CancellationToken serverCt)
+    {
+        try
+        {
+            _cannyState.Reset();
+            _cannyState.Running = true;
+            _cannyState.StartedAt = DateTime.UtcNow;
+            // CannyService n'expose pas de progression fine → on ne renseigne que Running/LastError/LastRefreshAt.
+            await Kpi.Canny.CannyService.ExtractAndStoreAsync(_config, serverCt);
+            _cannyState.LastRefreshAt = DateTime.UtcNow;
+            _cannyState.LastError = null;
+        }
+        catch (OperationCanceledException)
+        {
+            _cannyState.LastError = "Annulé.";
+            Console.WriteLine("Refresh Canny annulé.");
+        }
+        catch (Exception ex)
+        {
+            _cannyState.LastError = ex.Message;
+            Console.Error.WriteLine("Refresh Canny KO : " + ex);
+        }
+        finally
+        {
+            _cannyState.Running = false;
+            _cannyLock.Release();
+        }
+    }
+
     // --- Helpers (identiques à l'ancien serveur) ------------------------
 
     private static string RuntimeConfigPath() => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
@@ -565,6 +622,8 @@ public sealed partial class WebDashboard
                 foreach (var s in servers)
                     if (s is JsonObject so && so["GroupToken"] != null) Enc(so, "GroupToken");
             if (root["Auth"] is JsonObject auth && auth["ClientSecret"] != null) Enc(auth, "ClientSecret");
+            // Connexion externe Canny : la clé API est un secret au même titre que les tokens GitLab.
+            if (root["ExternalConnections"] is JsonObject ext && ext["Canny"] is JsonObject cannyCfg && cannyCfg["ApiKey"] != null) Enc(cannyCfg, "ApiKey");
 
             // Semis rétro-compat des labels transversaux : seulement si la CLÉ est absente. Une fois écrite
             // (même []), on ne re-sème plus → « tout retirer » reste stable au redémarrage.
@@ -708,6 +767,12 @@ public sealed partial class WebDashboard
                 : new Dictionary<string, object>(),
             trackedLabels = cfg.Export.TrackedLabels ?? new(),
             transversalLabels = cfg.Export.TransversalLabels ?? new(),
+            // Connexion externe Canny : état léger pour la page Options + la page KPI (JAMAIS la clé API).
+            canny = new
+            {
+                connected = cfg.ExternalConnections?.Canny?.Configured ?? false,
+                lastExtracted = Kpi.Canny.CannyService.LastExtractedString(cfg),
+            },
         };
 
         var json = DashboardView.BuildPayloadJson(

@@ -68,6 +68,8 @@ public static class SecureStore
     {
         foreach (var s in cfg.Servers ?? new()) s.GroupToken = UnprotectSecret(s.GroupToken);
         cfg.Auth.ClientSecret = UnprotectSecret(cfg.Auth.ClientSecret);
+        // Connexions externes : la clé API Canny est un secret au même titre que les tokens GitLab.
+        if (cfg.ExternalConnections?.Canny is { } canny) canny.ApiKey = UnprotectSecret(canny.ApiKey);
     }
 
     /// <summary>Écrit du texte CHIFFRÉ de façon atomique (tmp + rename), avec la sous-clé du serveur.</summary>

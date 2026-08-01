@@ -11,6 +11,8 @@ public sealed class AppConfig
     public List<ServerConfig> Servers { get; set; } = new();
     public ExportConfig Export { get; set; } = new();
     public AuthConfig Auth { get; set; } = new();
+    /// <summary>Connexions vers des applications externes (Canny pour l'instant). Extensible.</summary>
+    public ExternalConnectionsConfig ExternalConnections { get; set; } = new();
 
     /// <summary>Serveurs configurés. Plus de repli legacy : <see cref="Servers"/> est l'unique source.</summary>
     public List<ServerConfig> ResolveServers() => Servers ?? new();
@@ -158,6 +160,40 @@ public sealed class AuthConfig
         !string.IsNullOrWhiteSpace(Authority)
         && !string.IsNullOrWhiteSpace(ClientId)
         && !string.IsNullOrWhiteSpace(ClientSecret);
+}
+
+/// <summary>
+/// Connexions vers des applications externes (au-delà de GitLab). Étape « connexions externes » du setup.
+/// Une seule intégration pour l'instant : <see cref="Canny"/>. Ajouter ici les futurs connecteurs.
+/// </summary>
+public sealed class ExternalConnectionsConfig
+{
+    public CannyConfig Canny { get; set; } = new();
+}
+
+/// <summary>
+/// Connexion à Canny (feedback / roadmap). L'<see cref="ApiKey"/> est un SECRET chiffré au repos
+/// (format enc:v1:, comme les tokens GitLab) — jamais exposé au client ni loggé. Les données extraites
+/// sont chiffrées sous output/canny/. Le SLA (« Acknowledge Time ») utilise les heures ouvrées configurées.
+/// </summary>
+public sealed class CannyConfig
+{
+    /// <summary>Clé API Canny (POST param apiKey). Chiffrée au repos ; déchiffrée en mémoire au chargement.</summary>
+    public string ApiKey { get; set; } = "";
+    /// <summary>Sous-domaine / nom d'espace Canny (affichage, meta.source). Ex : « obvious-technologies ».</summary>
+    public string Subdomain { get; set; } = "";
+    /// <summary>Seuil SLA « Acknowledge Time » en heures ouvrées (défaut 4h).</summary>
+    public int SlaHours { get; set; } = 4;
+    /// <summary>Début de la journée ouvrée (heure locale du fuseau). Défaut 8h.</summary>
+    public int WorkStartHour { get; set; } = 8;
+    /// <summary>Fin de la journée ouvrée. Défaut 19h.</summary>
+    public int WorkEndHour { get; set; } = 19;
+    /// <summary>Fuseau horaire pour le calcul des heures ouvrées (IANA). Défaut « Europe/Paris ».</summary>
+    public string TimeZone { get; set; } = "Europe/Paris";
+    public int RequestTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>True si la connexion Canny est exploitable (clé API renseignée).</summary>
+    public bool Configured => !string.IsNullOrWhiteSpace(ApiKey);
 }
 
 public sealed class GitLabConfig

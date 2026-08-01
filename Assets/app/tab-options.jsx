@@ -601,6 +601,69 @@
       </div>);
   }
 
+  // Connexion externe CANNY (feedback / roadmap) : saisir/valider la clé API (POST /api/options/canny,
+  // testée côté serveur) puis lancer l'extraction (POST /api/refresh-canny, suivi via /api/canny-status).
+  // La clé n'est jamais renvoyée au client. Réservé aux admins.
+  function CannyConfigEditor() {
+    const C = ((window.__DATA__ || {}).setup || {}).canny || {};
+    const [apiKey, setApiKey] = useState('');
+    const [connected, setConnected] = useState(!!C.connected);
+    const lastExtracted = C.lastExtracted || '';
+    const [st, setSt] = useState('idle'); // connexion : idle | busy | done | err
+    const [err, setErr] = useState('');
+    const [refreshState, setRefreshState] = useState('idle'); // extraction : idle | busy | done | err
+    const pollRef = React.useRef(null);
+    const stopPoll = () => {if (pollRef.current) {clearInterval(pollRef.current);pollRef.current = null;}};
+    const startPoll = () => {
+      stopPoll();
+      pollRef.current = setInterval(() => {
+        fetch('/api/canny-status').then((r) => r.json()).then((s) => {
+          if (!s.running) {stopPoll();setRefreshState(s.lastError ? 'err' : 'done');if (s.lastError) setErr(s.lastError);}
+        }).catch(() => {});
+      }, 1500);
+    };
+    React.useEffect(() => {
+      fetch('/api/canny-status').then((r) => r.json()).then((s) => {if (s.running) {setRefreshState('busy');startPoll();}}).catch(() => {});
+      return stopPoll;
+    }, []);
+    const connect = () => {
+      setSt('busy');setErr('');
+      fetch('/api/options/canny', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey }) })
+        .then((r) => r.json()).then((j) => {if (j.ok) {setSt('done');setConnected(!!j.connected);setApiKey('');} else {setSt('err');setErr(j.error || '');}})
+        .catch(() => {setSt('err');setErr('');});
+    };
+    const refresh = () => {
+      setRefreshState('busy');setErr('');
+      fetch('/api/refresh-canny', { method: 'POST' })
+        .then((r) => {if (r.ok || r.status === 409) startPoll();else setRefreshState('err');})
+        .catch(() => setRefreshState('err'));
+    };
+    const busy = refreshState === 'busy';
+    const keyStyle = Object.assign({}, selStyle, { width: 300, fontFamily: 'var(--mono, monospace)' });
+    return (
+      <div className="opt-sec">
+        <h3>{window.t('opt.cannyTitle')}</h3>
+        <p className="lead">{window.t('opt.cannyLead')}</p>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyStatus')}<span>{connected ? (lastExtracted ? window.t('opt.cannyLast') + ' ' + lastExtracted : window.t('opt.cannyNoData')) : window.t('opt.cannyNotConnected')}</span></div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: connected ? 'var(--c-good,#2f9e44)' : 'var(--ink-dim,#888)' }}>{connected ? window.t('opt.cannyConnected') : '—'}</span>
+        </div>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyKey')}<span>{window.t('opt.cannyKeySub')}</span></div>
+          <input style={keyStyle} type="password" value={apiKey} placeholder={connected ? '••••••••' : ''} autoComplete="off" onChange={(e) => setApiKey(e.target.value)} />
+          <button className="btn" disabled={st === 'busy' || (!apiKey && !connected)} onClick={connect}>{window.t('opt.cannyConnect')}</button>
+        </div>
+        {connected &&
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyRefresh')}<span>{window.t('opt.cannyRefreshSub')}</span></div>
+          <button className="btn btn-primary" disabled={busy} onClick={refresh}>{window.ICONS.refresh} {busy ? window.t('opt.cannyRefreshing') : window.t('opt.cannyRefreshBtn')}</button>
+        </div>}
+        {st === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.cannySaved')}</p>}
+        {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.cannyDone')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+        {(st === 'err' || refreshState === 'err') && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{err || window.t('opt.refreshError')}</p>}
+      </div>);
+  }
+
   // ===================== ONGLET =====================
   window.TabOptions = function TabOptions({ theme, setTheme, appearance }) {
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
@@ -733,6 +796,8 @@
         </div>}
 
         {isAdmin && <WorkTimeEditor lang={appearance.lang} />}
+
+        {isAdmin && <CannyConfigEditor />}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
       </div>);

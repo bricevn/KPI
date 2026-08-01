@@ -191,7 +191,7 @@ public sealed class DashboardView
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string payloadJson, string lang = "en")
+    public static string BuildReferencePage(string payloadJson, string lang = "en", string? cannyJson = null)
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
@@ -225,10 +225,14 @@ public sealed class DashboardView
             // Défense XSS : le payload est inliné dans un <script>. Neutraliser toute séquence pouvant
             // clore la balise / casser le parseur (titres d'issues contrôlés par les membres du projet).
             // Ces caractères n'apparaissent que dans des littéraux de chaîne JSON → \uXXXX y est décodé à l'identique.
-            var safeJson = payloadJson
+            // Échappement partagé (même défense pour __DATA__ et __CANNY__, tous deux du contenu rédigé
+            // par des utilisateurs : titres d'issues GitLab / posts + commentaires Canny).
+            static string Esc(string j) => j
                 .Replace("<", "\\u003C").Replace(">", "\\u003E").Replace("&", "\\u0026")
                 .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
-            sb.AppendLine("  <script>window.__DATA__ = " + safeJson + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+            sb.AppendLine("  <script>window.__DATA__ = " + Esc(payloadJson) + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+            // Dataset Canny (feedback/roadmap) déchiffré, injecté séparément du payload GitLab. null si non extrait.
+            sb.AppendLine("  <script>window.__CANNY__ = " + (string.IsNullOrEmpty(cannyJson) ? "null" : Esc(cannyJson)) + ";</script>");
         }
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.

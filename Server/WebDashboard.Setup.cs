@@ -233,6 +233,14 @@ public sealed partial class WebDashboard
         return Results.Json(new { ok = true });
     }
 
+    // POST /api/setup/canny { apiKey } → étape « Connexions externes » du wizard (facultative). Ouvert au
+    // bootstrap (RequireSetupAccess), sinon admin-only. Valide + chiffre la clé (cœur partagé avec les Options).
+    private async Task<IResult> SetupCannySaveAsync(HttpContext ctx)
+    {
+        var deny = RequireSetupAccess(ctx); if (deny != null) return deny;
+        return await WriteCannyConnectionAsync(ctx);
+    }
+
     // POST /api/setup { baseUrl, token, selfSigned, timeout, projectIds, labelPhases, teams } → écrit appsettings.json
     private async Task<IResult> SetupSaveAsync(HttpContext ctx)
     {
