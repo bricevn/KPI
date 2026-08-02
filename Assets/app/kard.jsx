@@ -30,7 +30,7 @@
 
   // --- Kard (verbatim du handoff) ---
   function Kard({ icon, iconColor, title, value, display = 'bar', ratio = 0,
-                  barColor = 'var(--color-accent)', series, footer, popup, onOpen }) {
+                  barColor = 'var(--color-accent)', series, footer, popup, onOpen, info }) {
     const clickable = !!popup;
     const open = () => { if (clickable && onOpen) onOpen(popup); };
 
@@ -57,10 +57,12 @@
         onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}
         title={clickable ? 'Ouvrir le détail' : undefined}
       >
+        {info && window.InfoTip
+          ? <span className="kinfo" onClick={(e) => e.stopPropagation()}><window.InfoTip text={info} /></span>
+          : null}
         <div className="ktop">
           <span className="kchip" style={{ background: iconColor || 'var(--color-accent)' }}>{window.Icon(icon, 16)}</span>
           <span className="klab">{title}</span>
-          {clickable && <span className="kexp">{window.Icon('expand', 15)}</span>}
         </div>
         <div className="kbig">{value}</div>
         {body}
