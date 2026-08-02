@@ -34,13 +34,18 @@ public sealed class ExportService
             : $"Récupération des issues (milestone={effective})...");
         var issues = await _client.GetIssuesByMilestoneAsync(effective, ct);
         Console.WriteLine($"  -> {issues.Count} issues récupérées.");
-        onProgress?.Invoke(0, issues.Count);
+        return await BuildExportsFromIssuesAsync(issues, ct, onProgress);
+    }
 
-        // Traitement PARALLÈLE des issues (concurrence bornée). Chaque issue déclenche ~4-5 appels API
-        // (label events, notes, MRs, approvals) ; les enchaîner en séquence sur N issues était le goulot
-        // (« milestone lente »). BuildSingleAsync n'a aucun état partagé mutable → sûr en concurrent ;
-        // l'ordre du résultat est préservé (tableau indexé). Concurrence bornée = prudent vs rate-limit GitLab.
-        const int MaxConcurrency = 6;
+    /// <summary>Construit les IssueExport à partir d'une liste d'issues DÉJÀ récupérées (ex. extraction scopée
+    /// par assignee, où l'appelant a fait l'union multi-assignee). Traitement PARALLÈLE à concurrence bornée :
+    /// chaque issue déclenche ~4-5 appels API (events, notes, MRs, approvals) — l'enchaînement séquentiel était
+    /// le goulot. BuildSingleAsync est sans état partagé mutable → sûr en concurrent ; ordre préservé.</summary>
+    public async Task<List<IssueExport>> BuildExportsFromIssuesAsync(
+        List<GitLabIssue> issues, CancellationToken ct, Action<int, int>? onProgress = null)
+    {
+        onProgress?.Invoke(0, issues.Count);
+        const int MaxConcurrency = 6; // prudent vs rate-limit GitLab
         var exports = new IssueExport[issues.Count];
         var done = 0;
         using var gate = new SemaphoreSlim(MaxConcurrency);

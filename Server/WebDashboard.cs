@@ -458,7 +458,27 @@ public sealed partial class WebDashboard
 
     private async Task<IResult> RefreshAsync(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var login = EffectiveLogin(ctx, out _);
+        var acct = ResolveAccount(login);
+
+        // NON-ADMIN (Phase B) : refresh SCOPÉ à son périmètre (membre = ses issues ; lead = son équipe) →
+        // store PAR UTILISATEUR isolé. Doit rester membre GitLab des projets (IsAllowedAsync).
+        if (acct.Role != "admin")
+        {
+            if (!await IsAllowedAsync(ctx))
+                return Results.Text("Accès au projet révoqué.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 403);
+            var assignees = (acct.ScopeType == "team" && !string.IsNullOrEmpty(acct.ScopeValue)
+                && _config.Export.Teams.TryGetValue(acct.ScopeValue!, out var members) && members is { Count: > 0 })
+                ? members : new List<string> { login };
+            if (!await _refreshLock.WaitAsync(0))
+                return Results.Text("Une acquisition est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
+            var stopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
+            var sct = stopping?.ApplicationStopping ?? CancellationToken.None;
+            _ = Task.Run(() => RunScopedRefreshAsync(login, assignees, sct));
+            return Results.Text("Acquisition (périmètre personnel) démarrée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 202);
+        }
+
+        // ADMIN : refresh COMPLET du store partagé, ciblable par projet/milestones.
         if (!await _refreshLock.WaitAsync(0))
             return Results.Text("Une acquisition est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
 
@@ -557,6 +577,36 @@ public sealed partial class WebDashboard
         finally
         {
             // Données régénérées → invalider le cache des payloads.
+            _payloadCache.Clear();
+            _state.Running = false;
+            _refreshLock.Release();
+            linked.Dispose();
+            lock (_ctsLock) { if (_refreshCts == localCts) _refreshCts = null; }
+            localCts.Dispose();
+        }
+    }
+
+    // Refresh SCOPÉ non-admin (Phase B) : extraction du périmètre du demandeur → store perso isolé.
+    // Réutilise _refreshLock/_state (sérialise avec le refresh admin ; le demandeur suit via /api/status).
+    private async Task RunScopedRefreshAsync(string login, IReadOnlyList<string> assignees, CancellationToken serverCt)
+    {
+        CancellationTokenSource localCts;
+        lock (_ctsLock) { localCts = new CancellationTokenSource(); _refreshCts = localCts; }
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(serverCt, localCts.Token);
+        try
+        {
+            _state.Reset();
+            _state.Running = true;
+            _state.StartedAt = DateTime.UtcNow;
+            await ExportPipeline.RunUserScopedExportAsync(_config, login, assignees,
+                (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token);
+            _state.LastRefreshAt = DateTime.UtcNow;
+            _state.LastError = null;
+        }
+        catch (OperationCanceledException) { _state.LastError = "Annulé par l'utilisateur."; }
+        catch (Exception ex) { _state.LastError = ex.Message; Console.Error.WriteLine("Refresh scopé KO : " + ex); }
+        finally
+        {
             _payloadCache.Clear();
             _state.Running = false;
             _refreshLock.Release();
@@ -705,22 +755,35 @@ public sealed partial class WebDashboard
         var serverId = ServerById(ctx.User.FindFirst(ServerClaim)?.Value)?.Id ?? cfg.ResolveServers().FirstOrDefault()?.Id ?? "default";
         var (dataDir, encrypted) = ResolveServerDataDir(cfg.Export.OutputDirectory, serverId);
 
+        // Store PAR UTILISATEUR (Phase B) : un non-admin ayant extrait son propre périmètre lit SON store
+        // (déjà scopé par assignee) au lieu du store partagé filtré. Repli sur le partagé sinon.
+        var perUser = false;
+        if (r.Role != "admin")
+        {
+            var userDir = Path.Combine(cfg.Export.OutputDirectory, ExportPipeline.SafeSegment(serverId), "users", ExportPipeline.SafeSegment(login));
+            if (File.Exists(Path.Combine(userDir, "issues.json"))) { dataDir = userDir; encrypted = true; perUser = true; }
+        }
+
         // Cache du JSON produit : clé = serveur + périmètre du compte, signature = mtimes des fichiers source.
         string Mtime(string f) { var fp = Path.Combine(dataDir, f); return File.Exists(fp) ? File.GetLastWriteTimeUtc(fp).Ticks.ToString() : "0"; }
-        var cacheKey = $"{serverId}|{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}";
+        var cacheKey = $"{serverId}|{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}|{(perUser ? "pu:" + login : "sh")}";
         var sig = $"{Mtime("issues.json")}.{Mtime("labels.json")}.{Mtime("milestones.json")}";
         if (_payloadCache.TryGetValue(cacheKey, out var cached) && cached.sig == sig) return cached.json;
 
         var (all, labels, milestones, lastExtracted) = await LoadServerDataAsync(serverId, dataDir, encrypted, ctx.RequestAborted);
 
         IEnumerable<IssueExport> filtered = all;
-        if (r.ScopeType == "user" && !string.IsNullOrEmpty(r.ScopeValue))
-            filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => string.Equals(a, r.ScopeValue, StringComparison.OrdinalIgnoreCase)));
-        else if (r.ScopeType == "team" && !string.IsNullOrEmpty(r.ScopeValue))
+        // Store partagé → on filtre par périmètre. Store PERSO → déjà scopé à l'extraction, aucun filtre assignee.
+        if (!perUser)
         {
-            cfg.Export.Teams.TryGetValue(r.ScopeValue, out var members);
-            var set = new HashSet<string>(members ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => set.Contains(a)));
+            if (r.ScopeType == "user" && !string.IsNullOrEmpty(r.ScopeValue))
+                filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => string.Equals(a, r.ScopeValue, StringComparison.OrdinalIgnoreCase)));
+            else if (r.ScopeType == "team" && !string.IsNullOrEmpty(r.ScopeValue))
+            {
+                cfg.Export.Teams.TryGetValue(r.ScopeValue, out var members);
+                var set = new HashSet<string>(members ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => set.Contains(a)));
+            }
         }
         if (r.Milestones.Count > 0)
         {

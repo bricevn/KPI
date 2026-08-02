@@ -281,6 +281,61 @@ public static class ExportPipeline
         // NB (Phase 3) : CSV par serveur/projet + vues HTML d'export restent à brancher sur ce chemin.
     }
 
+    /// <summary>
+    /// Extraction SCOPÉE par utilisateur (Phase B) : ne récupère QUE les issues assignées à <paramref name="assignees"/>
+    /// (membre = lui-même ; lead = tous les membres de son équipe), et écrit un store PAR UTILISATEUR isolé
+    /// output/&lt;serverId&gt;/users/&lt;login&gt;/ en REMPLACEMENT COMPLET (aucun merge → n'affecte jamais le store partagé).
+    /// </summary>
+    public static async Task RunUserScopedExportAsync(AppConfig config, string userLogin,
+        IReadOnlyList<string> assignees, Action<int, int>? onProgress, CancellationToken ct)
+    {
+        var uniq = assignees.Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (uniq.Count == 0) { Console.WriteLine("[ScopedRefresh] aucun assignee — rien à extraire."); return; }
+
+        foreach (var server in config.ResolveServers())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(server.Id) || string.IsNullOrWhiteSpace(server.BaseUrl) || string.IsNullOrWhiteSpace(server.GroupToken)) continue;
+            var userDir = Path.Combine(config.Export.OutputDirectory, SafeSegment(server.Id), "users", SafeSegment(userLogin));
+            var projectIds = server.ProjectIds is { Count: > 0 } ? server.ProjectIds : await ListProjectsAsync(server, ct);
+            Console.WriteLine($"== Refresh scopé '{userLogin}' ({string.Join(", ", uniq)}) sur '{server.Id}' : {projectIds.Count} projet(s) ==");
+
+            var allIssues = new List<IssueExport>();
+            var labels = new Dictionary<string, GitLabLabel>(StringComparer.OrdinalIgnoreCase);
+            var milestones = new Dictionary<string, GitLabMilestone>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pid in projectIds)
+            {
+                ct.ThrowIfCancellationRequested();
+                var glCfg = new GitLabConfig
+                {
+                    BaseUrl = server.BaseUrl, PrivateToken = server.GroupToken, ProjectId = pid, Milestone = "",
+                    AllowSelfSignedCertificates = server.AllowSelfSignedCertificates, RequestTimeoutSeconds = server.RequestTimeoutSeconds,
+                };
+                using var client = new GitLabClient(glCfg);
+                var service = new ExportService(client, glCfg, config.Export);
+                try { foreach (var m in await client.GetProjectMilestonesAsync(ct)) if (!string.IsNullOrEmpty(m.Title)) milestones[m.Title] = m; }
+                catch (Exception ex) { Console.WriteLine($"     [warn] milestones projet {pid} : {ex.Message}"); }
+                // Union des issues sur tous les assignees (l'API GitLab filtre un assignee à la fois).
+                var byIid = new Dictionary<long, Kpi.GitLab.Models.GitLabIssue>();
+                foreach (var assignee in uniq)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    foreach (var i in await client.GetIssuesByMilestoneAsync("", ct, assignee)) byIid[i.Iid] = i;
+                }
+                allIssues.AddRange(await service.BuildExportsFromIssuesAsync(byIid.Values.ToList(), ct, onProgress));
+                try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
+                catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
+            }
+
+            allIssues = allIssues.OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(userDir, "issues.json"), JsonSerializer.Serialize(allIssues, _storeJson), ct);
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(userDir, "labels.json"), JsonSerializer.Serialize(labels.Values.ToList(), _storeJson), ct);
+            await SecureStore.WriteEncryptedAsync(server.Id, Path.Combine(userDir, "milestones.json"), JsonSerializer.Serialize(milestones.Values.ToList(), _storeJson), ct);
+            Console.WriteLine($"  -> {allIssues.Count} issues scopées chiffrées dans {userDir}/");
+        }
+    }
+
     /// <summary>Liste les projets accessibles au token de groupe d'un serveur (id numériques, en chaîne).</summary>
     private static async Task<List<string>> ListProjectsAsync(ServerConfig server, CancellationToken ct)
     {
@@ -316,7 +371,7 @@ public static class ExportPipeline
         return null;
     }
 
-    private static string SafeSegment(string s)
+    internal static string SafeSegment(string s)
     {
         var arr = (s ?? "").Trim().Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_').ToArray();
         var r = new string(arr);

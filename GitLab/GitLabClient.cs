@@ -43,19 +43,13 @@ public sealed class GitLabClient : IDisposable
         _projectIdEncoded = HttpUtility.UrlEncode(config.ProjectId);
     }
 
-    public async Task<List<GitLabIssue>> GetIssuesByMilestoneAsync(string? milestone, CancellationToken ct)
+    public async Task<List<GitLabIssue>> GetIssuesByMilestoneAsync(string? milestone, CancellationToken ct, string? assigneeUsername = null)
     {
-        // milestone null/vide = fetcher TOUTES les issues du projet (toutes milestones confondues).
-        string path;
-        if (string.IsNullOrWhiteSpace(milestone))
-        {
-            path = $"projects/{_projectIdEncoded}/issues?scope=all&per_page=100";
-        }
-        else
-        {
-            var encoded = HttpUtility.UrlEncode(milestone);
-            path = $"projects/{_projectIdEncoded}/issues?milestone={encoded}&scope=all&per_page=100";
-        }
+        // milestone null/vide = TOUTES les issues du projet. assigneeUsername renseigné = extraction SCOPÉE
+        // (issues assignées à cet utilisateur) — utilisé pour le refresh par rôle (membre/lead).
+        var path = $"projects/{_projectIdEncoded}/issues?scope=all&per_page=100";
+        if (!string.IsNullOrWhiteSpace(milestone)) path += "&milestone=" + HttpUtility.UrlEncode(milestone);
+        if (!string.IsNullOrWhiteSpace(assigneeUsername)) path += "&assignee_username=" + HttpUtility.UrlEncode(assigneeUsername);
         return await GetAllPagesAsync<GitLabIssue>(path, ct);
     }
 

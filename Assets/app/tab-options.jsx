@@ -718,9 +718,32 @@
     };
     const doCancel = () => {fetch('/api/cancel', { method: 'POST' }).catch(() => {});};
     const regenBusy = refreshState === 'busy';
+    // Non-admin (Phase B) : rafraîchir SON périmètre — POST /api/refresh sans corps → le serveur scope
+    // selon le rôle (membre = ses issues, lead = son équipe) et écrit un store perso.
+    const doMyRefresh = () => {
+      setRefreshState('busy'); setProg(null);
+      fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then((r) => { if (r.ok || r.status === 409) startPoll(); else setRefreshState('err'); })
+        .catch(() => setRefreshState('err'));
+    };
 
     return (
       <div style={{ maxWidth: 860 }}>
+        {!isAdmin &&
+        <div className="opt-sec">
+          <h3>{window.t('opt.myData')}</h3>
+          <p className="lead">{window.t('opt.myDataLead')}</p>
+          {!regenBusy &&
+          <div className="opt-row"><div className="lbl"></div>
+            <button className="btn btn-primary" onClick={doMyRefresh}>{window.ICONS.refresh} {window.t('opt.myRefresh')}</button></div>}
+          {regenBusy &&
+          <div className="opt-row">
+            <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
+            <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
+          </div>}
+          {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.refreshDone')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+          {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
+        </div>}
         <div className="opt-sec">
           <h3>{window.t('opt.appearance')}</h3>
           <p className="lead">{window.t('opt.appearanceLead')}</p>
