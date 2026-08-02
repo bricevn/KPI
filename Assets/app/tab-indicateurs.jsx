@@ -3,14 +3,12 @@
 // window.APP (GitLab, filtré par les pills) et window.__CANNY__ (Canny, global). Ordre = liste produit.
 // Regression Rate volontairement OMIS (à ignorer pour l'instant).
 //
-// ⚠️ Libellés GitLab NON confirmés (données chiffrées) → matchés par MOT-CLÉ (robuste quel que soit le
-//    préfixe Prio::/Type::) : 'critical' (MTTR) et 'refactor' (Refactoring). À figer quand confirmés.
-//    'unplanned' et 'contractual' = labels transversaux (match exact).
+// Labels GitLab CONFIRMÉS (match EXACT, insensible à la casse) : « Unplanned », « Type::Client Bug »,
+// « PRIO::Critical », « Type::Refactor ». MTTR = PRIO::Critical ET Type::Client Bug (les deux).
 (function () {
   // Verdict : plus HAUT = mieux (up) ou plus BAS = mieux (down, seuils = maxima acceptables).
   const colorUp = (pct) => pct >= 85 ? 'var(--color-good)' : pct >= 70 ? 'var(--color-warn)' : 'var(--color-bad)';
   const colorDown = (pct, good, warn) => pct <= good ? 'var(--color-good)' : pct <= warn ? 'var(--color-warn)' : 'var(--color-bad)';
-  const hasKw = (d, kw) => (d.labels || []).some((l) => String(l).toLowerCase().indexOf(kw) >= 0);
   const hasExact = (d, name) => (d.labels || []).some((l) => String(l).toLowerCase() === name);
   const hours = (a, b) => (new Date(b).getTime() - new Date(a).getTime()) / 3600000;
 
@@ -187,21 +185,21 @@
     card('patch', 'badge-check', t('kpi.patchTitle'), patchPct, bugs.length > 0, colorUp(patchPct),
       F(patchOk, t('kpi.zeroReturn'), bugs.length, t('kpi.bugsClosed')), t('kpi.patchInfo'));
 
-    // 5. Bug Resolution — Client Bug fermés en ≤ 72h.
-    const cb = det.filter((d) => d.type === 'clientbug' && d.state === 'closed' && d.createdAt && d.closedAt);
+    // 5. Bug Resolution — issues « Type::Client Bug » fermées en ≤ 72h (création → fermeture).
+    const cb = det.filter((d) => hasExact(d, 'type::client bug') && d.state === 'closed' && d.createdAt && d.closedAt);
     const cbOk = cb.filter((d) => hours(d.createdAt, d.closedAt) <= 72).length;
     const cbPct = cb.length ? Math.round(cbOk / cb.length * 100) : 0;
     card('bugres', 'gauge', t('kpi.bugResTitle'), cbPct, cb.length > 0, colorUp(cbPct), F(cbOk, '≤72h', cb.length, t('kpi.clientBugs')), t('kpi.bugResInfo'));
 
-    // 6. MTTR — Critical + Client Bug fermés en ≤ 48h.
+    // 6. MTTR — issues « PRIO::Critical » ET « Type::Client Bug » fermées en ≤ 48h.
     const crit = det.filter((d) => d.state === 'closed' && d.createdAt && d.closedAt
-      && hasKw(d, 'critical') && (d.type === 'clientbug' || hasKw(d, 'client bug')));
+      && hasExact(d, 'prio::critical') && hasExact(d, 'type::client bug'));
     const critOk = crit.filter((d) => hours(d.createdAt, d.closedAt) <= 48).length;
     const mttrPct = crit.length ? Math.round(critOk / crit.length * 100) : 0;
     card('mttr', 'clock', t('kpi.mttrTitle'), mttrPct, crit.length > 0, colorUp(mttrPct), F(critOk, '≤48h', crit.length, t('kpi.critBugs')), t('kpi.mttrInfo'));
 
-    // 7. Refactoring — part des issues « Refactor » (cible < 20%, plus bas mieux).
-    const refac = det.filter((d) => hasKw(d, 'refactor')).length;
+    // 7. Refactoring — part des issues « Type::Refactor » sur le total (cible < 20%, plus bas mieux).
+    const refac = det.filter((d) => hasExact(d, 'type::refactor')).length;
     const rfPct = det.length ? Math.round(refac / det.length * 100) : 0;
     card('refactor', 'activity', t('kpi.refactorTitle'), rfPct, det.length > 0, colorDown(rfPct, 20, 30),
       F(refac, t('kpi.refactorIssues'), det.length, t('kpi.ofIssues')), t('kpi.refactorInfo'));
