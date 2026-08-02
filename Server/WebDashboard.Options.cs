@@ -307,6 +307,10 @@ public sealed partial class WebDashboard
                 teams[name] = arr;
             }
             ex["Teams"] = teams;
+            // Rôles LEAD : chaque équipe (lead = 1er membre, ordering client via orderTeam) → compte 'group'
+            // dans accounts.json, lu par ResolveAccount pour donner à ce membre le rôle lead (scope équipe).
+            // Les autres membres retombent en scope individuel (auto-provision). Préserve comptes 'user' + vues.
+            await WriteTeamLeadAccountsAsync(teams);
         }
         // Équipes PAR PROJET : { "projectId": [ {name, members:[username]} ] } → { name → members } par projet.
         // N'écrit QUE si transmis (sinon préserve l'existant).
@@ -353,6 +357,47 @@ public sealed partial class WebDashboard
     // POST /api/options/canny { apiKey, subdomain? } → connexion externe Canny (ADMIN). Valide la clé auprès
     // de l'API Canny AVANT de la chiffrer/persister (enc:v1:). Clé vide + clé existante = conservée (permet de
     // modifier le sous-domaine sans re-saisir). La clé n'est JAMAIS renvoyée au client. Hot-reload.
+    // Génère/actualise output/accounts.json à partir des équipes : un compte 'group' par équipe ayant au
+    // moins un membre (subject=équipe, leads=[1er membre]). Préserve les comptes non-'group' (user) + les vues.
+    // C'est ce que ResolveAccount lit pour attribuer le rôle LEAD (scope équipe) au 1er membre de chaque équipe.
+    private async Task WriteTeamLeadAccountsAsync(JsonObject teams)
+    {
+        try
+        {
+            var path = AccountsPath();
+            JsonObject root;
+            try { root = (JsonNode.Parse(await File.ReadAllTextAsync(path)) as JsonObject) ?? new JsonObject(); }
+            catch { root = new JsonObject(); }
+
+            var kept = new JsonArray();
+            if (root["accounts"] is JsonArray existing)
+                foreach (var a in existing)
+                    if (a is JsonObject ao && (ao["type"]?.GetValue<string>() ?? "") != "group")
+                        kept.Add(ao.DeepClone());
+
+            foreach (var kv in teams)
+            {
+                if (kv.Value is not JsonArray members || members.Count == 0) continue;
+                var lead = members[0]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(lead)) continue;
+                kept.Add(new JsonObject
+                {
+                    ["type"] = "group",
+                    ["subject"] = kv.Key,
+                    ["username"] = kv.Key,
+                    ["leads"] = new JsonArray(JsonValue.Create(lead)),
+                    ["viewId"] = "",
+                });
+            }
+            root["accounts"] = kept;
+            root["views"] ??= new JsonArray();
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await WriteFileAtomicAsync(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception e) { Console.Error.WriteLine("WriteTeamLeadAccounts KO : " + e); }
+    }
+
     private async Task<IResult> SaveCannyAsync(HttpContext ctx)
     {
         var deny = RequireAdmin(ctx); if (deny != null) return deny;
