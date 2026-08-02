@@ -74,6 +74,27 @@
     );
   }
 
+  // Une ligne d'issue GitLab (popups des KPI par issue) : badge d'état + #iid/titre (lien) + Type::* +
+  // métrique propre au KPI (rowMeta : délai de résolution, retours, …). base = URL d'issue (A.meta.issueBase).
+  function IssueRow({ d, base, rowMeta }) {
+    const t = window.t;
+    const closed = d.state === 'closed';
+    const typeLbl = (d.labels || []).find((l) => /^type::/i.test(l));
+    const short = typeLbl ? typeLbl.replace(/^type::\s*/i, '') : null;
+    const href = base ? base + d.iid : null;
+    const title = '#' + d.iid + ' ' + (d.title || '');
+    return (
+      <div className="ackp-row">
+        <span className={'st-badge ' + (closed ? 'st-closed' : 'st-open')}><span className="sd"></span>{closed ? t('common.closedF') : t('common.openF')}</span>
+        {href
+          ? <a className="ackp-title" href={href} target="_blank" rel="noreferrer">{title}</a>
+          : <span className="ackp-title">{title}</span>}
+        {short && <span className="ackp-author">{short}</span>}
+        <span className="ackp-resp">{rowMeta ? rowMeta(d) : null}</span>
+      </div>
+    );
+  }
+
   window.TabIndicateurs = function TabIndicateurs() {
     const A = window.APP || {};
     const CANNY = window.__CANNY__ || null;
@@ -83,14 +104,26 @@
     const K = window.Kard;
     const [rmOpen, setRmOpen] = React.useState(false);
     const [ackOpen, setAckOpen] = React.useState(false);
+    const [issModal, setIssModal] = React.useState(null); // { title, issues, rowMeta } | null
 
     const cards = [];
     const F = (a, aw, b, bw) => <span><b>{a}</b> {aw} · <b>{b}</b> {bw}</span>;
-    function card(key, icon, title, pct, has, barColor, footer, info) {
-      // Sans données : couleur NEUTRE (pas de faux verdict good/bad) + barre vide.
+    const base = (A.meta || {}).issueBase || '';
+    const good = 'var(--color-good)', bad = 'var(--color-bad)';
+    // Tris des listes d'issues : ouvertes d'abord (puis iid décroissant), ou par délai de résolution décroissant.
+    const byOpenFirst = (a, b) => (a.state === b.state ? b.iid - a.iid : (a.state === 'open' ? -1 : 1));
+    const byTimeDesc = (a, b) => hours(b.createdAt, b.closedAt) - hours(a.createdAt, a.closedAt);
+    // Métrique « délai de résolution » colorée selon un seuil (heures création → fermeture).
+    const timeMeta = (limit) => (d) => { const h = hours(d.createdAt, d.closedAt); return <b style={{ color: h <= limit ? good : bad }}>{h.toFixed(1)}h</b>; };
+    // Carte KPI. `issues` (optionnel) → carte CLIQUABLE ouvrant la liste des issues concernées ; `rowMeta` =
+    // rendu de la colonne de droite par issue dans le popup.
+    function card(key, icon, title, pct, has, barColor, footer, info, issues, rowMeta) {
       const col = has ? barColor : 'var(--color-neutral)';
+      const list = issues || [];
+      const clickable = list.length > 0;
       cards.push(<K key={key} icon={icon} iconColor={col} title={title} info={info}
-        value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer} />);
+        value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer}
+        popup={clickable ? true : null} onOpen={clickable ? () => setIssModal({ title, issues: list, rowMeta }) : undefined} />);
     }
 
     // 1. Roadmap Adherence — sujets roadmap « [N] » corrélés à GitLab. Adhérent = statut Canny « complete »
@@ -173,36 +206,42 @@
     }
 
     // 3. Unplanned Work — part des issues « Unplanned » (cible < 15%, plus bas mieux).
-    const unpl = det.filter((d) => hasExact(d, 'unplanned')).length;
-    const upPct = det.length ? Math.round(unpl / det.length * 100) : 0;
+    const unplIssues = det.filter((d) => hasExact(d, 'unplanned'));
+    const upPct = det.length ? Math.round(unplIssues.length / det.length * 100) : 0;
     card('unplanned', 'alert-triangle', t('kpi.unplannedTitle'), upPct, det.length > 0, colorDown(upPct, 15, 25),
-      F(unpl, t('kpi.unplannedIssues'), det.length, t('kpi.ofIssues')), t('kpi.unplannedInfo'));
+      F(unplIssues.length, t('kpi.unplannedIssues'), det.length, t('kpi.ofIssues')), t('kpi.unplannedInfo'),
+      unplIssues.slice().sort(byOpenFirst));
 
     // 4. Patch Success — bugs fermés avec 0 aller-retour QA (retours === 0).
     const bugs = det.filter((d) => (d.type === 'bug' || d.type === 'clientbug') && d.state === 'closed');
     const patchOk = bugs.filter((d) => d.retours === 0).length;
     const patchPct = bugs.length ? Math.round(patchOk / bugs.length * 100) : 0;
     card('patch', 'badge-check', t('kpi.patchTitle'), patchPct, bugs.length > 0, colorUp(patchPct),
-      F(patchOk, t('kpi.zeroReturn'), bugs.length, t('kpi.bugsClosed')), t('kpi.patchInfo'));
+      F(patchOk, t('kpi.zeroReturn'), bugs.length, t('kpi.bugsClosed')), t('kpi.patchInfo'),
+      bugs.slice().sort((a, b) => b.retours - a.retours),
+      (d) => <b style={{ color: d.retours === 0 ? good : bad }}>{d.retours} {t('kpi.returns')}</b>);
 
     // 5. Bug Resolution — issues « Type::Client Bug » fermées en ≤ 72h (création → fermeture).
     const cb = det.filter((d) => hasExact(d, 'type::client bug') && d.state === 'closed' && d.createdAt && d.closedAt);
     const cbOk = cb.filter((d) => hours(d.createdAt, d.closedAt) <= 72).length;
     const cbPct = cb.length ? Math.round(cbOk / cb.length * 100) : 0;
-    card('bugres', 'gauge', t('kpi.bugResTitle'), cbPct, cb.length > 0, colorUp(cbPct), F(cbOk, '≤72h', cb.length, t('kpi.clientBugs')), t('kpi.bugResInfo'));
+    card('bugres', 'gauge', t('kpi.bugResTitle'), cbPct, cb.length > 0, colorUp(cbPct), F(cbOk, '≤72h', cb.length, t('kpi.clientBugs')), t('kpi.bugResInfo'),
+      cb.slice().sort(byTimeDesc), timeMeta(72));
 
     // 6. MTTR — issues « PRIO::Critical » ET « Type::Client Bug » fermées en ≤ 48h.
     const crit = det.filter((d) => d.state === 'closed' && d.createdAt && d.closedAt
       && hasExact(d, 'prio::critical') && hasExact(d, 'type::client bug'));
     const critOk = crit.filter((d) => hours(d.createdAt, d.closedAt) <= 48).length;
     const mttrPct = crit.length ? Math.round(critOk / crit.length * 100) : 0;
-    card('mttr', 'clock', t('kpi.mttrTitle'), mttrPct, crit.length > 0, colorUp(mttrPct), F(critOk, '≤48h', crit.length, t('kpi.critBugs')), t('kpi.mttrInfo'));
+    card('mttr', 'clock', t('kpi.mttrTitle'), mttrPct, crit.length > 0, colorUp(mttrPct), F(critOk, '≤48h', crit.length, t('kpi.critBugs')), t('kpi.mttrInfo'),
+      crit.slice().sort(byTimeDesc), timeMeta(48));
 
     // 7. Refactoring — part des issues « Type::Refactor » sur le total (cible < 20%, plus bas mieux).
-    const refac = det.filter((d) => hasExact(d, 'type::refactor')).length;
-    const rfPct = det.length ? Math.round(refac / det.length * 100) : 0;
+    const refacIssues = det.filter((d) => hasExact(d, 'type::refactor'));
+    const rfPct = det.length ? Math.round(refacIssues.length / det.length * 100) : 0;
     card('refactor', 'activity', t('kpi.refactorTitle'), rfPct, det.length > 0, colorDown(rfPct, 20, 30),
-      F(refac, t('kpi.refactorIssues'), det.length, t('kpi.ofIssues')), t('kpi.refactorInfo'));
+      F(refacIssues.length, t('kpi.refactorIssues'), det.length, t('kpi.ofIssues')), t('kpi.refactorInfo'),
+      refacIssues.slice().sort(byOpenFirst));
 
     // 8. Say/Do Ratio — roadmap Canny livré / prévu (cible > 85%). Proxy = validation roadmap.
     if (agg.roadmapValidation) {
@@ -239,6 +278,15 @@
             {ackRows && ackRows.length
               ? <div className="ackp-list">{ackRows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
               : <p className="empty">{t('kpi.ackNoDetail')}</p>}
+          </window.Modal>
+        )}
+
+        {issModal && (
+          <window.Modal title={issModal.title} subtitle={issModal.issues.length + ' ' + t('kpi.issuesConcerned')}
+            wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setIssModal(null)}>
+            <div className="ackp-list">
+              {issModal.issues.map((d) => <IssueRow key={d.iid} d={d} base={base} rowMeta={issModal.rowMeta} />)}
+            </div>
           </window.Modal>
         )}
       </div>
