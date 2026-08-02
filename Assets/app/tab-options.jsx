@@ -601,6 +601,137 @@
       </div>);
   }
 
+  // Connexion externe CANNY (feedback / roadmap) : saisir/valider la clé API (POST /api/options/canny,
+  // testée côté serveur) puis lancer l'extraction (POST /api/refresh-canny, suivi via /api/canny-status).
+  // La clé n'est jamais renvoyée au client. Réservé aux admins.
+  function CannyConfigEditor() {
+    const C = ((window.__DATA__ || {}).setup || {}).canny || {};
+    const [apiKey, setApiKey] = useState('');
+    const [connected, setConnected] = useState(!!C.connected);
+    const lastExtracted = C.lastExtracted || '';
+    const [st, setSt] = useState('idle'); // connexion : idle | busy | done | err
+    const [err, setErr] = useState('');
+    const [refreshState, setRefreshState] = useState('idle'); // extraction : idle | busy | done | err
+    const pollRef = React.useRef(null);
+    const stopPoll = () => {if (pollRef.current) {clearInterval(pollRef.current);pollRef.current = null;}};
+    const startPoll = () => {
+      stopPoll();
+      pollRef.current = setInterval(() => {
+        fetch('/api/canny-status').then((r) => r.json()).then((s) => {
+          if (!s.running) {stopPoll();setRefreshState(s.lastError ? 'err' : 'done');if (s.lastError) setErr(s.lastError);}
+        }).catch(() => {});
+      }, 1500);
+    };
+    React.useEffect(() => {
+      fetch('/api/canny-status').then((r) => r.json()).then((s) => {if (s.running) {setRefreshState('busy');startPoll();}}).catch(() => {});
+      return stopPoll;
+    }, []);
+    const connect = () => {
+      setSt('busy');setErr('');
+      fetch('/api/options/canny', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey }) })
+        .then((r) => r.json()).then((j) => {if (j.ok) {setSt('done');setConnected(!!j.connected);setApiKey('');} else {setSt('err');setErr(j.error || '');}})
+        .catch(() => {setSt('err');setErr('');});
+    };
+    const refresh = () => {
+      setRefreshState('busy');setErr('');
+      fetch('/api/refresh-canny', { method: 'POST' })
+        .then((r) => {if (r.ok || r.status === 409) startPoll();else setRefreshState('err');})
+        .catch(() => setRefreshState('err'));
+    };
+    const busy = refreshState === 'busy';
+    const keyStyle = Object.assign({}, selStyle, { width: 300, fontFamily: 'var(--mono, monospace)' });
+    return (
+      <div className="opt-sec">
+        <h3>{window.t('opt.cannyTitle')}</h3>
+        <p className="lead">{window.t('opt.cannyLead')}</p>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyStatus')}<span>{connected ? (lastExtracted ? window.t('opt.cannyLast') + ' ' + lastExtracted : window.t('opt.cannyNoData')) : window.t('opt.cannyNotConnected')}</span></div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: connected ? 'var(--c-good,#2f9e44)' : 'var(--ink-dim,#888)' }}>{connected ? window.t('opt.cannyConnected') : '—'}</span>
+        </div>
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyKey')}<span>{window.t('opt.cannyKeySub')}</span></div>
+          <input style={keyStyle} type="password" value={apiKey} placeholder={connected ? '••••••••' : ''} autoComplete="off" onChange={(e) => setApiKey(e.target.value)} />
+          <button className="btn" disabled={st === 'busy' || (!apiKey && !connected)} onClick={connect}>{window.t('opt.cannyConnect')}</button>
+        </div>
+        {connected &&
+        <div className="opt-row">
+          <div className="lbl">{window.t('opt.cannyRefresh')}<span>{window.t('opt.cannyRefreshSub')}</span></div>
+          <button className="btn btn-primary" disabled={busy} onClick={refresh}>{window.ICONS.refresh} {busy ? window.t('opt.cannyRefreshing') : window.t('opt.cannyRefreshBtn')}</button>
+        </div>}
+        {st === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.cannySaved')}</p>}
+        {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.cannyDone')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+        {(st === 'err' || refreshState === 'err') && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{err || window.t('opt.refreshError')}</p>}
+      </div>);
+  }
+
+  // Listes « Acknowledge Time » : auteurs CONCERNÉS + répondeurs AUTORISÉS, cochés depuis les utilisateurs
+  // Canny (window.__CANNY__.users). Recalcul LIVE du KPI : à la sauvegarde on met à jour window.__ACKCFG__
+  // (l'onglet Indicateurs recalcule au prochain rendu, sans ré-extraction).
+  function AckConfigEditor() {
+    const users = ((window.__CANNY__ || {}).users) || [];
+    const cfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
+    const [authors, setAuthors] = useState(() => new Set(cfg.authorIds || []));
+    const [responders, setResponders] = useState(() => new Set(cfg.responderIds || []));
+    const [qA, setQA] = useState('');
+    const [qR, setQR] = useState('');
+    const [st, setSt] = useState('idle');
+    const [err, setErr] = useState('');
+    if (!users.length) return null; // Canny non extrait → aucune personne à lister
+
+    const label = (u) => u.name || u.email || u.id;
+    const match = (u, q) => { q = q.trim().toLowerCase(); return !q || (label(u) + ' ' + (u.email || '')).toLowerCase().indexOf(q) >= 0; };
+    const toggle = (setFn) => (id) => setFn((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    const sortU = (a, b) => (a.isAdmin === b.isAdmin ? label(a).localeCompare(label(b)) : (a.isAdmin ? -1 : 1));
+    const save = () => {
+      setSt('busy'); setErr('');
+      const body = { authorIds: Array.from(authors), responderIds: Array.from(responders) };
+      fetch('/api/options/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then((r) => r.json()).then((j) => {
+          if (j.ok) { setSt('done'); window.__ACKCFG__ = { authorIds: j.authorIds || [], responderIds: j.responderIds || [] }; }
+          else { setSt('err'); setErr(j.error || ''); }
+        }).catch(() => { setSt('err'); setErr(''); });
+    };
+    const picker = (sel, setSel, q, setQ, onlyAdmins) => {
+      const list = users.filter((u) => (!onlyAdmins || u.isAdmin) && match(u, q)).sort(sortU);
+      return (
+        <div className="ack-picker">
+          <input className="ack-search" placeholder={window.t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="ack-list">
+            {list.map((u) => (
+              <label key={u.id} className={'ack-item' + (sel.has(u.id) ? ' on' : '')}>
+                <input type="checkbox" checked={sel.has(u.id)} onChange={() => toggle(setSel)(u.id)} />
+                <span className="ack-name">{label(u)}{u.isAdmin && <span className="ack-badge">admin</span>}</span>
+                {u.email && u.email !== label(u) && <span className="ack-email">{u.email}</span>}
+              </label>
+            ))}
+            {!list.length && <div className="muted" style={{ padding: '8px 10px' }}>{window.t('common.none')}</div>}
+          </div>
+          <div className="ack-count">{sel.size} {window.t('opt.ackSelected')}</div>
+        </div>
+      );
+    };
+    return (
+      <div className="opt-sec">
+        <h3>{window.t('opt.ackTitle')}</h3>
+        <p className="lead">{window.t('opt.ackLead')}</p>
+        <div className="opt-row" style={{ alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="lbl">{window.t('opt.ackAuthors')}<span>{window.t('opt.ackAuthorsSub')}</span></div>
+            {picker(authors, setAuthors, qA, setQA, false)}
+          </div>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="lbl">{window.t('opt.ackResponders')}<span>{window.t('opt.ackRespondersSub')}</span></div>
+            {picker(responders, setResponders, qR, setQR, true)}
+          </div>
+        </div>
+        <div className="opt-row" style={{ justifyContent: 'flex-end', gap: 12 }}>
+          {st === 'done' && <span className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.ackApplied')}</span>}
+          {st === 'err' && <span className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{err || window.t('opt.saveError')}</span>}
+          <button className="btn btn-primary" disabled={st === 'busy'} onClick={save}>{window.t('opt.save')}</button>
+        </div>
+      </div>);
+  }
+
   // ===================== ONGLET =====================
   window.TabOptions = function TabOptions({ theme, setTheme, appearance }) {
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
@@ -655,9 +786,32 @@
     };
     const doCancel = () => {fetch('/api/cancel', { method: 'POST' }).catch(() => {});};
     const regenBusy = refreshState === 'busy';
+    // Non-admin (Phase B) : rafraîchir SON périmètre — POST /api/refresh sans corps → le serveur scope
+    // selon le rôle (membre = ses issues, lead = son équipe) et écrit un store perso.
+    const doMyRefresh = () => {
+      setRefreshState('busy'); setProg(null);
+      fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then((r) => { if (r.ok || r.status === 409) startPoll(); else setRefreshState('err'); })
+        .catch(() => setRefreshState('err'));
+    };
 
     return (
       <div style={{ maxWidth: 860 }}>
+        {!isAdmin &&
+        <div className="opt-sec">
+          <h3>{window.t('opt.myData')}</h3>
+          <p className="lead">{window.t('opt.myDataLead')}</p>
+          {!regenBusy &&
+          <div className="opt-row"><div className="lbl"></div>
+            <button className="btn btn-primary" onClick={doMyRefresh}>{window.ICONS.refresh} {window.t('opt.myRefresh')}</button></div>}
+          {regenBusy &&
+          <div className="opt-row">
+            <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
+            <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
+          </div>}
+          {refreshState === 'done' && <p className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.refreshDone')} <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => window.location.reload()}>{window.t('opt.reload')}</button></p>}
+          {refreshState === 'err' && <p className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{window.t('opt.refreshError')}</p>}
+        </div>}
         <div className="opt-sec">
           <h3>{window.t('opt.appearance')}</h3>
           <p className="lead">{window.t('opt.appearanceLead')}</p>
@@ -721,7 +875,19 @@
             <div className="lbl"></div>
             <button className="btn btn-primary" onClick={doRefresh}>{window.ICONS.refresh} {window.t('opt.refresh')}</button>
           </div>}
-          {regenBusy &&
+          {regenBusy && prog && prog.milestones && prog.milestones.length > 0 &&
+          <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+            {prog.milestones.map((m) =>
+            <div key={m.name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="lbl" style={{ minWidth: 220, flex: 'none' }}>{window.t('opt.milestone')} {m.name}<span>{m.current}/{m.total || 0} {window.t('issues')}</span></div>
+              <div className={'opt-progress' + (m.total > 0 ? '' : ' ind')} style={{ flex: 1 }}><i style={{ width: (m.total > 0 ? Math.min(100, Math.round(m.current / m.total * 100)) : 12) + '%' }}></i></div>
+            </div>)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
+              <span className="muted" style={{ fontSize: 'var(--text-caption,12px)' }}>{prog.milestones.reduce((s, m) => s + (m.current || 0), 0)} / {prog.milestones.reduce((s, m) => s + (m.total || 0), 0)} {window.t('issues')} {window.t('opt.total')}</span>
+              <button className="btn btn-sm" onClick={doCancel}>{window.t('opt.cancel')}</button>
+            </div>
+          </div>}
+          {regenBusy && (!prog || !prog.milestones || prog.milestones.length === 0) &&
           <div className="opt-row">
             <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
             <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
@@ -733,6 +899,10 @@
         </div>}
 
         {isAdmin && <WorkTimeEditor lang={appearance.lang} />}
+
+        {isAdmin && <CannyConfigEditor />}
+
+        {isAdmin && <AckConfigEditor />}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
       </div>);

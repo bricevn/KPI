@@ -43,19 +43,13 @@ public sealed class GitLabClient : IDisposable
         _projectIdEncoded = HttpUtility.UrlEncode(config.ProjectId);
     }
 
-    public async Task<List<GitLabIssue>> GetIssuesByMilestoneAsync(string? milestone, CancellationToken ct)
+    public async Task<List<GitLabIssue>> GetIssuesByMilestoneAsync(string? milestone, CancellationToken ct, string? assigneeUsername = null)
     {
-        // milestone null/vide = fetcher TOUTES les issues du projet (toutes milestones confondues).
-        string path;
-        if (string.IsNullOrWhiteSpace(milestone))
-        {
-            path = $"projects/{_projectIdEncoded}/issues?scope=all&per_page=100";
-        }
-        else
-        {
-            var encoded = HttpUtility.UrlEncode(milestone);
-            path = $"projects/{_projectIdEncoded}/issues?milestone={encoded}&scope=all&per_page=100";
-        }
+        // milestone null/vide = TOUTES les issues du projet. assigneeUsername renseigné = extraction SCOPÉE
+        // (issues assignées à cet utilisateur) — utilisé pour le refresh par rôle (membre/lead).
+        var path = $"projects/{_projectIdEncoded}/issues?scope=all&per_page=100";
+        if (!string.IsNullOrWhiteSpace(milestone)) path += "&milestone=" + HttpUtility.UrlEncode(milestone);
+        if (!string.IsNullOrWhiteSpace(assigneeUsername)) path += "&assignee_username=" + HttpUtility.UrlEncode(assigneeUsername);
         return await GetAllPagesAsync<GitLabIssue>(path, ct);
     }
 
@@ -92,6 +86,42 @@ public sealed class GitLabClient : IDisposable
         resp.EnsureSuccessStatusCode();
         await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         return await JsonSerializer.DeserializeAsync<GitLabApprovals>(stream, _jsonOptions, ct);
+    }
+
+    // ---- Adhérence roadmap : épics de GROUPE + issues par chemin ARBITRAIRE ----------------------
+    // Les liens Canny→GitLab pointent des épics (/groups/<grp>/-/epics/N) et des issues de projets
+    // divers (/<projet>/-/issues/N), hors du projet configuré. On cible donc le chemin explicitement.
+    // Le GroupToken (read_api) couvre le groupe et ses projets. Tolérant : 404/403 → null/vide (épic
+    // supprimé, ou plan sans épics) plutôt qu'une exception qui ferait tomber toute l'extraction.
+
+    /// <summary>Épic de groupe (état + titre). null si absent/inaccessible.</summary>
+    public async Task<GitLabEpic?> GetGroupEpicAsync(string groupPath, long epicIid, CancellationToken ct)
+    {
+        var path = $"groups/{HttpUtility.UrlEncode(groupPath)}/epics/{epicIid}";
+        using var resp = await _http.GetAsync(path, ct);
+        if (resp.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden) return null;
+        resp.EnsureSuccessStatusCode();
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+        return await JsonSerializer.DeserializeAsync<GitLabEpic>(stream, _jsonOptions, ct);
+    }
+
+    /// <summary>Issues rattachées à un épic de groupe (tous projets confondus). Vide si inaccessible.</summary>
+    public async Task<List<GitLabIssue>> GetGroupEpicIssuesAsync(string groupPath, long epicIid, CancellationToken ct)
+    {
+        var path = $"groups/{HttpUtility.UrlEncode(groupPath)}/epics/{epicIid}/issues?per_page=100";
+        try { return await GetAllPagesAsync<GitLabIssue>(path, ct); }
+        catch (HttpRequestException ex) { Console.Error.WriteLine($"  [warn] issues de l'épic {groupPath}&{epicIid} indisponibles : {ex.Message}"); return new(); }
+    }
+
+    /// <summary>Une issue d'un projet ciblé par son CHEMIN (namespace/projet). null si absente/inaccessible.</summary>
+    public async Task<GitLabIssue?> GetIssueByRefAsync(string projectPath, long iid, CancellationToken ct)
+    {
+        var path = $"projects/{HttpUtility.UrlEncode(projectPath)}/issues/{iid}";
+        using var resp = await _http.GetAsync(path, ct);
+        if (resp.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden) return null;
+        resp.EnsureSuccessStatusCode();
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+        return await JsonSerializer.DeserializeAsync<GitLabIssue>(stream, _jsonOptions, ct);
     }
 
     public async Task<List<GitLabLabel>> GetProjectLabelsAsync(CancellationToken ct)

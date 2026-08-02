@@ -1,7 +1,7 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
-  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
+  const NAV_IDS = ['indicateurs', 'dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
 
@@ -72,6 +72,7 @@
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
     const TabComp = {
+      indicateurs: window.TabIndicateurs,
       dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
       issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
     }[tab];
@@ -110,6 +111,8 @@
     // Filtrage réel : on ne garde de fMilestone que les VRAIES milestones (le sentinel « Tout le projet »
     // n'en est pas une → []=toutes). Reconstruit window.APP EN PLACE (mémoïsé par signature).
     const realMs = fMilestone.filter((m) => ((A.filterOptions || {}).milestones || []).indexOf(m) >= 0);
+    // Milestones actives exposées au KPI Roadmap Adherence (corrélation milestone ↔ roadmap Canny par NOM).
+    window.__activeMilestones = realMs;
     if (window.__applyFilters) window.__applyFilters({ milestones: realMs, labels: fLabel, teams: fTeam, users: fUser });
 
     return (
@@ -122,7 +125,7 @@
           <div className="sb-h">{window.t('pilotage')}</div>
           <nav className="sb-nav">
             {NAV_IDS.map((id) =>
-            <button key={id} className={'sb-item' + (tab === id ? ' on' : '')} onClick={() => setTab(id)}>
+            <button key={id} className={'sb-item' + (tab === id ? ' on' : '')} onClick={() => setTab(id)} data-tip={window.t('navdesc_' + id)}>
                 {window.ICONS[id]}<span>{window.t('nav_' + id)}</span>
                 {id === 'anomalies' && <span className="badge">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
                 {id === 'issues' && <span className="cnt">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
@@ -130,8 +133,8 @@
             )}
           </nav>
           <div className="sb-sp"></div>
-          <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} title={window.t('nav_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
-          <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} title={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
+          <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} data-tip={window.t('navdesc_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
+          <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} data-tip={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
           <button className="sb-collapse" onClick={() => setSbCollapsed((c) => !c)} title={sbCollapsed ? window.t('expandT') : window.t('reduceT')}>
             <span className="sb-collapse-ic">{window.ICONS.chevron}</span><span>{window.t('reduce')}</span>
           </button>

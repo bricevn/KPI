@@ -1,0 +1,118 @@
+/* ============================================================================
+   kcard.css — Cartouche KPI (prefab). Charte §13.
+   Dépend de charte-tokens.css (--color-*, --space-*, --radius-*, --text-*, --font-*,
+   --shadow-*, --dur-*, --ease-*). Aucune valeur en dur.
+   ============================================================================ */
+
+.kcard {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-line-1);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+/* ---- en-tête : icône + titre + (option) affordance popup ---- */
+.kcard .ktop { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.kcard .kchip {
+  width: 28px; height: 28px; flex: none;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;                       /* la teinte de fond est passée en style inline */
+}
+.kcard .kchip svg { width: 16px; height: 16px; }
+.kcard .klab {
+  font-size: var(--text-caption); font-weight: 600;
+  color: var(--color-ink-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* ---- valeur ---- */
+.kcard .kbig {
+  font-family: var(--font-display);
+  font-size: var(--text-stat); font-weight: 700;
+  letter-spacing: -.01em; line-height: 1;
+  margin-bottom: var(--space-4);
+}
+.kcard .kbig small { font-size: 14px; font-weight: 500; color: var(--color-ink-3); }
+
+/* ---- barre de progression ---- */
+.kbar { height: 7px; border-radius: var(--radius-pill); background: var(--color-surface-3); overflow: hidden; }
+.kbar > i { display: block; height: 100%; border-radius: inherit; }
+
+/* ---- infos optionnelles sous la barre ---- */
+.kcard .kcap {
+  display: flex; gap: var(--space-2); align-items: center;
+  font-size: var(--text-caption); color: var(--color-ink-3);
+  margin-top: var(--space-3);
+}
+.kcard .kcap b { font-family: var(--font-mono); color: var(--color-ink-1); }
+
+/* ---- état cliquable (une popup est configurée) ---- */
+.kcard.clickable { cursor: pointer; transition: border-color var(--dur-base) var(--ease-out); }
+.kcard.clickable:hover { border-color: var(--color-accent); }
+.kcard .kexp { margin-left: auto; color: var(--color-ink-3); display: none; }
+.kcard .kexp svg { width: 15px; height: 15px; display: block; }
+.kcard.clickable .kexp { display: inline-flex; }
+.kcard.clickable:hover .kexp { color: var(--color-accent); }
+.kcard.clickable:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ---- variante : sparkline en barres à la place de la barre de progression ---- */
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.spark > i { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; }
+
+/* ---- variante COMPACTE (page « Indicateurs ») ------------------------------------
+   Densité accrue : padding, pastille, valeur et barre réduits. Scopée sur .kcard-kpi
+   pour NE PAS toucher les cartes .kcard du Dashboard (studio.css). */
+.kcard-kpi { padding: var(--space-4); border-radius: var(--radius-lg); position: relative; }
+/* Info « i » ancrée dans le coin haut-droit. Pas de z-index ici : éviter de créer un contexte
+   d'empilement qui piégerait le tooltip (il doit passer par-dessus les cartes voisines). */
+.kcard-kpi .kinfo { position: absolute; top: var(--space-3); right: var(--space-3); display: inline-flex; }
+.kcard-kpi .ktop { margin-bottom: var(--space-3); padding-right: 16px; }
+.kcard-kpi .kchip { width: 22px; height: 22px; border-radius: var(--radius-xs); }
+.kcard-kpi .kchip svg { width: 13px; height: 13px; }
+.kcard-kpi .kbig { font-size: 22px; margin-bottom: var(--space-3); }
+.kcard-kpi .kbig small { font-size: 12px; }
+.kcard-kpi .kbar { height: 6px; }
+.kcard-kpi .kcap { margin-top: var(--space-2); }
+
+/* ---- popup « Roadmap Adherence » (accordéon par sujet [N] + issues GitLab) --------
+   Structure = accordéon .issue/.issue-hd/.issue-body de l'onglet Issues (studio.css) ;
+   badges/états propres au KPI via .rm-* (tokens charte, thème-aware). */
+.rm-intro { font-size: var(--text-caption); color: var(--color-ink-3); margin: 0 0 var(--space-4); line-height: 1.5; }
+.rm-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
+.rm-title { color: var(--color-ink-1); text-decoration: none; }
+.rm-title:hover { color: var(--color-accent); text-decoration: underline; }
+.rm-badge {
+  font-size: var(--text-caption); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);
+  background: var(--color-surface-3); color: var(--color-ink-2); text-transform: capitalize; white-space: nowrap;
+}
+.rm-count { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.rm-epic { padding: var(--space-2) 0; }
+.rm-epic + .rm-epic { border-top: 1px dashed var(--color-line-2); }
+
+/* ---- popup « Acknowledge Time » : liste des posts concernés ------------------------
+   Une ligne par post : pastille de verdict + titre (lien) + auteur + répondeur/délai. */
+.ackp-list { display: flex; flex-direction: column; }
+.ackp-row { display: flex; align-items: center; gap: var(--space-3); padding: 9px var(--space-2); font-size: var(--text-sm); border-top: 1px solid var(--color-line-2); }
+.ackp-row:first-child { border-top: 0; }
+.ackp-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
+.ackp-title { flex: 1; min-width: 0; color: var(--color-ink-1); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ackp-title:hover { color: var(--color-accent); text-decoration: underline; }
+.ackp-author { flex: none; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-3); }
+.ackp-resp { flex: none; min-width: 150px; text-align: right; font-size: var(--text-caption); color: var(--color-ink-2); white-space: nowrap; }
+.ackp-resp b { font-family: var(--font-mono); }
+.ackp-none { color: var(--color-neutral); }
+.rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
+.rm-epic-h:hover { color: var(--color-accent); }
+.rm-epic-h svg { flex: none; }
+.rm-epic-issues { margin: var(--space-2) 0 0 18px; display: flex; flex-direction: column; gap: 2px; }
+.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-2); }
+.rm-issue a { color: var(--color-ink-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-issue a:hover { color: var(--color-accent); text-decoration: underline; }
+.rm-st {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; flex: none;
+  padding: 1px 6px; border-radius: var(--radius-pill);
+}
+.rm-st.closed { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 15%, transparent); }
+.rm-st.opened { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 15%, transparent); }

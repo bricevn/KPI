@@ -46,6 +46,9 @@ public sealed partial class WebDashboard
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private CancellationTokenSource? _refreshCts;
     private readonly object _ctsLock = new();
+    // État de refresh Canny SÉPARÉ du refresh GitLab (verrou + état indépendants → suivi distinct via /api/canny-status).
+    private readonly RefreshState _cannyState = new();
+    private readonly SemaphoreSlim _cannyLock = new(1, 1);
 
     // HTTP partagé (réutilise le pool de connexions) pour les appels GitLab par requête (login token,
     // résolution des membres) : un HttpClient neuf par requête épuise les sockets sous charge.
@@ -305,6 +308,11 @@ public sealed partial class WebDashboard
         app.MapGet("/api/status", () => Results.Json(self._state.Snapshot()));
         app.MapPost("/api/cancel", (HttpContext ctx) => self.CancelAsync(ctx));
         app.MapPost("/api/refresh", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshAsync(ctx)));
+        // Connexion externe Canny : refresh (extraction chiffrée) + statut, indépendants du refresh GitLab.
+        app.MapPost("/api/refresh-canny", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshCannyAsync(ctx)));
+        app.MapGet("/api/canny-status", () => Results.Json(self._cannyState.Snapshot()));
+        app.MapPost("/api/options/canny", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveCannyAsync(ctx)));
+        app.MapPost("/api/options/ack", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveAckAsync(ctx)));
         // Édition de la config depuis le dashboard (ADMIN, cf. RequireAdmin) : listing live des projets/labels
         // (via le token de groupe STOCKÉ) + sauvegarde des sections Export.* (projets/phases/labels).
         app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
@@ -323,13 +331,14 @@ public sealed partial class WebDashboard
         app.MapGet("/setup", (HttpContext ctx) =>
         {
             if (!self.IsConfigured() || self.IsAdminLogin(ctx.User.Identity?.Name))
-                return Results.Content(SetupView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+                return Results.Content(SetupView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, self._config.ExternalConnections?.Canny?.Configured ?? false), "text/html; charset=utf-8");
             return (ctx.User.Identity?.IsAuthenticated ?? false) ? Results.Redirect("/") : Results.Redirect("/login");
         }).AllowAnonymous();
         // Endpoints de l'assistant : ouverts au bootstrap (non configuré), sinon admin-only (RequireSetupAccess).
         app.MapPost("/api/setup/test",   (Func<HttpContext, Task<IResult>>)(ctx => self.SetupTestAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/labels", (Func<HttpContext, Task<IResult>>)(ctx => self.SetupLabelsAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup/oauth",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupOAuthSaveAsync(ctx))).AllowAnonymous();
+        app.MapPost("/api/setup/canny",  (Func<HttpContext, Task<IResult>>)(ctx => self.SetupCannySaveAsync(ctx))).AllowAnonymous();
         app.MapPost("/api/setup",        (Func<HttpContext, Task<IResult>>)(ctx => self.SetupSaveAsync(ctx))).AllowAnonymous();
         app.MapGet("/api/setup/progress", (HttpContext ctx) => self.SetupProgress(ctx)).AllowAnonymous();
         app.MapPost("/api/setup/cancel",  (HttpContext ctx) => self.CancelAsync(ctx));
@@ -430,7 +439,18 @@ public sealed partial class WebDashboard
         // inliné et window.APP est construit par le mapper AVANT le rendu React.
         var json = await BuildScopedPayloadAsync(ctx);
         var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName; // "fr"/"en" (posée par UseRequestLocalization)
-        return Results.Content(DashboardView.BuildReferencePage(json, lang), "text/html; charset=utf-8");
+        // Dataset Canny (feedback/roadmap) déchiffré, injecté dans la page à côté du payload GitLab. null si non extrait.
+        var cannyJson = Kpi.Canny.CannyService.TryReadDatasetJson(_config);
+        // Adhérence roadmap (KPI Roadmap Adherence) : sujets [N] + états d'issues résolus. null si non résolu.
+        var roadmapJson = Kpi.Canny.CannyService.TryReadRoadmapJson(_config);
+        // Listes « Acknowledge Time » (ids Canny) injectées au client pour le recalcul live du SLA.
+        var ackCanny = _config.ExternalConnections?.Canny;
+        var ackCfgJson = JsonSerializer.Serialize(new
+        {
+            authorIds = ackCanny?.AckAuthorIds ?? new List<string>(),
+            responderIds = ackCanny?.AckResponderIds ?? new List<string>(),
+        });
+        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson, roadmapJson, ackCfgJson), "text/html; charset=utf-8");
     }
 
     private IResult CancelAsync(HttpContext ctx)
@@ -448,7 +468,27 @@ public sealed partial class WebDashboard
 
     private async Task<IResult> RefreshAsync(HttpContext ctx)
     {
-        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var login = EffectiveLogin(ctx, out _);
+        var acct = ResolveAccount(login);
+
+        // NON-ADMIN (Phase B) : refresh SCOPÉ à son périmètre (membre = ses issues ; lead = son équipe) →
+        // store PAR UTILISATEUR isolé. Doit rester membre GitLab des projets (IsAllowedAsync).
+        if (acct.Role != "admin")
+        {
+            if (!await IsAllowedAsync(ctx))
+                return Results.Text("Accès au projet révoqué.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 403);
+            var assignees = (acct.ScopeType == "team" && !string.IsNullOrEmpty(acct.ScopeValue)
+                && _config.Export.Teams.TryGetValue(acct.ScopeValue!, out var members) && members is { Count: > 0 })
+                ? members : new List<string> { login };
+            if (!await _refreshLock.WaitAsync(0))
+                return Results.Text("Une acquisition est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
+            var stopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
+            var sct = stopping?.ApplicationStopping ?? CancellationToken.None;
+            _ = Task.Run(() => RunScopedRefreshAsync(login, assignees, sct));
+            return Results.Text("Acquisition (périmètre personnel) démarrée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 202);
+        }
+
+        // ADMIN : refresh COMPLET du store partagé, ciblable par projet/milestones.
         if (!await _refreshLock.WaitAsync(0))
             return Results.Text("Une acquisition est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
 
@@ -496,14 +536,19 @@ public sealed partial class WebDashboard
                 // v2 multi-serveurs : extraction cloisonnée + chiffrée, CIBLABLE par projet et/ou
                 // milestone (merge du store : seule la portée demandée est remplacée).
                 if (milestonesToRefresh.Count == 0)
-                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, projectFilter);
+                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token, projectFilter);
                 else
-                    for (int i = 0; i < milestonesToRefresh.Count; i++)
-                    {
-                        linked.Token.ThrowIfCancellationRequested();
-                        Console.WriteLine($"[Refresh] Milestone {i + 1}/{milestonesToRefresh.Count} : {milestonesToRefresh[i]}");
-                        await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) => { _state.Current = cur; _state.Total = tot; }, linked.Token, projectFilter, milestonesToRefresh[i]);
-                    }
+                {
+                    // Milestones sélectionnées extraites EN PARALLÈLE, avec une progression PAR milestone
+                    // (« Milestone <titre> : cur/total »). Un seul merge/écriture à la fin (pas de course au store).
+                    // La clé d'agrégation est (projet, titre) : le seed n'est pas possible ici (pid inconnu),
+                    // les lignes apparaissent au 1er callback de chaque milestone.
+                    _state.MilestoneCount = milestonesToRefresh.Count;
+                    await ExportPipeline.RunMultiServerExportAsync(_config,
+                        (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, projectFilter,
+                        explicitMilestones: milestonesToRefresh,
+                        onMilestoneProgress: (pid, ms, cur, tot) => _state.SetMs(pid, ms, cur, tot));
+                }
             }
             else
             {
@@ -539,6 +584,83 @@ public sealed partial class WebDashboard
         }
     }
 
+    // Refresh SCOPÉ non-admin (Phase B) : extraction du périmètre du demandeur → store perso isolé.
+    // Réutilise _refreshLock/_state (sérialise avec le refresh admin ; le demandeur suit via /api/status).
+    private async Task RunScopedRefreshAsync(string login, IReadOnlyList<string> assignees, CancellationToken serverCt)
+    {
+        CancellationTokenSource localCts;
+        lock (_ctsLock) { localCts = new CancellationTokenSource(); _refreshCts = localCts; }
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(serverCt, localCts.Token);
+        try
+        {
+            _state.Reset();
+            _state.Running = true;
+            _state.StartedAt = DateTime.UtcNow;
+            await ExportPipeline.RunUserScopedExportAsync(_config, login, assignees,
+                (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token);
+            _state.LastRefreshAt = DateTime.UtcNow;
+            _state.LastError = null;
+        }
+        catch (OperationCanceledException) { _state.LastError = "Annulé par l'utilisateur."; }
+        catch (Exception ex) { _state.LastError = ex.Message; Console.Error.WriteLine("Refresh scopé KO : " + ex); }
+        finally
+        {
+            _payloadCache.Clear();
+            _state.Running = false;
+            _refreshLock.Release();
+            linked.Dispose();
+            lock (_ctsLock) { if (_refreshCts == localCts) _refreshCts = null; }
+            localCts.Dispose();
+        }
+    }
+
+    // --- Refresh Canny (connexion externe) ------------------------------
+
+    /// <summary>POST /api/refresh-canny : (ré)extraction Canny en tâche de fond (ADMIN). 409 si déjà en cours,
+    /// 400 si Canny non configuré. Suivi via /api/canny-status (état séparé du refresh GitLab).</summary>
+    private async Task<IResult> RefreshCannyAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        if (!(_config.ExternalConnections?.Canny?.Configured ?? false))
+            return Results.Text("Connexion Canny non configurée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 400);
+        if (!await _cannyLock.WaitAsync(0))
+            return Results.Text("Une extraction Canny est déjà en cours.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 409);
+
+        var appStopping = ctx.RequestServices.GetService(typeof(IHostApplicationLifetime)) as IHostApplicationLifetime;
+        var serverCt = appStopping?.ApplicationStopping ?? CancellationToken.None;
+        _ = Task.Run(() => RunCannyRefreshAsync(serverCt));
+        return Results.Text("Extraction Canny démarrée.", "text/plain; charset=utf-8", Encoding.UTF8, statusCode: 202);
+    }
+
+    private async Task RunCannyRefreshAsync(CancellationToken serverCt)
+    {
+        try
+        {
+            _cannyState.Reset();
+            _cannyState.Running = true;
+            _cannyState.StartedAt = DateTime.UtcNow;
+            // CannyService n'expose pas de progression fine → on ne renseigne que Running/LastError/LastRefreshAt.
+            await Kpi.Canny.CannyService.ExtractAndStoreAsync(_config, serverCt);
+            _cannyState.LastRefreshAt = DateTime.UtcNow;
+            _cannyState.LastError = null;
+        }
+        catch (OperationCanceledException)
+        {
+            _cannyState.LastError = "Annulé.";
+            Console.WriteLine("Refresh Canny annulé.");
+        }
+        catch (Exception ex)
+        {
+            _cannyState.LastError = ex.Message;
+            Console.Error.WriteLine("Refresh Canny KO : " + ex);
+        }
+        finally
+        {
+            _cannyState.Running = false;
+            _cannyLock.Release();
+        }
+    }
+
     // --- Helpers (identiques à l'ancien serveur) ------------------------
 
     private static string RuntimeConfigPath() => Path.Combine(AppContext.BaseDirectory, "appsettings.json");
@@ -565,6 +687,8 @@ public sealed partial class WebDashboard
                 foreach (var s in servers)
                     if (s is JsonObject so && so["GroupToken"] != null) Enc(so, "GroupToken");
             if (root["Auth"] is JsonObject auth && auth["ClientSecret"] != null) Enc(auth, "ClientSecret");
+            // Connexion externe Canny : la clé API est un secret au même titre que les tokens GitLab.
+            if (root["ExternalConnections"] is JsonObject ext && ext["Canny"] is JsonObject cannyCfg && cannyCfg["ApiKey"] != null) Enc(cannyCfg, "ApiKey");
 
             // Semis rétro-compat des labels transversaux : seulement si la CLÉ est absente. Une fois écrite
             // (même []), on ne re-sème plus → « tout retirer » reste stable au redémarrage.
@@ -629,22 +753,35 @@ public sealed partial class WebDashboard
         var serverId = ServerById(ctx.User.FindFirst(ServerClaim)?.Value)?.Id ?? cfg.ResolveServers().FirstOrDefault()?.Id ?? "default";
         var (dataDir, encrypted) = ResolveServerDataDir(cfg.Export.OutputDirectory, serverId);
 
+        // Store PAR UTILISATEUR (Phase B) : un non-admin ayant extrait son propre périmètre lit SON store
+        // (déjà scopé par assignee) au lieu du store partagé filtré. Repli sur le partagé sinon.
+        var perUser = false;
+        if (r.Role != "admin")
+        {
+            var userDir = Path.Combine(cfg.Export.OutputDirectory, ExportPipeline.SafeSegment(serverId), "users", ExportPipeline.SafeSegment(login));
+            if (File.Exists(Path.Combine(userDir, "issues.json"))) { dataDir = userDir; encrypted = true; perUser = true; }
+        }
+
         // Cache du JSON produit : clé = serveur + périmètre du compte, signature = mtimes des fichiers source.
         string Mtime(string f) { var fp = Path.Combine(dataDir, f); return File.Exists(fp) ? File.GetLastWriteTimeUtc(fp).Ticks.ToString() : "0"; }
-        var cacheKey = $"{serverId}|{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}";
+        var cacheKey = $"{serverId}|{r.ScopeType}|{r.ScopeValue}|{string.Join(',', r.Milestones)}|{string.Join(',', r.Labels)}|{r.Role}|{(perUser ? "pu:" + login : "sh")}";
         var sig = $"{Mtime("issues.json")}.{Mtime("labels.json")}.{Mtime("milestones.json")}";
         if (_payloadCache.TryGetValue(cacheKey, out var cached) && cached.sig == sig) return cached.json;
 
         var (all, labels, milestones, lastExtracted) = await LoadServerDataAsync(serverId, dataDir, encrypted, ctx.RequestAborted);
 
         IEnumerable<IssueExport> filtered = all;
-        if (r.ScopeType == "user" && !string.IsNullOrEmpty(r.ScopeValue))
-            filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => string.Equals(a, r.ScopeValue, StringComparison.OrdinalIgnoreCase)));
-        else if (r.ScopeType == "team" && !string.IsNullOrEmpty(r.ScopeValue))
+        // Store partagé → on filtre par périmètre. Store PERSO → déjà scopé à l'extraction, aucun filtre assignee.
+        if (!perUser)
         {
-            cfg.Export.Teams.TryGetValue(r.ScopeValue, out var members);
-            var set = new HashSet<string>(members ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => set.Contains(a)));
+            if (r.ScopeType == "user" && !string.IsNullOrEmpty(r.ScopeValue))
+                filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => string.Equals(a, r.ScopeValue, StringComparison.OrdinalIgnoreCase)));
+            else if (r.ScopeType == "team" && !string.IsNullOrEmpty(r.ScopeValue))
+            {
+                cfg.Export.Teams.TryGetValue(r.ScopeValue, out var members);
+                var set = new HashSet<string>(members ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                filtered = filtered.Where(e => e.Assignees != null && e.Assignees.Any(a => set.Contains(a)));
+            }
         }
         if (r.Milestones.Count > 0)
         {
@@ -708,6 +845,12 @@ public sealed partial class WebDashboard
                 : new Dictionary<string, object>(),
             trackedLabels = cfg.Export.TrackedLabels ?? new(),
             transversalLabels = cfg.Export.TransversalLabels ?? new(),
+            // Connexion externe Canny : état léger pour la page Options + la page KPI (JAMAIS la clé API).
+            canny = new
+            {
+                connected = cfg.ExternalConnections?.Canny?.Configured ?? false,
+                lastExtracted = Kpi.Canny.CannyService.LastExtractedString(cfg),
+            },
         };
 
         var json = DashboardView.BuildPayloadJson(
@@ -787,6 +930,14 @@ public sealed partial class WebDashboard
         private string? _lastError;
         private DateTime? _lastRefreshAt;
         private DateTime? _startedAt;
+        // Récap enrichi : position dans la sélection de milestones + cumul d'issues de la sélection.
+        private int _milestoneCurrent;
+        private int _milestoneCount;
+        private string? _currentMilestone;
+        private int _totalIssues;
+        // Progression PAR (projet, milestone) : clé composite pid+US+titre → (nom, current, total). Composite
+        // pour ne pas écraser une milestone de groupe partagée entre projets ; agrégée par nom au Snapshot.
+        private readonly Dictionary<string, (string name, int cur, int tot)> _ms = new();
 
         public bool Running { get { lock (_lock) return _running; } set { lock (_lock) _running = value; } }
         public int Current { get { lock (_lock) return _current; } set { lock (_lock) _current = value; } }
@@ -794,8 +945,14 @@ public sealed partial class WebDashboard
         public string? LastError { get { lock (_lock) return _lastError; } set { lock (_lock) _lastError = value; } }
         public DateTime? LastRefreshAt { get { lock (_lock) return _lastRefreshAt; } set { lock (_lock) _lastRefreshAt = value; } }
         public DateTime? StartedAt { get { lock (_lock) return _startedAt; } set { lock (_lock) _startedAt = value; } }
+        public int MilestoneCurrent { get { lock (_lock) return _milestoneCurrent; } set { lock (_lock) _milestoneCurrent = value; } }
+        public int MilestoneCount { get { lock (_lock) return _milestoneCount; } set { lock (_lock) _milestoneCount = value; } }
+        public string? CurrentMilestone { get { lock (_lock) return _currentMilestone; } set { lock (_lock) _currentMilestone = value; } }
+        public int TotalIssues { get { lock (_lock) return _totalIssues; } set { lock (_lock) _totalIssues = value; } }
+        // Clé = pid + ':' + titre (pid numérique -> pas de collision : le 1er ':' sépare pid du titre).
+        public void SetMs(string pid, string ms, int cur, int tot) { lock (_lock) _ms[pid + ":" + ms] = (ms, cur, tot); }
 
-        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; } }
+        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; _milestoneCurrent = 0; _milestoneCount = 0; _currentMilestone = null; _totalIssues = 0; _ms.Clear(); } }
 
         public StateSnapshot Snapshot()
         {
@@ -809,9 +966,25 @@ public sealed partial class WebDashboard
                     lastError = _lastError,
                     lastRefreshAt = _lastRefreshAt?.ToString("yyyy-MM-dd HH:mm:ss"),
                     startedAt = _startedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    milestoneCurrent = _milestoneCurrent,
+                    milestoneCount = _milestoneCount,
+                    currentMilestone = _currentMilestone,
+                    totalIssues = _totalIssues,
+                    // Agrégation par TITRE de milestone : une même milestone présente dans plusieurs projets
+                    // (clés (pid,titre) distinctes) se cumule en une seule ligne « cur/total ».
+                    milestones = _ms.Values.GroupBy(v => v.name, StringComparer.OrdinalIgnoreCase)
+                        .Select(g => new MsProgress { name = g.Key, current = g.Sum(x => x.cur), total = g.Sum(x => x.tot) })
+                        .OrderBy(m => m.name, StringComparer.OrdinalIgnoreCase).ToList(),
                 };
             }
         }
+    }
+
+    public sealed class MsProgress
+    {
+        public string name { get; set; } = "";
+        public int current { get; set; }
+        public int total { get; set; }
     }
 
     public sealed class StateSnapshot
@@ -822,6 +995,13 @@ public sealed partial class WebDashboard
         public string? lastError { get; set; }
         public string? lastRefreshAt { get; set; }
         public string? startedAt { get; set; }
+        // Récap enrichi (récupération par milestone).
+        public int milestoneCurrent { get; set; }
+        public int milestoneCount { get; set; }
+        public string? currentMilestone { get; set; }
+        public int totalIssues { get; set; }
+        // Progression PAR milestone (extraction concurrente) : une ligne par milestone sélectionnée.
+        public List<MsProgress> milestones { get; set; } = new();
     }
 
     private sealed class RefreshRequest

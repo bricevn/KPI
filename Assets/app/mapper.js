@@ -226,6 +226,9 @@ window.buildAPP = function (D) {
       iid: iss.iid, title: iss.title || '', type: t ? t.key : 'untyped', weight: (iss.weight == null ? 0 : iss.weight),
       assignees: iss.assignees || [], state: closed ? 'closed' : 'open',
       validated: closed, approval: approval, retours: tm.retours, _times: tm,
+      // Dates brutes ISO — consommées par la page Indicateurs (Bug Resolution : délai créé→fermé),
+      // exposées ici pour que le KPI respecte les filtres actifs (le detail est filtré, pas __DATA__).
+      createdAt: iss.createdAt || null, closedAt: iss.closedAt || null,
       // closeDay : offset (jours) de la FERMETURE — la semaine où la vélocité compte le poids validé.
       closeDay: closed ? clampOff(endRef) : null,
       seg: seg, start: start, end: end, mrCount: mrs.length,

@@ -307,6 +307,10 @@ public sealed partial class WebDashboard
                 teams[name] = arr;
             }
             ex["Teams"] = teams;
+            // Rôles LEAD : chaque équipe (lead = 1er membre, ordering client via orderTeam) → compte 'group'
+            // dans accounts.json, lu par ResolveAccount pour donner à ce membre le rôle lead (scope équipe).
+            // Les autres membres retombent en scope individuel (auto-provision). Préserve comptes 'user' + vues.
+            await WriteTeamLeadAccountsAsync(teams);
         }
         // Équipes PAR PROJET : { "projectId": [ {name, members:[username]} ] } → { name → members } par projet.
         // N'écrit QUE si transmis (sinon préserve l'existant).
@@ -348,6 +352,146 @@ public sealed partial class WebDashboard
         var refetch = b?["refetch"] is JsonValue rv && rv.TryGetValue<bool>(out var rb) && rb;
         if (refetch) StartSetupFetch(ctx);
         return Results.Json(new { ok = true, refetch });
+    }
+
+    // POST /api/options/canny { apiKey, subdomain? } → connexion externe Canny (ADMIN). Valide la clé auprès
+    // de l'API Canny AVANT de la chiffrer/persister (enc:v1:). Clé vide + clé existante = conservée (permet de
+    // modifier le sous-domaine sans re-saisir). La clé n'est JAMAIS renvoyée au client. Hot-reload.
+    // Génère/actualise output/accounts.json à partir des équipes : un compte 'group' par équipe ayant au
+    // moins un membre (subject=équipe, leads=[1er membre]). Préserve les comptes non-'group' (user) + les vues.
+    // C'est ce que ResolveAccount lit pour attribuer le rôle LEAD (scope équipe) au 1er membre de chaque équipe.
+    private async Task WriteTeamLeadAccountsAsync(JsonObject teams)
+    {
+        try
+        {
+            var path = AccountsPath();
+            JsonObject root;
+            try { root = (JsonNode.Parse(await File.ReadAllTextAsync(path)) as JsonObject) ?? new JsonObject(); }
+            catch { root = new JsonObject(); }
+
+            var kept = new JsonArray();
+            if (root["accounts"] is JsonArray existing)
+                foreach (var a in existing)
+                    if (a is JsonObject ao && (ao["type"]?.GetValue<string>() ?? "") != "group")
+                        kept.Add(ao.DeepClone());
+
+            foreach (var kv in teams)
+            {
+                if (kv.Value is not JsonArray members || members.Count == 0) continue;
+                var lead = members[0]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(lead)) continue;
+                kept.Add(new JsonObject
+                {
+                    ["type"] = "group",
+                    ["subject"] = kv.Key,
+                    ["username"] = kv.Key,
+                    ["leads"] = new JsonArray(JsonValue.Create(lead)),
+                    ["viewId"] = "",
+                });
+            }
+            root["accounts"] = kept;
+            root["views"] ??= new JsonArray();
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await WriteFileAtomicAsync(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception e) { Console.Error.WriteLine("WriteTeamLeadAccounts KO : " + e); }
+    }
+
+    private async Task<IResult> SaveCannyAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        return await WriteCannyConnectionAsync(ctx);
+    }
+
+    // Cœur PARTAGÉ (Options admin + étape « Connexions externes » du /setup) : valide la clé auprès de
+    // l'API Canny, la chiffre (enc:v1:) et l'enregistre. La garde d'accès est faite par l'appelant.
+    private async Task<IResult> WriteCannyConnectionAsync(HttpContext ctx)
+    {
+        var b = await ReadJsonBody(ctx);
+        var apiKey = (b?["apiKey"]?.GetValue<string>() ?? "").Trim();
+        var subdomain = (b?["subdomain"]?.GetValue<string>() ?? "").Trim();
+        var hasExisting = _config.ExternalConnections?.Canny?.Configured ?? false;
+        if (apiKey.Length == 0 && !hasExisting)
+            return Results.Json(new { ok = false, error = "Clé API Canny requise." });
+
+        // Valide la clé fournie auprès de l'API Canny (un simple boards/list) avant de l'enregistrer.
+        if (apiKey.Length > 0)
+        {
+            try
+            {
+                using var client = new Kpi.Canny.CannyClient(new Kpi.Config.CannyConfig { ApiKey = apiKey, RequestTimeoutSeconds = 20 });
+                await client.ListSimpleAsync<Kpi.Canny.CannyBoardRaw>("boards/list", "boards", ctx.RequestAborted);
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("SaveCanny test KO : " + e.Message);
+                return Results.Json(new { ok = false, error = "Connexion Canny refusée (clé API invalide ?)." });
+            }
+        }
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var ext = root["ExternalConnections"] as JsonObject ?? new JsonObject(); root["ExternalConnections"] = ext;
+        var canny = ext["Canny"] as JsonObject ?? new JsonObject(); ext["Canny"] = canny;
+        // Clé fournie → chiffrée ; sinon on conserve la valeur déjà stockée (chiffrée) telle quelle.
+        if (apiKey.Length > 0) canny["ApiKey"] = SecureStore.ProtectSecret(apiKey);
+        if (subdomain.Length > 0) canny["Subdomain"] = subdomain;
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveCanny write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveCanny reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        return Results.Json(new { ok = true, connected = _config.ExternalConnections?.Canny?.Configured ?? false });
+    }
+
+    // POST /api/options/ack { authorIds:[], responderIds:[] } (ADMIN) → listes « Acknowledge Time »
+    // (ids Canny). Non secret : écrit tel quel sous ExternalConnections.Canny et recharge à chaud. Le KPI
+    // recalcule le SLA côté client (window.__ACKCFG__ mis à jour dans l'onglet Options après sauvegarde).
+    private async Task<IResult> SaveAckAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        List<string> ReadIds(string key) => (b?[key] as JsonArray)?
+            .Select(n => n?.GetValue<string>() ?? "").Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.Ordinal).ToList() ?? new();
+        var authorIds = ReadIds("authorIds");
+        var responderIds = ReadIds("responderIds");
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var ext = root["ExternalConnections"] as JsonObject ?? new JsonObject(); root["ExternalConnections"] = ext;
+        var canny = ext["Canny"] as JsonObject ?? new JsonObject(); ext["Canny"] = canny;
+        var aArr = new JsonArray(); foreach (var x in authorIds) aArr.Add(x);
+        var rArr = new JsonArray(); foreach (var x in responderIds) rArr.Add(x);
+        canny["AckAuthorIds"] = aArr;
+        canny["AckResponderIds"] = rArr;
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveAck write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveAck reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        return Results.Json(new { ok = true, authorIds, responderIds });
     }
 
     // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority

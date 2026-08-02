@@ -30,6 +30,8 @@ bool fetchLabels = args.Any(a => a.Equals("--fetch-labels", StringComparison.Ord
 bool fetchMilestones = args.Any(a => a.Equals("--fetch-milestones", StringComparison.OrdinalIgnoreCase));
 bool fetchAll = args.Any(a => a.Equals("--fetch-all", StringComparison.OrdinalIgnoreCase));
 bool fetchServers = args.Any(a => a.Equals("--fetch-servers", StringComparison.OrdinalIgnoreCase));
+bool fetchCanny = args.Any(a => a.Equals("--fetch-canny", StringComparison.OrdinalIgnoreCase));
+bool cannyVerify = args.Any(a => a.Equals("--canny-verify", StringComparison.OrdinalIgnoreCase));
 int port = ParsePort(args, defaultPort: 5050);
 
 Console.WriteLine("=== GitLab Exporter ===");
@@ -84,6 +86,30 @@ try
         // v2 : extraction MULTI-SERVEURS, cloisonnée par serveur et chiffrée au repos (output/<serverId>/).
         Console.WriteLine("Mode     : --fetch-servers (extraction multi-serveurs chiffrée)");
         await ExportPipeline.RunMultiServerExportAsync(appConfig, null, cts.Token);
+        return 0;
+    }
+
+    if (fetchCanny)
+    {
+        // Connexion externe Canny : extraction API → consolidation → stockage chiffré output/canny/.
+        Console.WriteLine("Mode     : --fetch-canny (extraction Canny chiffrée)");
+        await Kpi.Canny.CannyService.ExtractAndStoreAsync(appConfig, cts.Token);
+        return 0;
+    }
+
+    if (cannyVerify)
+    {
+        // Vérification HORS-LIGNE du port de build-dataset.js : reconstruit le dataset depuis un dossier
+        // de JSON bruts (les data/*.json du projet Canny), écrit non chiffré pour diff vs sortie Node.
+        var vIdx = Array.FindIndex(args, a => a.Equals("--canny-verify", StringComparison.OrdinalIgnoreCase));
+        var rawDir = (vIdx >= 0 && vIdx + 1 < args.Length && !args[vIdx + 1].StartsWith("--")) ? args[vIdx + 1] : null;
+        if (rawDir == null) { Console.WriteLine("Usage : --canny-verify <dossier de JSON bruts Canny (data/)>"); return 1; }
+        Console.WriteLine($"Mode     : --canny-verify (build depuis {rawDir})");
+        var built = Kpi.Canny.CannyService.BuildFromRawDir(appConfig.ExternalConnections.Canny, rawDir);
+        var outFile = Path.Combine(Directory.GetParent(rawDir)?.FullName ?? ".", "export", "canny_dataset.csharp.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outFile)!);
+        await File.WriteAllTextAsync(outFile, built.DatasetJson, cts.Token);
+        Console.WriteLine($"  -> écrit {outFile} ({built.Result.Posts} posts, {built.Result.Roadmaps} roadmaps, {built.Result.Comments} commentaires)");
         return 0;
     }
 

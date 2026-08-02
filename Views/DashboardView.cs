@@ -191,7 +191,7 @@ public sealed class DashboardView
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string payloadJson, string lang = "en")
+    public static string BuildReferencePage(string payloadJson, string lang = "en", string? cannyJson = null, string? roadmapJson = null, string? ackCfgJson = null)
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
@@ -209,6 +209,10 @@ public sealed class DashboardView
         sb.AppendLine("  <style>");
         sb.AppendLine(A("design", "shared.css"));
         sb.AppendLine(A("design", "studio.css"));
+        // Cartouche KPI (page Indicateurs) : tokens de charte PUIS styles kcard (kcard dépend des tokens).
+        // Espace de noms de tokens distinct (--color-*) → aucun conflit avec studio.css (--ink/--accent…).
+        sb.AppendLine(A("design", "charte-tokens.css"));
+        sb.AppendLine(A("design", "kcard.css"));
         sb.AppendLine("  html, body { margin: 0; } body { background: #0a0e13; }");
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
@@ -225,17 +229,26 @@ public sealed class DashboardView
             // Défense XSS : le payload est inliné dans un <script>. Neutraliser toute séquence pouvant
             // clore la balise / casser le parseur (titres d'issues contrôlés par les membres du projet).
             // Ces caractères n'apparaissent que dans des littéraux de chaîne JSON → \uXXXX y est décodé à l'identique.
-            var safeJson = payloadJson
+            // Échappement partagé (même défense pour __DATA__ et __CANNY__, tous deux du contenu rédigé
+            // par des utilisateurs : titres d'issues GitLab / posts + commentaires Canny).
+            static string Esc(string j) => j
                 .Replace("<", "\\u003C").Replace(">", "\\u003E").Replace("&", "\\u0026")
                 .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
-            sb.AppendLine("  <script>window.__DATA__ = " + safeJson + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+            sb.AppendLine("  <script>window.__DATA__ = " + Esc(payloadJson) + ";\n" + A("app", "mapper.js") + "\nwindow.APP = window.buildAPP(window.__DATA__);</script>");
+            // Dataset Canny (feedback/roadmap) déchiffré, injecté séparément du payload GitLab. null si non extrait.
+            sb.AppendLine("  <script>window.__CANNY__ = " + (string.IsNullOrEmpty(cannyJson) ? "null" : Esc(cannyJson)) + ";</script>");
+            // Adhérence roadmap (KPI Roadmap Adherence) : sujets [N] + états d'issues GitLab résolus. null si non résolu.
+            sb.AppendLine("  <script>window.__ROADMAP__ = " + (string.IsNullOrEmpty(roadmapJson) ? "null" : Esc(roadmapJson)) + ";</script>");
+            // Listes « Acknowledge Time » (auteurs concernés / répondeurs autorisés) : ids Canny, non secrets.
+            // Le KPI recalcule le SLA côté client à partir de ces listes + des ackEvents par post.
+            sb.AppendLine("  <script>window.__ACKCFG__ = " + (string.IsNullOrEmpty(ackCfgJson) ? "{\"authorIds\":[],\"responderIds\":[]}" : ackCfgJson) + ";</script>");
         }
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.
         sb.AppendLine("  <script>window.__LANG__ = " + JsonSerializer.Serialize(lc)
             + "; window.__LANGS__ = " + JsonSerializer.Serialize(Kpi.Localization.Loc.List()) + ";</script>");
         sb.AppendLine("  <script data-asset=\"i18n\">" + A("app", "i18n.js") + "</script>");
-        foreach (var f in new[] { "ui.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
+        foreach (var f in new[] { "ui.jsx", "kard.jsx", "tab-indicateurs.jsx", "tab-dashboard.jsx", "tab-charts.jsx", "tab-comparison.jsx", "tab-anomalies.jsx", "tab-issues.jsx", "tab-calendar.jsx", "tab-velocity.jsx", "tab-options.jsx", "tweaks-panel.jsx", "shell.jsx" })
             sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\" data-asset=\"" + f + "\">" + A("app", f) + "</script>");
         sb.AppendLine("  <script type=\"text/babel\" data-presets=\"react\">ReactDOM.createRoot(document.getElementById('root')).render(<window.Shell />);</script>");
         sb.AppendLine("</body>");

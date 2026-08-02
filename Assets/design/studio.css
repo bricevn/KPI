@@ -33,7 +33,11 @@
 
 /* ---------- sidebar ---------- */
 .sb{width:228px; flex:none; background:var(--sidebar); border-right:1px solid var(--line);
-  display:flex; flex-direction:column; padding:18px 14px; position:sticky; top:0; height:100vh;}
+  display:flex; flex-direction:column; padding:18px 14px; position:sticky; top:0; height:100vh;
+  /* z-index : sticky crée déjà un contexte d'empilement — on l'élève au-dessus du contenu
+     positionné de .main (popovers ≤ 50) pour que les tooltips de nav débordent PAR-DESSUS.
+     Reste sous les modales (.modal-back = 200). */
+  z-index:100;}
 .sb-brand{display:flex; align-items:center; gap:10px; padding:4px 8px 18px;}
 .sb-mark{width:34px; height:34px; border-radius:11px; background:var(--accent); color:#fff;
   display:grid; place-items:center; font-weight:700; font-size:17px; flex:none;}
@@ -49,6 +53,31 @@
 .sb-item .badge{margin-left:auto; font:700 10px/1 var(--disp-font,'Space Grotesk'),sans-serif; background:var(--c-bad); color:#fff; padding:3px 7px; border-radius:999px;}
 .sb-item .cnt{margin-left:auto; font:600 11px/1 var(--disp-font,'Space Grotesk'),sans-serif; color:var(--ink-faint);}
 .sb-sp{flex:1;}
+
+/* ---- tooltips de la nav (survol / focus d'un item) ---------------------------
+   Popover thème-aware (même langage visuel que les dropdowns de l'app : surface +
+   filet + ombre douce), pas de chip inversé. Apparaît à droite de l'item —
+   indispensable en mode replié (icône seule), informatif en mode déployé.
+   Le débordement PAR-DESSUS le contenu est assuré par .sb{z-index:100} ci-dessus. */
+.sb-item[data-tip]{position:relative;}
+.sb-item[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute; left:calc(100% + 12px); top:50%;
+  transform:translateY(-50%) translateX(-6px);
+  z-index:5; pointer-events:none;
+  width:max-content; max-width:220px; white-space:normal; text-align:left;
+  background:var(--color-surface-1,#141a22);
+  color:var(--color-ink-1,#e9eef4);
+  border:1px solid var(--color-line-1,#222c37);
+  font-size:12px; font-weight:500; line-height:1.4; letter-spacing:.01em;
+  padding:8px 11px; border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.10);
+  opacity:0; visibility:hidden;
+  transition:opacity var(--dur-base,.16s) var(--ease-out,ease), transform var(--dur-base,.16s) var(--ease-out,ease);
+}
+.sb-item[data-tip]:hover::after, .sb-item[data-tip]:focus-visible::after{
+  opacity:1; visibility:visible; transform:translateY(-50%) translateX(0); transition-delay:.2s;
+}
 
 /* ---------- main + header ---------- */
 .main{flex:1; min-width:0; padding:20px 24px 36px; display:flex; flex-direction:column; gap:16px;}
@@ -85,16 +114,17 @@
 .infotip{display:inline-grid; place-items:center; color:var(--ink-faint); cursor:help; position:relative; outline:none;}
 .infotip svg{width:15px; height:15px;}
 .infotip:hover, .infotip:focus-visible{color:var(--accent);}
-.infotip::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:0; z-index:40;
-  width:max-content; max-width:248px; background:var(--ink); color:var(--bg); font-size:11.5px; font-weight:500;
-  line-height:1.45; padding:8px 11px; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.22);
-  opacity:0; transform:translateY(-3px); pointer-events:none; transition:opacity .13s, transform .13s; white-space:normal;}
-.infotip::before{content:""; position:absolute; top:calc(100% + 2px); right:5px; z-index:41;
-  border:5px solid transparent; border-bottom-color:var(--ink); opacity:0; transition:opacity .13s;}
+/* Tooltip = MÊME design que la nav (popover surface thème-aware, sans caret). z-index élevé
+   pour passer AU-DESSUS des cartes/panneaux voisins (mais sous les modales = 200). */
+.infotip::after{content:attr(data-tip); position:absolute; top:calc(100% + 9px); right:0; z-index:150;
+  width:max-content; max-width:240px; text-align:left; white-space:normal;
+  background:var(--color-surface-1,#141a22); color:var(--color-ink-1,#e9eef4); border:1px solid var(--color-line-1,#222c37);
+  font-size:12px; font-weight:500; line-height:1.4; letter-spacing:.01em;
+  padding:8px 11px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.10);
+  opacity:0; transform:translateY(-4px); pointer-events:none; transition:opacity .15s var(--ease-out,ease), transform .15s var(--ease-out,ease);}
+.infotip::before{content:none;} /* pas de caret (comme la nav) */
 .infotip:hover::after, .infotip:focus-visible::after{opacity:1; transform:translateY(0);}
-.infotip:hover::before, .infotip:focus-visible::before{opacity:1;}
 .infotip.left::after{right:auto; left:0;}
-.infotip.left::before{right:auto; left:5px;}
 .pnl-b{padding:6px 17px 17px;}
 
 .col{display:flex; flex-direction:column; gap:14px;}
@@ -425,6 +455,20 @@
 .opt-row:first-of-type{border-top:0;}
 .opt-row .lbl{font-size:13.5px; font-weight:600; color:var(--ink); flex:1;}
 .opt-row .lbl span{display:block; font-size:11.5px; color:var(--ink-dim); font-weight:400; margin-top:3px;}
+/* ---- sélecteur de personnes « Acknowledge Time » (auteurs / répondeurs) ---- */
+.ack-picker{margin-top:8px;}
+.ack-search{width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:9px; background:var(--panel-2); color:var(--ink); font:13px system-ui,sans-serif; padding:8px 11px; outline:none;}
+.ack-search:focus{border-color:var(--accent);}
+.ack-list{margin-top:8px; max-height:230px; overflow-y:auto; border:1px solid var(--line); border-radius:10px;}
+.ack-item{display:flex; align-items:center; gap:9px; padding:7px 11px; cursor:pointer; border-top:1px solid var(--line-2); font-size:13px;}
+.ack-item:first-child{border-top:0;}
+.ack-item:hover{background:var(--panel-2);}
+.ack-item.on{background:var(--accent-soft);}
+.ack-item input{accent-color:var(--accent); width:15px; height:15px; flex:none;}
+.ack-item .ack-name{color:var(--ink); font-weight:500; display:flex; align-items:center; gap:7px; min-width:0;}
+.ack-item .ack-badge{font:700 9px/1 var(--disp-font,'Space Grotesk'),sans-serif; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); background:var(--accent-soft); padding:2px 6px; border-radius:999px;}
+.ack-item .ack-email{margin-left:auto; font-size:11px; color:var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.ack-count{margin-top:6px; font-size:11.5px; color:var(--ink-faint);}
 .field{display:flex; flex-direction:column; gap:5px; margin-bottom:13px;}
 .field label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint);}
 .field input,.field select{border:1px solid var(--line); border-radius:9px; background:var(--panel-2); color:var(--ink); font:14px system-ui,sans-serif; padding:9px 12px; outline:none;}
