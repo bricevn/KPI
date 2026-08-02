@@ -50,7 +50,7 @@
 
     return (
       <div
-        className={'kcard' + (clickable ? ' clickable' : '')}
+        className={'kcard kcard-kpi' + (clickable ? ' clickable' : '')}
         onClick={open}
         role={clickable ? 'button' : undefined}
         tabIndex={clickable ? 0 : undefined}

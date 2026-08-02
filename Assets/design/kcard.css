@@ -60,3 +60,15 @@
 /* ---- variante : sparkline en barres à la place de la barre de progression ---- */
 .spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
 .spark > i { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; }
+
+/* ---- variante COMPACTE (page « Indicateurs ») ------------------------------------
+   Densité accrue : padding, pastille, valeur et barre réduits. Scopée sur .kcard-kpi
+   pour NE PAS toucher les cartes .kcard du Dashboard (studio.css). */
+.kcard-kpi { padding: var(--space-4); border-radius: var(--radius-lg); }
+.kcard-kpi .ktop { margin-bottom: var(--space-3); }
+.kcard-kpi .kchip { width: 22px; height: 22px; border-radius: var(--radius-xs); }
+.kcard-kpi .kchip svg { width: 13px; height: 13px; }
+.kcard-kpi .kbig { font-size: 22px; margin-bottom: var(--space-3); }
+.kcard-kpi .kbig small { font-size: 12px; }
+.kcard-kpi .kbar { height: 6px; }
+.kcard-kpi .kcap { margin-top: var(--space-2); }

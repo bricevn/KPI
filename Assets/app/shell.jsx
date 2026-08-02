@@ -123,7 +123,7 @@
           <div className="sb-h">{window.t('pilotage')}</div>
           <nav className="sb-nav">
             {NAV_IDS.map((id) =>
-            <button key={id} className={'sb-item' + (tab === id ? ' on' : '')} onClick={() => setTab(id)}>
+            <button key={id} className={'sb-item' + (tab === id ? ' on' : '')} onClick={() => setTab(id)} data-tip={window.t('navdesc_' + id)}>
                 {window.ICONS[id]}<span>{window.t('nav_' + id)}</span>
                 {id === 'anomalies' && <span className="badge">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
                 {id === 'issues' && <span className="cnt">{(A.tabs.find((t) => t.id === id) || {}).count}</span>}
@@ -131,8 +131,8 @@
             )}
           </nav>
           <div className="sb-sp"></div>
-          <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} title={window.t('nav_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
-          <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} title={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
+          <button className={'sb-item' + (tab === 'options' ? ' on' : '')} onClick={() => setTab('options')} data-tip={window.t('navdesc_options')}>{window.ICONS.options}<span>{window.t('nav_options')}</span></button>
+          <button className="sb-item sb-logout" onClick={() => {window.location.href = '/logout';}} data-tip={window.t('logout')}>{LOGOUT_ICON}<span>{window.t('logout')}</span></button>
           <button className="sb-collapse" onClick={() => setSbCollapsed((c) => !c)} title={sbCollapsed ? window.t('expandT') : window.t('reduceT')}>
             <span className="sb-collapse-ic">{window.ICONS.chevron}</span><span>{window.t('reduce')}</span>
           </button>

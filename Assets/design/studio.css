@@ -50,6 +50,38 @@
 .sb-item .cnt{margin-left:auto; font:600 11px/1 var(--disp-font,'Space Grotesk'),sans-serif; color:var(--ink-faint);}
 .sb-sp{flex:1;}
 
+/* ---- tooltips de la nav (survol / focus d'un item) ---------------------------
+   Apparaît À DROITE de l'item — indispensable en mode replié (icône seule), utile
+   en mode déployé (donne une description). Chip inversé thème-aware via les tokens
+   charte (--color-ink-1 / --color-surface-1). z-index élevé pour passer au-dessus
+   du contenu principal (la sidebar est avant .main dans le DOM). */
+.sb-item[data-tip]{position:relative;}
+.sb-item[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute; left:calc(100% + 11px); top:50%;
+  transform:translateY(-50%) translateX(-4px);
+  z-index:120; pointer-events:none;
+  width:max-content; max-width:230px; white-space:normal; text-align:left;
+  background:var(--color-ink-1,#10151c); color:var(--color-surface-1,#fff);
+  font-size:12px; font-weight:500; line-height:1.35;
+  padding:7px 10px; border-radius:9px;
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+  opacity:0; visibility:hidden;
+  transition:opacity var(--dur-base,.16s) var(--ease-out,ease), transform var(--dur-base,.16s) var(--ease-out,ease);
+}
+.sb-item[data-tip]::before{
+  content:""; position:absolute; left:calc(100% + 4px); top:50%;
+  transform:translateY(-50%); z-index:120; pointer-events:none;
+  border:5px solid transparent; border-right-color:var(--color-ink-1,#10151c);
+  opacity:0; visibility:hidden;
+  transition:opacity var(--dur-base,.16s) var(--ease-out,ease);
+}
+.sb-item[data-tip]:hover::after, .sb-item[data-tip]:focus-visible::after,
+.sb-item[data-tip]:hover::before, .sb-item[data-tip]:focus-visible::before{
+  opacity:1; visibility:visible; transition-delay:.22s;
+}
+.sb-item[data-tip]:hover::after, .sb-item[data-tip]:focus-visible::after{ transform:translateY(-50%) translateX(0); }
+
 /* ---------- main + header ---------- */
 .main{flex:1; min-width:0; padding:20px 24px 36px; display:flex; flex-direction:column; gap:16px;}
 .hd{display:flex; align-items:center; gap:16px;}
