@@ -57,6 +57,25 @@
     );
   }
 
+  // Une ligne de post « concerné » (popup Acknowledge Time) : pastille de verdict + titre (lien Canny) +
+  // auteur + répondeur/délai. Vert = réponse ≤ SLA, rouge = hors délai, neutre = aucune réponse éligible.
+  function AckPost({ r }) {
+    const t = window.t;
+    const col = r.answered ? (r.within ? 'var(--color-good)' : 'var(--color-bad)') : 'var(--color-neutral)';
+    return (
+      <div className="ackp-row">
+        <span className="ackp-dot" style={{ background: col }}></span>
+        <a className="ackp-title" href={r.url} target="_blank" rel="noreferrer">{r.title}</a>
+        <span className="ackp-author">{r.author}</span>
+        <span className="ackp-resp">
+          {r.answered
+            ? <span>{r.responder} · <b style={{ color: col }}>{r.delay}h</b></span>
+            : <span className="ackp-none">{t('kpi.ackNoResp')}</span>}
+        </span>
+      </div>
+    );
+  }
+
   window.TabIndicateurs = function TabIndicateurs() {
     const A = window.APP || {};
     const CANNY = window.__CANNY__ || null;
@@ -65,6 +84,7 @@
     const det = A.detail || [];
     const K = window.Kard;
     const [rmOpen, setRmOpen] = React.useState(false);
+    const [ackOpen, setAckOpen] = React.useState(false);
 
     const cards = [];
     const F = (a, aw, b, bw) => <span><b>{a}</b> {aw} · <b>{b}</b> {bw}</span>;
@@ -106,30 +126,52 @@
     //    CONCERNÉS (window.__ACKCFG__.authorIds — vide = tous) et une réponse d'un RÉPONDEUR autorisé
     //    (responderIds — vide = tout admin/status change, comportement historique). Par post, ackEvents =
     //    commentaires admin + changements de statut, avec l'id de l'auteur + délai ouvré (bh).
+    const ackCfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
+    const ackSlaH = (CANNY && CANNY.meta && CANNY.meta.slaConfig && CANNY.meta.slaConfig.hours) || 4;
     const hasAck = CANNY && CANNY.posts && CANNY.posts.some((p) => Array.isArray(p.ackEvents));
+    let ackRows = null, ackAnswered = 0, ackWithin = 0;   // exposés au popup (liste des posts concernés)
     if (hasAck) {
-      const ackCfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
       const authorSet = new Set(ackCfg.authorIds || []);
       const respSet = new Set(ackCfg.responderIds || []);
-      const slaH = (CANNY.meta && CANNY.meta.slaConfig && CANNY.meta.slaConfig.hours) || 4;
-      let answered = 0, within = 0;
+      const byId = {}; (CANNY.users || []).forEach((u) => { byId[u.id] = u; });
+      const uname = (id) => { const u = byId[id]; return u ? (u.name || u.email || id) : id; };
+      ackRows = [];
       CANNY.posts.forEach((p) => {
         if (authorSet.size && !authorSet.has(p.authorId)) return;            // hors périmètre « concernés »
         let ev = p.ackEvents || [];
         if (respSet.size) ev = ev.filter((e) => respSet.has(e.a));           // réponse d'un répondeur autorisé
-        if (!ev.length) return;                                              // non répondu → hors dénominateur
-        answered++;
-        const bh = Math.min.apply(null, ev.map((e) => e.bh));               // 1re réponse éligible (délai ouvré)
-        if (bh <= slaH) within++;
+        const first = ev.length ? ev.reduce((a, b) => (b.bh < a.bh ? b : a)) : null; // 1re réponse éligible
+        ackRows.push({
+          id: p.id, title: p.title || p.id, url: p.url, author: p.authorName || uname(p.authorId),
+          answered: !!first, delay: first ? first.bh : null, within: !!first && first.bh <= ackSlaH,
+          responder: first ? uname(first.a) : null, via: first ? first.v : null,
+        });
       });
-      const pct = answered ? Math.round(within / answered * 100) : 0;
-      card('ack', 'clock', t('kpi.ackTitle'), pct, answered > 0, colorUp(pct), F(within, '≤' + slaH + 'h', answered, t('kpi.answered')), t('kpi.ackInfo'));
+      ackAnswered = ackRows.filter((r) => r.answered).length;
+      ackWithin = ackRows.filter((r) => r.within).length;
+      // Tri : sans réponse d'abord, puis hors délai (le pire en haut), puis dans les délais.
+      const rank = (r) => (r.answered ? (r.within ? 2 : 1) : 0);
+      ackRows.sort((a, b) => rank(a) - rank(b) || ((b.delay || 0) - (a.delay || 0)));
+      const pct = ackAnswered ? Math.round(ackWithin / ackAnswered * 100) : 0;
+      const col = ackAnswered ? colorUp(pct) : 'var(--color-neutral)';
+      cards.push(
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+          value={ackAnswered ? pct + ' %' : '—'} display="bar" ratio={ackAnswered ? pct / 100 : 0} barColor={col}
+          footer={F(ackWithin, '≤' + ackSlaH + 'h', ackAnswered, t('kpi.answered'))}
+          popup onOpen={() => setAckOpen(true)} />
+      );
     } else if (agg.sla) {
-      // Repli : dataset extrait AVANT l'ajout des ackEvents (pas de recalcul filtré possible). On affiche
-      // l'agrégat serveur historique (non filtré) — relancer une extraction Canny active les deux listes.
+      // Repli : dataset extrait AVANT l'ajout des ackEvents (pas de liste par post ni de recalcul filtré).
+      // Agrégat serveur historique (non filtré). Cliquable → invite à ré-extraire Canny.
       const answered = (agg.sla.compliant || 0) + (agg.sla.breached || 0);
       const pct = answered ? Math.round((agg.sla.within4h || 0) / answered * 100) : 0;
-      card('ack', 'clock', t('kpi.ackTitle'), pct, answered > 0, colorUp(pct), F(agg.sla.within4h || 0, '≤4h', answered, t('kpi.answered')), t('kpi.ackInfo'));
+      const col = answered ? colorUp(pct) : 'var(--color-neutral)';
+      cards.push(
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+          value={answered ? pct + ' %' : '—'} display="bar" ratio={answered ? pct / 100 : 0} barColor={col}
+          footer={F(agg.sla.within4h || 0, '≤4h', answered, t('kpi.answered'))}
+          popup onOpen={() => setAckOpen(true)} />
+      );
     }
 
     // 3. Unplanned Work — part des issues « Unplanned » (cible < 15%, plus bas mieux).
@@ -188,6 +230,17 @@
             {rmHas
               ? <div className="rm-list">{rmTopics.map((tp) => <RmTopic key={tp.postId} tp={tp} />)}</div>
               : <p className="empty">{rmDataExists ? t('kpi.roadmapNoScope') : t('kpi.roadmapEmpty')}</p>}
+          </window.Modal>
+        )}
+
+        {ackOpen && (
+          <window.Modal title={t('kpi.ackTitle')}
+            subtitle={ackRows && ackRows.length ? ackRows.length + ' ' + t('kpi.postsConcerned') + ' · ' + ackWithin + ' / ' + ackAnswered + ' ≤' + ackSlaH + 'h' : undefined}
+            wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setAckOpen(false)}>
+            <p className="rm-intro">{t('kpi.ackInfo')}</p>
+            {ackRows && ackRows.length
+              ? <div className="ackp-list">{ackRows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+              : <p className="empty">{t('kpi.ackNoDetail')}</p>}
           </window.Modal>
         )}
       </div>

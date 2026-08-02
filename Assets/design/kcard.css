@@ -90,6 +90,19 @@
 .rm-count { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
 .rm-epic { padding: var(--space-2) 0; }
 .rm-epic + .rm-epic { border-top: 1px dashed var(--color-line-2); }
+
+/* ---- popup « Acknowledge Time » : liste des posts concernés ------------------------
+   Une ligne par post : pastille de verdict + titre (lien) + auteur + répondeur/délai. */
+.ackp-list { display: flex; flex-direction: column; }
+.ackp-row { display: flex; align-items: center; gap: var(--space-3); padding: 9px var(--space-2); font-size: var(--text-sm); border-top: 1px solid var(--color-line-2); }
+.ackp-row:first-child { border-top: 0; }
+.ackp-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
+.ackp-title { flex: 1; min-width: 0; color: var(--color-ink-1); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ackp-title:hover { color: var(--color-accent); text-decoration: underline; }
+.ackp-author { flex: none; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-3); }
+.ackp-resp { flex: none; min-width: 150px; text-align: right; font-size: var(--text-caption); color: var(--color-ink-2); white-space: nowrap; }
+.ackp-resp b { font-family: var(--font-mono); }
+.ackp-none { color: var(--color-neutral); }
 .rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
 .rm-epic-h:hover { color: var(--color-accent); }
 .rm-epic-h svg { flex: none; }
