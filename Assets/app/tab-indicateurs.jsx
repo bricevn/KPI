@@ -25,8 +25,10 @@
     const cards = [];
     const F = (a, aw, b, bw) => <span><b>{a}</b> {aw} · <b>{b}</b> {bw}</span>;
     function card(key, icon, title, pct, has, barColor, footer) {
-      cards.push(<K key={key} icon={icon} iconColor={barColor} title={title}
-        value={has ? pct + ' %' : '—'} display="bar" ratio={(pct || 0) / 100} barColor={barColor} footer={footer} />);
+      // Sans données : couleur NEUTRE (pas de faux verdict good/bad) + barre vide.
+      const col = has ? barColor : 'var(--color-neutral)';
+      cards.push(<K key={key} icon={icon} iconColor={col} title={title}
+        value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer} />);
     }
 
     // 1. Roadmap Adherence — sujet CONTRACTUAL fait (GitLab issues closed + Canny posts complete).
