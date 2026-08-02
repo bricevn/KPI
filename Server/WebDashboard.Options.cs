@@ -455,6 +455,45 @@ public sealed partial class WebDashboard
         return Results.Json(new { ok = true, connected = _config.ExternalConnections?.Canny?.Configured ?? false });
     }
 
+    // POST /api/options/ack { authorIds:[], responderIds:[] } (ADMIN) → listes « Acknowledge Time »
+    // (ids Canny). Non secret : écrit tel quel sous ExternalConnections.Canny et recharge à chaud. Le KPI
+    // recalcule le SLA côté client (window.__ACKCFG__ mis à jour dans l'onglet Options après sauvegarde).
+    private async Task<IResult> SaveAckAsync(HttpContext ctx)
+    {
+        var deny = RequireAdmin(ctx); if (deny != null) return deny;
+        var b = await ReadJsonBody(ctx);
+        List<string> ReadIds(string key) => (b?[key] as JsonArray)?
+            .Select(n => n?.GetValue<string>() ?? "").Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.Ordinal).ToList() ?? new();
+        var authorIds = ReadIds("authorIds");
+        var responderIds = ReadIds("responderIds");
+
+        JsonObject root;
+        try { root = (JsonNode.Parse(await File.ReadAllTextAsync(RuntimeConfigPath())) as JsonObject) ?? new JsonObject(); }
+        catch { root = new JsonObject(); }
+        var ext = root["ExternalConnections"] as JsonObject ?? new JsonObject(); root["ExternalConnections"] = ext;
+        var canny = ext["Canny"] as JsonObject ?? new JsonObject(); ext["Canny"] = canny;
+        var aArr = new JsonArray(); foreach (var x in authorIds) aArr.Add(x);
+        var rArr = new JsonArray(); foreach (var x in responderIds) rArr.Add(x);
+        canny["AckAuthorIds"] = aArr;
+        canny["AckResponderIds"] = rArr;
+
+        var outText = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await WriteFileAtomicAsync(RuntimeConfigPath(), outText);
+            var src = SourceConfigPath();
+            if (src != null && !string.Equals(src, RuntimeConfigPath(), StringComparison.OrdinalIgnoreCase))
+                await WriteFileAtomicAsync(src, outText);
+        }
+        catch (Exception e) { Console.Error.WriteLine("SaveAck write KO : " + e); return Results.Json(new { ok = false, error = "Écriture de la configuration impossible." }); }
+
+        try { _config = BuildConfig(); _payloadCache.Clear(); }
+        catch (Exception e) { Console.Error.WriteLine("SaveAck reload KO : " + e); return Results.Json(new { ok = false, error = "Enregistré, mais rechargement échoué (redémarrez le serveur)." }); }
+
+        return Results.Json(new { ok = true, authorIds, responderIds });
+    }
+
     // POST /api/setup/oauth { clientId, clientSecret, authority } → écrit Auth.ClientId/ClientSecret/Authority
     // dans appsettings.json, recharge la config, et INVALIDE le cache des options OAuth → reconfiguration À CHAUD
     // (le bouton SSO devient actif sans redémarrage). Le Secret n'est pas renvoyé au client.

@@ -101,6 +101,11 @@ public static class CannyDatasetBuilder
         var realCountByPost = new Dictionary<string, int>();
         var firstStatus = new Dictionary<string, long>();
         var commentTextByPost = new Dictionary<string, List<string>>();
+        // Événements d'acquittement ATTRIBUÉS (« Acknowledge Time ») : chaque commentaire admin et chaque
+        // changement de statut, avec (timestamp, id de l'auteur/changer). Émis par post → le client recalcule
+        // le SLA live selon les listes « auteurs concernés » / « répondeurs autorisés ».
+        var adminCmtsByPost = new Dictionary<string, List<(long ts, string aid)>>();
+        var statusByPost = new Dictionary<string, List<(long ts, string aid)>>();
         foreach (var c in comments)
         {
             var pid = c.Post?.Id;
@@ -116,7 +121,12 @@ public static class CannyDatasetBuilder
                 if (c.Author?.IsAdmin == true)
                 {
                     var t = ParseMs(c.Created);
-                    if (t.HasValue && (!firstAdminText.TryGetValue(pid, out var cur) || t.Value < cur)) firstAdminText[pid] = t.Value;
+                    if (t.HasValue)
+                    {
+                        if (!firstAdminText.TryGetValue(pid, out var cur) || t.Value < cur) firstAdminText[pid] = t.Value;
+                        if (!adminCmtsByPost.TryGetValue(pid, out var lst)) { lst = new(); adminCmtsByPost[pid] = lst; }
+                        lst.Add((t.Value, c.Author?.Id ?? ""));
+                    }
                 }
             }
         }
@@ -125,7 +135,12 @@ public static class CannyDatasetBuilder
             var pid = sc.Post?.Id;
             if (string.IsNullOrEmpty(pid)) continue;
             var t = ParseMs(sc.Created);
-            if (t.HasValue && (!firstStatus.TryGetValue(pid, out var cur) || t.Value < cur)) firstStatus[pid] = t.Value;
+            if (t.HasValue)
+            {
+                if (!firstStatus.TryGetValue(pid, out var cur) || t.Value < cur) firstStatus[pid] = t.Value;
+                if (!statusByPost.TryGetValue(pid, out var lst)) { lst = new(); statusByPost[pid] = lst; }
+                lst.Add((t.Value, sc.Changer?.Id ?? ""));
+            }
         }
 
         // ---- roadmaps (normalisation + tables de référence) ----
@@ -182,6 +197,14 @@ public static class CannyDatasetBuilder
             string? planned = raw != null && roadmapByKey.TryGetValue(Norm(raw), out var pn) ? pn : null;
             var cur = Current(p);
             commentTextByPost.TryGetValue(p.Id, out var ctext);
+            // Événements d'acquittement du post (commentaires admin + changements de statut), avec l'id de
+            // l'auteur et le délai OUVRÉ (heures) depuis la création. Le client en dérive le SLA filtré.
+            double Bh(long ts) => Math.Round(BusinessMs(created, ts) / (double)Hour, 2, MidpointRounding.AwayFromZero);
+            var ackEvents = new List<object>();
+            if (adminCmtsByPost.TryGetValue(p.Id, out var acl))
+                foreach (var (ts, aid) in acl) ackEvents.Add(new { a = aid, v = "c", bh = Bh(ts) });
+            if (statusByPost.TryGetValue(p.Id, out var scl))
+                foreach (var (ts, aid) in scl) ackEvents.Add(new { a = aid, v = "s", bh = Bh(ts) });
             return new
             {
                 id = p.Id,
@@ -196,6 +219,8 @@ public static class CannyDatasetBuilder
                 realCommentCount = realCountByPost.GetValueOrDefault(p.Id),
                 created = p.Created,
                 authorId = p.Author?.Id,
+                authorName = p.Author?.Name,
+                ackEvents,
                 categoryId = p.Category?.Id,
                 tagIds = (p.Tags ?? new()).Select(t => t.Id).ToList(),
                 roadmapIds = (p.Roadmaps ?? new()).Select(r => r.Id).ToList(),

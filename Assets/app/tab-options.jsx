@@ -664,6 +664,74 @@
       </div>);
   }
 
+  // Listes « Acknowledge Time » : auteurs CONCERNÉS + répondeurs AUTORISÉS, cochés depuis les utilisateurs
+  // Canny (window.__CANNY__.users). Recalcul LIVE du KPI : à la sauvegarde on met à jour window.__ACKCFG__
+  // (l'onglet Indicateurs recalcule au prochain rendu, sans ré-extraction).
+  function AckConfigEditor() {
+    const users = ((window.__CANNY__ || {}).users) || [];
+    const cfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
+    const [authors, setAuthors] = useState(() => new Set(cfg.authorIds || []));
+    const [responders, setResponders] = useState(() => new Set(cfg.responderIds || []));
+    const [qA, setQA] = useState('');
+    const [qR, setQR] = useState('');
+    const [st, setSt] = useState('idle');
+    const [err, setErr] = useState('');
+    if (!users.length) return null; // Canny non extrait → aucune personne à lister
+
+    const label = (u) => u.name || u.email || u.id;
+    const match = (u, q) => { q = q.trim().toLowerCase(); return !q || (label(u) + ' ' + (u.email || '')).toLowerCase().indexOf(q) >= 0; };
+    const toggle = (setFn) => (id) => setFn((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    const sortU = (a, b) => (a.isAdmin === b.isAdmin ? label(a).localeCompare(label(b)) : (a.isAdmin ? -1 : 1));
+    const save = () => {
+      setSt('busy'); setErr('');
+      const body = { authorIds: Array.from(authors), responderIds: Array.from(responders) };
+      fetch('/api/options/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then((r) => r.json()).then((j) => {
+          if (j.ok) { setSt('done'); window.__ACKCFG__ = { authorIds: j.authorIds || [], responderIds: j.responderIds || [] }; }
+          else { setSt('err'); setErr(j.error || ''); }
+        }).catch(() => { setSt('err'); setErr(''); });
+    };
+    const picker = (sel, setSel, q, setQ, onlyAdmins) => {
+      const list = users.filter((u) => (!onlyAdmins || u.isAdmin) && match(u, q)).sort(sortU);
+      return (
+        <div className="ack-picker">
+          <input className="ack-search" placeholder={window.t('common.search')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="ack-list">
+            {list.map((u) => (
+              <label key={u.id} className={'ack-item' + (sel.has(u.id) ? ' on' : '')}>
+                <input type="checkbox" checked={sel.has(u.id)} onChange={() => toggle(setSel)(u.id)} />
+                <span className="ack-name">{label(u)}{u.isAdmin && <span className="ack-badge">admin</span>}</span>
+                {u.email && u.email !== label(u) && <span className="ack-email">{u.email}</span>}
+              </label>
+            ))}
+            {!list.length && <div className="muted" style={{ padding: '8px 10px' }}>{window.t('common.none')}</div>}
+          </div>
+          <div className="ack-count">{sel.size} {window.t('opt.ackSelected')}</div>
+        </div>
+      );
+    };
+    return (
+      <div className="opt-sec">
+        <h3>{window.t('opt.ackTitle')}</h3>
+        <p className="lead">{window.t('opt.ackLead')}</p>
+        <div className="opt-row" style={{ alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="lbl">{window.t('opt.ackAuthors')}<span>{window.t('opt.ackAuthorsSub')}</span></div>
+            {picker(authors, setAuthors, qA, setQA, false)}
+          </div>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div className="lbl">{window.t('opt.ackResponders')}<span>{window.t('opt.ackRespondersSub')}</span></div>
+            {picker(responders, setResponders, qR, setQR, true)}
+          </div>
+        </div>
+        <div className="opt-row" style={{ justifyContent: 'flex-end', gap: 12 }}>
+          {st === 'done' && <span className="opt-note" style={{ color: 'var(--c-good,#2f9e44)' }}>{window.t('opt.ackApplied')}</span>}
+          {st === 'err' && <span className="opt-note" style={{ color: 'var(--c-bad,#e5484d)' }}>{err || window.t('opt.saveError')}</span>}
+          <button className="btn btn-primary" disabled={st === 'busy'} onClick={save}>{window.t('opt.save')}</button>
+        </div>
+      </div>);
+  }
+
   // ===================== ONGLET =====================
   window.TabOptions = function TabOptions({ theme, setTheme, appearance }) {
     const { accent, setAccent, numFont, setNumFont, compact, setCompact, drillLayout, setDrillLayout } = appearance;
@@ -833,6 +901,8 @@
         {isAdmin && <WorkTimeEditor lang={appearance.lang} />}
 
         {isAdmin && <CannyConfigEditor />}
+
+        {isAdmin && <AckConfigEditor />}
 
         {isAdmin ? <AdminConfigEditor S={S} /> : <ReadOnlyConfig S={S} />}
       </div>);

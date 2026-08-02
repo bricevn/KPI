@@ -101,8 +101,32 @@
         popup onOpen={() => setRmOpen(true)} />
     );
 
-    // 2. Acknowledge Time — réponse Canny ≤ 4h ouvrées.
-    if (agg.sla) {
+    // 2. Acknowledge Time — part des demandes Canny répondues en ≤ SLA (heures ouvrées). Recalcul CLIENT
+    //    filtré par deux listes configurables (Options → admin) : on ne compte QUE les posts d'auteurs
+    //    CONCERNÉS (window.__ACKCFG__.authorIds — vide = tous) et une réponse d'un RÉPONDEUR autorisé
+    //    (responderIds — vide = tout admin/status change, comportement historique). Par post, ackEvents =
+    //    commentaires admin + changements de statut, avec l'id de l'auteur + délai ouvré (bh).
+    const hasAck = CANNY && CANNY.posts && CANNY.posts.some((p) => Array.isArray(p.ackEvents));
+    if (hasAck) {
+      const ackCfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
+      const authorSet = new Set(ackCfg.authorIds || []);
+      const respSet = new Set(ackCfg.responderIds || []);
+      const slaH = (CANNY.meta && CANNY.meta.slaConfig && CANNY.meta.slaConfig.hours) || 4;
+      let answered = 0, within = 0;
+      CANNY.posts.forEach((p) => {
+        if (authorSet.size && !authorSet.has(p.authorId)) return;            // hors périmètre « concernés »
+        let ev = p.ackEvents || [];
+        if (respSet.size) ev = ev.filter((e) => respSet.has(e.a));           // réponse d'un répondeur autorisé
+        if (!ev.length) return;                                              // non répondu → hors dénominateur
+        answered++;
+        const bh = Math.min.apply(null, ev.map((e) => e.bh));               // 1re réponse éligible (délai ouvré)
+        if (bh <= slaH) within++;
+      });
+      const pct = answered ? Math.round(within / answered * 100) : 0;
+      card('ack', 'clock', t('kpi.ackTitle'), pct, answered > 0, colorUp(pct), F(within, '≤' + slaH + 'h', answered, t('kpi.answered')), t('kpi.ackInfo'));
+    } else if (agg.sla) {
+      // Repli : dataset extrait AVANT l'ajout des ackEvents (pas de recalcul filtré possible). On affiche
+      // l'agrégat serveur historique (non filtré) — relancer une extraction Canny active les deux listes.
       const answered = (agg.sla.compliant || 0) + (agg.sla.breached || 0);
       const pct = answered ? Math.round((agg.sla.within4h || 0) / answered * 100) : 0;
       card('ack', 'clock', t('kpi.ackTitle'), pct, answered > 0, colorUp(pct), F(agg.sla.within4h || 0, '≤4h', answered, t('kpi.answered')), t('kpi.ackInfo'));

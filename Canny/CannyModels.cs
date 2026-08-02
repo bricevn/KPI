@@ -76,6 +76,9 @@ public sealed class CannyStatusChangeRaw
     public string? Status { get; set; }
     public string? Created { get; set; }
     public CannyRef? Post { get; set; }
+    /// <summary>Admin ayant effectué le changement de statut (id/nom). Sert à attribuer l'acquittement
+    /// (« Acknowledge Time ») à une personne — filtrable par la liste des répondeurs autorisés.</summary>
+    public CannyAuthor? Changer { get; set; }
 }
 
 public sealed class CannyUserRaw

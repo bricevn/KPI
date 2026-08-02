@@ -191,7 +191,7 @@ public sealed class DashboardView
         }).ToList(),
     };
 
-    public static string BuildReferencePage(string payloadJson, string lang = "en", string? cannyJson = null, string? roadmapJson = null)
+    public static string BuildReferencePage(string payloadJson, string lang = "en", string? cannyJson = null, string? roadmapJson = null, string? ackCfgJson = null)
     {
         var baseDir = AppContext.BaseDirectory;
         string A(string sub, string f) => File.ReadAllText(Path.Combine(baseDir, "Assets", sub, f));
@@ -239,6 +239,9 @@ public sealed class DashboardView
             sb.AppendLine("  <script>window.__CANNY__ = " + (string.IsNullOrEmpty(cannyJson) ? "null" : Esc(cannyJson)) + ";</script>");
             // Adhérence roadmap (KPI Roadmap Adherence) : sujets [N] + états d'issues GitLab résolus. null si non résolu.
             sb.AppendLine("  <script>window.__ROADMAP__ = " + (string.IsNullOrEmpty(roadmapJson) ? "null" : Esc(roadmapJson)) + ";</script>");
+            // Listes « Acknowledge Time » (auteurs concernés / répondeurs autorisés) : ids Canny, non secrets.
+            // Le KPI recalcule le SLA côté client à partir de ces listes + des ackEvents par post.
+            sb.AppendLine("  <script>window.__ACKCFG__ = " + (string.IsNullOrEmpty(ackCfgJson) ? "{\"authorIds\":[],\"responderIds\":[]}" : ackCfgJson) + ";</script>");
         }
         // i18n CLIENT : window.__LANG__ (langue serveur) PUIS i18n.js (définit window.t) — AVANT les .jsx,
         // qui appellent window.t() au render. Script sync = exécuté avant les <script type="text/babel">.

@@ -192,6 +192,13 @@ public sealed class CannyConfig
     public string TimeZone { get; set; } = "Europe/Paris";
     public int RequestTimeoutSeconds { get; set; } = 60;
 
+    /// <summary>« Acknowledge Time » — ids d'utilisateurs Canny dont les posts sont CONCERNÉS par le SLA.
+    /// Vide = tous les posts comptent. (Non secret : injecté au client pour recalcul live.)</summary>
+    public List<string> AckAuthorIds { get; set; } = new();
+    /// <summary>« Acknowledge Time » — ids d'utilisateurs Canny dont la réponse VALIDE l'acquittement
+    /// (commentaire ou changement de statut). Vide = tout admin (comportement historique).</summary>
+    public List<string> AckResponderIds { get; set; } = new();
+
     /// <summary>True si la connexion Canny est exploitable (clé API renseignée).</summary>
     public bool Configured => !string.IsNullOrWhiteSpace(ApiKey);
 }

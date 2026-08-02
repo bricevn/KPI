@@ -312,6 +312,7 @@ public sealed partial class WebDashboard
         app.MapPost("/api/refresh-canny", (Func<HttpContext, Task<IResult>>)(ctx => self.RefreshCannyAsync(ctx)));
         app.MapGet("/api/canny-status", () => Results.Json(self._cannyState.Snapshot()));
         app.MapPost("/api/options/canny", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveCannyAsync(ctx)));
+        app.MapPost("/api/options/ack", (Func<HttpContext, Task<IResult>>)(ctx => self.SaveAckAsync(ctx)));
         // Édition de la config depuis le dashboard (ADMIN, cf. RequireAdmin) : listing live des projets/labels
         // (via le token de groupe STOCKÉ) + sauvegarde des sections Export.* (projets/phases/labels).
         app.MapGet("/api/options/projects", (Func<HttpContext, Task<IResult>>)(ctx => self.OptionsProjectsAsync(ctx)));
@@ -442,7 +443,14 @@ public sealed partial class WebDashboard
         var cannyJson = Kpi.Canny.CannyService.TryReadDatasetJson(_config);
         // Adhérence roadmap (KPI Roadmap Adherence) : sujets [N] + états d'issues résolus. null si non résolu.
         var roadmapJson = Kpi.Canny.CannyService.TryReadRoadmapJson(_config);
-        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson, roadmapJson), "text/html; charset=utf-8");
+        // Listes « Acknowledge Time » (ids Canny) injectées au client pour le recalcul live du SLA.
+        var ackCanny = _config.ExternalConnections?.Canny;
+        var ackCfgJson = JsonSerializer.Serialize(new
+        {
+            authorIds = ackCanny?.AckAuthorIds ?? new List<string>(),
+            responderIds = ackCanny?.AckResponderIds ?? new List<string>(),
+        });
+        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson, roadmapJson, ackCfgJson), "text/html; charset=utf-8");
     }
 
     private IResult CancelAsync(HttpContext ctx)
