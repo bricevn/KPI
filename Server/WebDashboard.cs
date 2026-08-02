@@ -330,7 +330,7 @@ public sealed partial class WebDashboard
         app.MapGet("/setup", (HttpContext ctx) =>
         {
             if (!self.IsConfigured() || self.IsAdminLogin(ctx.User.Identity?.Name))
-                return Results.Content(SetupView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName), "text/html; charset=utf-8");
+                return Results.Content(SetupView.Page(self._config.Auth, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, self._config.ExternalConnections?.Canny?.Configured ?? false), "text/html; charset=utf-8");
             return (ctx.User.Identity?.IsAuthenticated ?? false) ? Results.Redirect("/") : Results.Redirect("/login");
         }).AllowAnonymous();
         // Endpoints de l'assistant : ouverts au bootstrap (non configuré), sinon admin-only (RequireSetupAccess).

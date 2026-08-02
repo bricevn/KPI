@@ -36,18 +36,30 @@ public sealed class ExportService
         Console.WriteLine($"  -> {issues.Count} issues récupérées.");
         onProgress?.Invoke(0, issues.Count);
 
-        var exports = new List<IssueExport>(issues.Count);
-        int index = 0;
-        foreach (var issue in issues)
+        // Traitement PARALLÈLE des issues (concurrence bornée). Chaque issue déclenche ~4-5 appels API
+        // (label events, notes, MRs, approvals) ; les enchaîner en séquence sur N issues était le goulot
+        // (« milestone lente »). BuildSingleAsync n'a aucun état partagé mutable → sûr en concurrent ;
+        // l'ordre du résultat est préservé (tableau indexé). Concurrence bornée = prudent vs rate-limit GitLab.
+        const int MaxConcurrency = 6;
+        var exports = new IssueExport[issues.Count];
+        var done = 0;
+        using var gate = new SemaphoreSlim(MaxConcurrency);
+        async Task ProcessAsync(int i)
         {
-            index++;
-            Console.WriteLine($"  [{index}/{issues.Count}] #{issue.Iid} — {Truncate(issue.Title, 60)}");
-
-            var export = await BuildSingleAsync(issue, ct);
-            exports.Add(export);
-            onProgress?.Invoke(index, issues.Count);
+            await gate.WaitAsync(ct);
+            try
+            {
+                exports[i] = await BuildSingleAsync(issues[i], ct);
+                var n = Interlocked.Increment(ref done);
+                Console.WriteLine($"  [{n}/{issues.Count}] #{issues[i].Iid} — {Truncate(issues[i].Title, 60)}");
+                onProgress?.Invoke(n, issues.Count);
+            }
+            finally { gate.Release(); }
         }
-        return exports;
+        var tasks = new List<Task>(issues.Count);
+        for (var i = 0; i < issues.Count; i++) tasks.Add(ProcessAsync(i));
+        await Task.WhenAll(tasks);
+        return exports.ToList();
     }
 
     private async Task<IssueExport> BuildSingleAsync(GitLabIssue issue, CancellationToken ct)

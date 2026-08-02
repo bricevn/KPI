@@ -17,7 +17,7 @@ namespace Kpi.Views;
 
 public static partial class SetupView
 {
-    public static string Page(AuthConfig auth, string culture = "en")
+    public static string Page(AuthConfig auth, string culture = "en", bool cannyConfigured = false)
     {
         // Champ instance TOUJOURS vide par défaut (placeholder gitlab.com) — AUCUN pré-remplissage ET AUCUNE trace
         // de l'instance configurée dans la page (ni champ, ni indicateur). L'« Instance : … » ne reflète que ce que
@@ -28,6 +28,7 @@ public static partial class SetupView
         return Html
             .Replace("__I18N__", I18nJs) // i18n extrait dans SetupView.I18n.cs (partial)
             .Replace("__OAUTH__", auth.OAuthConfigured ? "true" : "false")
+            .Replace("__CANNY_OK__", cannyConfigured ? "true" : "false")
             .Replace("__DEFAULT_INSTANCE__", "")
             .Replace("__SLANG__", lc)
             .Replace("__DIR__", Kpi.Localization.Loc.IsRtl(lc) ? " dir=\"rtl\"" : "")
@@ -365,6 +366,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family
   // ---- i18n (FR/EN) ----
   var SLANG='__SLANG__';
   var OAUTHOK=__OAUTH__; // OAuth GitLab configuré côté serveur (Auth.ClientId/ClientSecret)
+  var CANNYOK=__CANNY_OK__; // connexion Canny déjà configurée côté serveur (ExternalConnections.Canny)
 __I18N__
   // Fallback i18n PAR CLÉ vers l'anglais : une clé absente dans la langue courante retombe sur EN
   // (au lieu d'« undefined »). Permet de n'ajouter les nouvelles clés qu'en en+fr.
@@ -378,7 +380,7 @@ __I18N__
     phaseScope:'all',phaseProj:null,phasesByProject:{},labelPhaseByProject:{},
     acc1:[],teamOpen:[],adminState:'idle',adminUser:null,oauthClientId:'',oauthSecret:'',oauthEdit:false,adminErr:'',
     openDd:'',exportMilestone:{},
-    cannyApiKey:'',cannyConnected:false,cannyState:'idle',cannyErr:'',
+    cannyApiKey:'',cannyConnected:CANNYOK,cannyState:'idle',cannyErr:'',
     teams:[],memberships:[],saving:false,saveErr:'',launching:false,progress:null};
   var app=document.getElementById('app');
   // Répertoire username→nom (reconstruit depuis les groupes renvoyés par /api/setup/test).
@@ -625,7 +627,7 @@ __I18N__
     var _vt=visibleTeams();var _vid={};_vt.forEach(function(t){_vid[t.id]=1;});
     var ppl={};ST.memberships.forEach(function(m){if(_vid[m.teamId])ppl[m.pid]=1;});
     var phVal=ST.phaseScope==='per'?T.perProjectRecap:(mapped+T.labelsLinked);
-    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,_vt.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3]];
+    var rows=[['link',T.stepConnexion,ST.baseUrl.replace(/^https?:\/\//,''),0],['box',T.stepProjets,imp.length?imp.join(', '):T.none,1],['layers',T.stepPhases,phVal,2],['users',T.stepEquipes,_vt.length+T.teamsCount+Object.keys(ppl).length+T.peopleCount,3],['server',T.stepConnexions,ST.cannyConnected?T.cannyDone:'—',4]];
     var h='<div class="recap">';
     for(var i=0;i<rows.length;i++)h+='<div class="rrow"><span class="ric">'+ic(rows[i][0],15)+'</span><div class="rk">'+rows[i][1]+'</div><div class="rv">'+esc(rows[i][2])+'</div><button class="redit" data-act="goto:'+rows[i][3]+'">'+T.edit+'</button></div>';
     h+='</div>';
