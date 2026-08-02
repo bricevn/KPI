@@ -78,9 +78,19 @@
     // 1. Roadmap Adherence — sujets roadmap « [N] » corrélés à GitLab. Adhérent = statut Canny « complete »
     //    ET toutes les issues liées fermées (celles de l'épic et/ou les issues directes). Pré-résolu côté
     //    serveur dans window.__ROADMAP__ (voir RoadmapAdherenceResolver). Carte CLIQUABLE → détail par sujet.
+    //    FILTRÉ par la milestone active : corrélation milestone GitLab ↔ roadmap Canny résolue PAR NOM
+    //    (« 2026-R2 » ↔ « Roadmap 2026.r2 » : minuscules + retrait de « roadmap » et des non-alphanumériques).
     const RM = window.__ROADMAP__ || null;
-    const rmTotal = RM && RM.summary ? RM.summary.total : 0;
-    const rmAdh = RM && RM.summary ? RM.summary.adherent : 0;
+    const rmAllTopics = (RM && RM.topics) || [];
+    const activeMs = window.__activeMilestones || [];
+    const normMs = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normRm = (s) => String(s).toLowerCase().replace(/roadmap/g, '').replace(/[^a-z0-9]/g, '');
+    const selMsNorm = activeMs.map(normMs).filter(Boolean);
+    const rmInScope = (tp) => !selMsNorm.length || (tp.roadmaps || []).map(normRm).some((r) => selMsNorm.indexOf(r) >= 0);
+    const rmTopics = rmAllTopics.filter(rmInScope);
+    const rmDataExists = rmAllTopics.length > 0;   // des sujets existent (extraction Canny faite) vs filtre sans correspondance
+    const rmTotal = rmTopics.length;
+    const rmAdh = rmTopics.filter((x) => x.adherent).length;
     const rmPct = rmTotal ? Math.round(rmAdh / rmTotal * 100) : 0;
     const rmHas = rmTotal > 0;
     const rmCol = rmHas ? colorUp(rmPct) : 'var(--color-neutral)';
@@ -147,12 +157,13 @@
         {!CANNY && <p style={{ marginTop: 16, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
 
         {rmOpen && (
-          <window.Modal title={t('kpi.roadmapTitle')} subtitle={rmHas ? rmAdh + ' / ' + rmTotal + ' ' + t('kpi.adherent') : undefined}
+          <window.Modal title={t('kpi.roadmapTitle')}
+            subtitle={[rmHas ? rmAdh + ' / ' + rmTotal + ' ' + t('kpi.adherent') : null, activeMs.length ? activeMs.join(', ') : null].filter(Boolean).join(' · ') || undefined}
             wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setRmOpen(false)}>
             <p className="rm-intro">{t('kpi.roadmapInfo')}</p>
             {rmHas
-              ? <div className="rm-list">{RM.topics.map((tp) => <RmTopic key={tp.postId} tp={tp} />)}</div>
-              : <p className="empty">{t('kpi.roadmapEmpty')}</p>}
+              ? <div className="rm-list">{rmTopics.map((tp) => <RmTopic key={tp.postId} tp={tp} />)}</div>
+              : <p className="empty">{rmDataExists ? t('kpi.roadmapNoScope') : t('kpi.roadmapEmpty')}</p>}
           </window.Modal>
         )}
       </div>

@@ -22,6 +22,7 @@
       'kpi.refactorInfo': 'Refactoring : part des issues « Refactor » sur le périmètre filtré. Cible < 20 % (plus bas = mieux).',
       'kpi.saydoInfo': 'Say/Do Ratio : roadmap Canny livrée vs prévue (taux de validation des éléments de roadmap).',
       'kpi.roadmapEmpty': 'Aucune donnée d’adhérence pour l’instant. Lancez un rafraîchissement Canny (Options → Rafraîchir Canny) : l’adhérence roadmap est résolue pendant l’extraction Canny.',
+      'kpi.roadmapNoScope': 'Aucun sujet roadmap ne correspond à la milestone sélectionnée. La roadmap Canny est corrélée par nom (ex. « 2026-R2 » ↔ « Roadmap 2026.r2 »).',
       nav_dashboard: 'Dashboard', nav_charts: 'Graphiques', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendrier', nav_velocity: 'Vélocité', nav_options: 'Options', nav_comparison: 'Évolution',
       // descriptions courtes affichées en tooltip au survol des items de la sidebar
@@ -181,6 +182,7 @@
       'kpi.refactorInfo': 'Refactoring: share of "Refactor" issues in the filtered scope. Target < 20% (lower is better).',
       'kpi.saydoInfo': 'Say/Do Ratio: Canny roadmap delivered vs planned (roadmap validation rate).',
       'kpi.roadmapEmpty': 'No adherence data yet. Run a Canny refresh (Options → Refresh Canny): roadmap adherence is resolved during the Canny extraction.',
+      'kpi.roadmapNoScope': 'No roadmap topic matches the selected milestone. The Canny roadmap is correlated by name (e.g. "2026-R2" ↔ "Roadmap 2026.r2").',
       nav_dashboard: 'Dashboard', nav_charts: 'Charts', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendar', nav_velocity: 'Velocity', nav_options: 'Options', nav_comparison: 'Evolution',
       navdesc_indicateurs: 'KPI cards — product health at a glance',

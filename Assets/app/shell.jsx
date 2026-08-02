@@ -111,6 +111,8 @@
     // Filtrage réel : on ne garde de fMilestone que les VRAIES milestones (le sentinel « Tout le projet »
     // n'en est pas une → []=toutes). Reconstruit window.APP EN PLACE (mémoïsé par signature).
     const realMs = fMilestone.filter((m) => ((A.filterOptions || {}).milestones || []).indexOf(m) >= 0);
+    // Milestones actives exposées au KPI Roadmap Adherence (corrélation milestone ↔ roadmap Canny par NOM).
+    window.__activeMilestones = realMs;
     if (window.__applyFilters) window.__applyFilters({ milestones: realMs, labels: fLabel, teams: fTeam, users: fUser });
 
     return (
