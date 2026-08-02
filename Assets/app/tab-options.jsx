@@ -786,7 +786,11 @@
           </div>}
           {regenBusy &&
           <div className="opt-row">
-            <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
+            <div className="lbl">{window.t('opt.extracting')}<span>{prog ? (
+              prog.milestoneCount > 0
+                ? window.t('opt.milestone') + ' ' + prog.milestoneCurrent + '/' + prog.milestoneCount + (prog.currentMilestone ? ' · ' + prog.currentMilestone : '') + ' — ' + (prog.totalIssues || 0) + ' ' + window.t('issues')
+                : (prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…')
+            ) : '…'}</span></div>
             <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
             <button className="btn" onClick={doCancel}>{window.t('opt.cancel')}</button>
           </div>}

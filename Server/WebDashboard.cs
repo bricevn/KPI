@@ -506,14 +506,31 @@ public sealed partial class WebDashboard
                 // v2 multi-serveurs : extraction cloisonnée + chiffrée, CIBLABLE par projet et/ou
                 // milestone (merge du store : seule la portée demandée est remplacée).
                 if (milestonesToRefresh.Count == 0)
-                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, projectFilter);
+                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token, projectFilter);
                 else
+                {
+                    // Récap : « Milestone en cours / max » + cumul d'issues de la sélection. selTotal accumule
+                    // les milestones terminées ; pendant l'une, on affiche selTotal + progression courante.
+                    _state.MilestoneCount = milestonesToRefresh.Count;
+                    var selTotal = 0;
                     for (int i = 0; i < milestonesToRefresh.Count; i++)
                     {
                         linked.Token.ThrowIfCancellationRequested();
+                        _state.MilestoneCurrent = i + 1;
+                        _state.CurrentMilestone = milestonesToRefresh[i];
                         Console.WriteLine($"[Refresh] Milestone {i + 1}/{milestonesToRefresh.Count} : {milestonesToRefresh[i]}");
-                        await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) => { _state.Current = cur; _state.Total = tot; }, linked.Token, projectFilter, milestonesToRefresh[i]);
+                        var msMax = 0;
+                        var baseTotal = selTotal;
+                        await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) =>
+                        {
+                            _state.Current = cur; _state.Total = tot;
+                            if (tot > msMax) msMax = tot;
+                            _state.TotalIssues = baseTotal + cur;
+                        }, linked.Token, projectFilter, milestonesToRefresh[i]);
+                        selTotal += msMax;
+                        _state.TotalIssues = selTotal;
                     }
+                }
             }
             else
             {
@@ -852,6 +869,11 @@ public sealed partial class WebDashboard
         private string? _lastError;
         private DateTime? _lastRefreshAt;
         private DateTime? _startedAt;
+        // Récap enrichi : position dans la sélection de milestones + cumul d'issues de la sélection.
+        private int _milestoneCurrent;
+        private int _milestoneCount;
+        private string? _currentMilestone;
+        private int _totalIssues;
 
         public bool Running { get { lock (_lock) return _running; } set { lock (_lock) _running = value; } }
         public int Current { get { lock (_lock) return _current; } set { lock (_lock) _current = value; } }
@@ -859,8 +881,12 @@ public sealed partial class WebDashboard
         public string? LastError { get { lock (_lock) return _lastError; } set { lock (_lock) _lastError = value; } }
         public DateTime? LastRefreshAt { get { lock (_lock) return _lastRefreshAt; } set { lock (_lock) _lastRefreshAt = value; } }
         public DateTime? StartedAt { get { lock (_lock) return _startedAt; } set { lock (_lock) _startedAt = value; } }
+        public int MilestoneCurrent { get { lock (_lock) return _milestoneCurrent; } set { lock (_lock) _milestoneCurrent = value; } }
+        public int MilestoneCount { get { lock (_lock) return _milestoneCount; } set { lock (_lock) _milestoneCount = value; } }
+        public string? CurrentMilestone { get { lock (_lock) return _currentMilestone; } set { lock (_lock) _currentMilestone = value; } }
+        public int TotalIssues { get { lock (_lock) return _totalIssues; } set { lock (_lock) _totalIssues = value; } }
 
-        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; } }
+        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; _milestoneCurrent = 0; _milestoneCount = 0; _currentMilestone = null; _totalIssues = 0; } }
 
         public StateSnapshot Snapshot()
         {
@@ -874,6 +900,10 @@ public sealed partial class WebDashboard
                     lastError = _lastError,
                     lastRefreshAt = _lastRefreshAt?.ToString("yyyy-MM-dd HH:mm:ss"),
                     startedAt = _startedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    milestoneCurrent = _milestoneCurrent,
+                    milestoneCount = _milestoneCount,
+                    currentMilestone = _currentMilestone,
+                    totalIssues = _totalIssues,
                 };
             }
         }
@@ -887,6 +917,11 @@ public sealed partial class WebDashboard
         public string? lastError { get; set; }
         public string? lastRefreshAt { get; set; }
         public string? startedAt { get; set; }
+        // Récap enrichi (récupération par milestone).
+        public int milestoneCurrent { get; set; }
+        public int milestoneCount { get; set; }
+        public string? currentMilestone { get; set; }
+        public int totalIssues { get; set; }
     }
 
     private sealed class RefreshRequest
