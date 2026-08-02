@@ -21,6 +21,7 @@
     const t = window.t;
     const det = A.detail || [];
     const K = window.Kard;
+    const [rmOpen, setRmOpen] = React.useState(false);
 
     const cards = [];
     const F = (a, aw, b, bw) => <span><b>{a}</b> {aw} · <b>{b}</b> {bw}</span>;
@@ -31,19 +32,22 @@
         value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer} />);
     }
 
-    // 1. Roadmap Adherence — sujet CONTRACTUAL fait (GitLab issues closed + Canny posts complete).
-    const glC = det.filter((d) => hasExact(d, 'contractual'));
-    const glCdone = glC.filter((d) => d.state === 'closed').length;
-    let cnC = 0, cnCdone = 0;
-    if (CANNY) {
-      const ids = (CANNY.tags || []).filter((tg) => String(tg.name).toLowerCase() === 'contractual').map((tg) => tg.id);
-      const posts = (CANNY.posts || []).filter((p) => (p.tagIds || []).some((id) => ids.indexOf(id) >= 0));
-      cnC = posts.length; cnCdone = posts.filter((p) => p.valide || p.status === 'complete').length;
-    }
-    const raT = glC.length + cnC, raD = glCdone + cnCdone;
-    const raPct = raT ? Math.round(raD / raT * 100) : 0;
-    card('roadmap', 'circle-check', t('kpi.roadmapTitle'), raPct, raT > 0, colorUp(raPct),
-      F(glCdone + '/' + glC.length, 'GitLab', cnCdone + '/' + cnC, 'Canny'));
+    // 1. Roadmap Adherence — sujets roadmap « [N] » corrélés à GitLab. Adhérent = statut Canny « complete »
+    //    ET toutes les issues liées fermées (celles de l'épic et/ou les issues directes). Pré-résolu côté
+    //    serveur dans window.__ROADMAP__ (voir RoadmapAdherenceResolver). Carte CLIQUABLE → détail par sujet.
+    const RM = window.__ROADMAP__ || null;
+    const rmTotal = RM && RM.summary ? RM.summary.total : 0;
+    const rmAdh = RM && RM.summary ? RM.summary.adherent : 0;
+    const rmPct = rmTotal ? Math.round(rmAdh / rmTotal * 100) : 0;
+    const rmHas = rmTotal > 0;
+    const rmCol = rmHas ? colorUp(rmPct) : 'var(--color-neutral)';
+    cards.push(
+      <K key="roadmap" icon="circle-check" iconColor={rmCol}
+        title={<span>{t('kpi.roadmapTitle')} <window.InfoTip text={t('kpi.roadmapInfo')} /></span>}
+        value={rmHas ? rmPct + ' %' : '—'} display="bar" ratio={rmHas ? rmPct / 100 : 0} barColor={rmCol}
+        footer={<span><b>{rmAdh}</b> {t('kpi.adherent')} · <b>{rmTotal}</b> {t('kpi.topics')}</span>}
+        popup={rmHas ? true : null} onOpen={rmHas ? () => setRmOpen(true) : undefined} />
+    );
 
     // 2. Acknowledge Time — réponse Canny ≤ 4h ouvrées.
     if (agg.sla) {
@@ -93,12 +97,51 @@
       card('saydo', 'gauge', t('kpi.saydoTitle'), sdPct, tot > 0, colorUp(sdPct), F(val, t('kpi.delivered'), tot, t('kpi.planned')));
     }
 
+    // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien vers l'issue.
+    const rmIssue = (it) => (
+      <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
+        <span className={'rm-st ' + (it.state === 'closed' ? 'closed' : 'opened')}>{it.state}</span>
+        <a href={it.webUrl} target="_blank" rel="noreferrer">#{it.iid} {it.title}</a>
+      </div>
+    );
+
     return (
       <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
           {cards}
         </div>
         {!CANNY && <p style={{ marginTop: 16, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
+
+        {rmOpen && RM && (
+          <window.Modal title={t('kpi.roadmapTitle')} subtitle={rmAdh + ' / ' + rmTotal + ' ' + t('kpi.adherent')}
+            wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setRmOpen(false)}>
+            <p className="rm-intro">{t('kpi.roadmapInfo')}</p>
+            <div className="rm-list">
+              {RM.topics.map((tp) => (
+                <div className={'rm-topic' + (tp.adherent ? ' adh' : '')} key={tp.postId}>
+                  <div className="rm-topic-h">
+                    <span className="rm-dot" style={{ background: tp.adherent ? 'var(--color-good)' : 'var(--color-bad)' }}></span>
+                    <a className="rm-title" href={tp.url} target="_blank" rel="noreferrer">{tp.title}</a>
+                    <span className="rm-badge">{tp.status}</span>
+                    <span className="rm-count">{tp.targetClosed}/{tp.targetTotal} {t('kpi.ofIssues')}</span>
+                  </div>
+                  <div className="rm-targets">
+                    {tp.epics.map((e) => (
+                      <div className="rm-epic" key={'e' + e.iid}>
+                        <a className="rm-epic-h" href={e.webUrl} target="_blank" rel="noreferrer">
+                          {window.Icon('activity', 12)} <b>épic &{e.iid}</b> {e.title}
+                          <span className={'rm-st ' + (e.allClosed ? 'closed' : 'opened')} style={{ marginLeft: 6 }}>{e.closed}/{e.total}</span>
+                        </a>
+                        <div className="rm-epic-issues">{e.issues.map(rmIssue)}</div>
+                      </div>
+                    ))}
+                    {tp.issues.map(rmIssue)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </window.Modal>
+        )}
       </div>
     );
   };

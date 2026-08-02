@@ -12,6 +12,8 @@
       'kpi.noCanny': 'Connectez Canny (Options) pour afficher le temps de réponse.',
       'kpi.roadmapTitle': 'Roadmap Adherence', 'kpi.unplannedTitle': 'Unplanned Work', 'kpi.mttrTitle': 'MTTR', 'kpi.refactorTitle': 'Refactoring', 'kpi.saydoTitle': 'Say/Do Ratio',
       'kpi.unplannedIssues': 'non prévu', 'kpi.ofIssues': 'issues', 'kpi.critBugs': 'crit. client', 'kpi.refactorIssues': 'refactor', 'kpi.delivered': 'livrés', 'kpi.planned': 'prévus',
+      'kpi.adherent': 'adhérents', 'kpi.topics': 'sujets',
+      'kpi.roadmapInfo': 'Adhérence roadmap : sujets « [N] » de la roadmap Canny reliés à GitLab. Un sujet est adhérent si son statut Canny est « Terminé » (complete) ET si toutes les issues liées — celles de son épic et/ou les issues directes — sont fermées. Cliquez la cartouche pour le détail par sujet.',
       nav_dashboard: 'Dashboard', nav_charts: 'Graphiques', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendrier', nav_velocity: 'Vélocité', nav_options: 'Options', nav_comparison: 'Évolution',
       // descriptions courtes affichées en tooltip au survol des items de la sidebar
@@ -161,6 +163,8 @@
       'kpi.noCanny': 'Connect Canny (Options) to show response time.',
       'kpi.roadmapTitle': 'Roadmap Adherence', 'kpi.unplannedTitle': 'Unplanned Work', 'kpi.mttrTitle': 'MTTR', 'kpi.refactorTitle': 'Refactoring', 'kpi.saydoTitle': 'Say/Do Ratio',
       'kpi.unplannedIssues': 'unplanned', 'kpi.ofIssues': 'issues', 'kpi.critBugs': 'crit. client', 'kpi.refactorIssues': 'refactor', 'kpi.delivered': 'delivered', 'kpi.planned': 'planned',
+      'kpi.adherent': 'adherent', 'kpi.topics': 'topics',
+      'kpi.roadmapInfo': 'Roadmap adherence: Canny roadmap "[N]" topics linked to GitLab. A topic is adherent when its Canny status is "Complete" AND every linked issue — its epic\'s issues and/or direct issues — is closed. Click the card for the per-topic breakdown.',
       nav_dashboard: 'Dashboard', nav_charts: 'Charts', nav_anomalies: 'Anomalies',
       nav_issues: 'Issues', nav_calendar: 'Calendar', nav_velocity: 'Velocity', nav_options: 'Options', nav_comparison: 'Evolution',
       navdesc_indicateurs: 'KPI cards — product health at a glance',

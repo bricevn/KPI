@@ -440,7 +440,9 @@ public sealed partial class WebDashboard
         var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName; // "fr"/"en" (posée par UseRequestLocalization)
         // Dataset Canny (feedback/roadmap) déchiffré, injecté dans la page à côté du payload GitLab. null si non extrait.
         var cannyJson = Kpi.Canny.CannyService.TryReadDatasetJson(_config);
-        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson), "text/html; charset=utf-8");
+        // Adhérence roadmap (KPI Roadmap Adherence) : sujets [N] + états d'issues résolus. null si non résolu.
+        var roadmapJson = Kpi.Canny.CannyService.TryReadRoadmapJson(_config);
+        return Results.Content(DashboardView.BuildReferencePage(json, lang, cannyJson, roadmapJson), "text/html; charset=utf-8");
     }
 
     private IResult CancelAsync(HttpContext ctx)

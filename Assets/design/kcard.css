@@ -72,3 +72,37 @@
 .kcard-kpi .kbig small { font-size: 12px; }
 .kcard-kpi .kbar { height: 6px; }
 .kcard-kpi .kcap { margin-top: var(--space-2); }
+
+/* ---- popup « Roadmap Adherence » (détail par sujet [N] + issues GitLab) ---------
+   Rendu dans window.Modal ; utilise les tokens charte (thème-aware). */
+.rm-intro { font-size: var(--text-caption); color: var(--color-ink-3); margin: 0 0 var(--space-4); line-height: 1.5; }
+.rm-list { display: flex; flex-direction: column; gap: var(--space-3); }
+.rm-topic {
+  border: 1px solid var(--color-line-1); border-radius: var(--radius-lg);
+  padding: var(--space-4); background: var(--color-surface-1);
+}
+.rm-topic.adh { border-color: color-mix(in srgb, var(--color-good) 40%, var(--color-line-1)); }
+.rm-topic-h { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.rm-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
+.rm-title { font-weight: 600; color: var(--color-ink-1); font-size: var(--text-sm); text-decoration: none; }
+.rm-title:hover { text-decoration: underline; }
+.rm-badge {
+  font-size: var(--text-caption); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);
+  background: var(--color-surface-3); color: var(--color-ink-2); text-transform: capitalize; white-space: nowrap;
+}
+.rm-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.rm-targets { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.rm-epic { padding: var(--space-2) 0; border-top: 1px dashed var(--color-line-2); }
+.rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
+.rm-epic-h:hover { color: var(--color-accent); }
+.rm-epic-h svg { flex: none; }
+.rm-epic-issues { margin: var(--space-2) 0 0 18px; display: flex; flex-direction: column; gap: 2px; }
+.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-2); }
+.rm-issue a { color: var(--color-ink-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-issue a:hover { color: var(--color-accent); text-decoration: underline; }
+.rm-st {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; flex: none;
+  padding: 1px 6px; border-radius: var(--radius-pill);
+}
+.rm-st.closed { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 15%, transparent); }
+.rm-st.opened { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 15%, transparent); }

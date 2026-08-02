@@ -5,8 +5,30 @@ using Kpi.Config;
 
 namespace Kpi.Canny;
 
-/// <summary>Sortie de la consolidation : le dataset analytique + les commentaires détaillés (JSON), et les comptes.</summary>
-public sealed record CannyBuildOutput(string DatasetJson, string CommentsJson, CannyExtractResult Result);
+/// <summary>Sortie de la consolidation : le dataset analytique + les commentaires détaillés (JSON), les
+/// comptes, et les sujets roadmap « [N] » avec leurs liens GitLab bruts (résolus ensuite côté API).</summary>
+public sealed record CannyBuildOutput(string DatasetJson, string CommentsJson, CannyExtractResult Result, List<RoadmapTopicRefs> RoadmapTopics);
+
+/// <summary>Référence d'épic de groupe extraite d'une URL Canny (<c>/groups/&lt;group&gt;/-/epics/&lt;iid&gt;</c>).</summary>
+public sealed class EpicRef { public string Group { get; set; } = ""; public long Iid { get; set; } }
+
+/// <summary>Référence d'issue extraite d'une URL Canny (<c>/&lt;projet&gt;/-/issues/&lt;iid&gt;</c>).</summary>
+public sealed class IssueRef { public string Project { get; set; } = ""; public long Iid { get; set; } }
+
+/// <summary>Sujet de roadmap Canny « [N] … » avec ses liens GitLab (épics/issues), AVANT résolution API.
+/// L'adhérence = statut Canny « complete » ET toutes les issues liées fermées (celles de l'épic, et/ou
+/// les issues directes).</summary>
+public sealed class RoadmapTopicRefs
+{
+    public string PostId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? Url { get; set; }
+    public string Status { get; set; } = "";
+    public bool Complete { get; set; }
+    public List<string> Roadmaps { get; set; } = new();
+    public List<EpicRef> Epics { get; set; } = new();
+    public List<IssueRef> Issues { get; set; } = new();
+}
 
 /// <summary>
 /// Consolidation du dataset Canny — PORT FIDÈLE de <c>Desktop/Canny/scripts/build-dataset.js</c>.
@@ -23,6 +45,13 @@ public static class CannyDatasetBuilder
     private static readonly JsonSerializerOptions OutJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private static readonly Regex IssueRx = new(@"/-/issues/(\d+)", RegexOptions.Compiled);
     private static readonly Regex EpicRx = new(@"/-/epics/(\d+)", RegexOptions.Compiled);
+    // Versions CAPTURANT LE CHEMIN (résolution API de l'adhérence roadmap) — URLs GitLab pleines :
+    //   issue : https://host/<namespace/projet>/-/issues/<iid>
+    //   épic  : https://host/groups/<group_full_path>/-/epics/<iid>
+    private static readonly Regex FullIssueRx = new(@"https?://[^/\s]+/([^\s""'<>]+?)/-/issues/(\d+)", RegexOptions.Compiled);
+    private static readonly Regex FullEpicRx = new(@"https?://[^/\s]+/groups/([^\s""'<>]+?)/-/epics/(\d+)", RegexOptions.Compiled);
+    // Sujet de roadmap « priorisé » : titre préfixé par [N] (marqueur d'ordre/priorité, PAS l'iid d'épic).
+    private static readonly Regex BracketRx = new(@"^\s*\[\d+\]", RegexOptions.Compiled);
     private static readonly Regex NonRoadmapKey = new("[^0-9r]", RegexOptions.Compiled);
     private static readonly Regex PlannedFieldRx = new(@"planned\s*release", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -261,6 +290,29 @@ public static class CannyDatasetBuilder
             },
         };
 
+        // ---- sujets roadmap « [N] » + liens GitLab (l'adhérence est résolue ensuite via l'API) ----
+        // Périmètre : titre préfixé [N], dans une roadmap, avec ≥1 lien épic ou issue GitLab.
+        var roadmapTopics = new List<RoadmapTopicRefs>();
+        foreach (var p in posts)
+        {
+            if (string.IsNullOrEmpty(p.Title) || !BracketRx.IsMatch(p.Title)) continue;
+            if ((p.Roadmaps ?? new()).Count == 0) continue;
+            commentTextByPost.TryGetValue(p.Id, out var ctext2);
+            var (epics, issues) = ExtractRefs(p.Details, ctext2);
+            if (epics.Count == 0 && issues.Count == 0) continue;
+            roadmapTopics.Add(new RoadmapTopicRefs
+            {
+                PostId = p.Id,
+                Title = p.Title!,
+                Url = p.Url,
+                Status = p.Status ?? "",
+                Complete = p.Status == "complete",
+                Roadmaps = (p.Roadmaps ?? new()).Select(r => r.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct(StringComparer.Ordinal).ToList(),
+                Epics = epics,
+                Issues = issues,
+            });
+        }
+
         var result = new CannyExtractResult
         {
             Posts = enriched.Count,
@@ -278,7 +330,27 @@ public static class CannyDatasetBuilder
         return new CannyBuildOutput(
             JsonSerializer.Serialize(dataset, OutJson),
             JsonSerializer.Serialize(detailComments, OutJson),
-            result);
+            result,
+            roadmapTopics);
+    }
+
+    /// <summary>Extrait les liens GitLab (épics + issues, avec chemin) des <c>details</c> d'un post et de
+    /// ses commentaires. Dédupliqué par (chemin, iid).</summary>
+    private static (List<EpicRef> epics, List<IssueRef> issues) ExtractRefs(string? details, List<string>? commentTexts)
+    {
+        var epics = new Dictionary<string, EpicRef>();
+        var issues = new Dictionary<string, IssueRef>();
+        void Scan(string? txt)
+        {
+            if (string.IsNullOrEmpty(txt)) return;
+            foreach (Match m in FullEpicRx.Matches(txt))
+                if (long.TryParse(m.Groups[2].Value, out var iid)) epics[m.Groups[1].Value + "!" + iid] = new EpicRef { Group = m.Groups[1].Value, Iid = iid };
+            foreach (Match m in FullIssueRx.Matches(txt))
+                if (long.TryParse(m.Groups[2].Value, out var iid)) issues[m.Groups[1].Value + "!" + iid] = new IssueRef { Project = m.Groups[1].Value, Iid = iid };
+        }
+        Scan(details);
+        if (commentTexts != null) foreach (var t in commentTexts) Scan(t);
+        return (epics.Values.ToList(), issues.Values.ToList());
     }
 
     // ---- temps passé dans chaque statut (port de l'IIFE timeInStatus) ----

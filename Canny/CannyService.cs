@@ -17,6 +17,7 @@ public static class CannyService
     private static string CannyDir(AppConfig cfg) => Path.Combine(cfg.Export.OutputDirectory, PartitionId);
     private static string DatasetPath(AppConfig cfg) => Path.Combine(CannyDir(cfg), "dataset.json");
     private static string CommentsPath(AppConfig cfg) => Path.Combine(CannyDir(cfg), "comments.json");
+    private static string RoadmapPath(AppConfig cfg) => Path.Combine(CannyDir(cfg), "roadmap.json");
 
     private static readonly JsonSerializerOptions RawJson = new() { PropertyNameCaseInsensitive = true };
 
@@ -41,6 +42,18 @@ public static class CannyService
         var built = CannyDatasetBuilder.Build(canny, boards, categories, tags, posts, comments, votesCount, users, statusChanges);
         await StoreAsync(cfg, built, ct);
 
+        // Adhérence roadmap : résout via l'API GitLab (GroupToken) l'état des issues/épics liés aux sujets
+        // « [N] », puis stocke le résultat chiffré. Best-effort : si GitLab est injoignable, l'extraction
+        // Canny reste valide (l'ancien roadmap.json est conservé, ou le KPI reste vide).
+        try
+        {
+            var roadmapJson = await RoadmapAdherenceResolver.ResolveAsync(cfg, built.RoadmapTopics, ct);
+            await SecureStore.WriteEncryptedAsync(PartitionId, RoadmapPath(cfg), roadmapJson, ct);
+            Console.WriteLine($"  -> adhérence roadmap : {built.RoadmapTopics.Count} sujet(s) [N] avec liens GitLab résolus.");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { Console.Error.WriteLine("  [warn] résolution de l'adhérence roadmap échouée (KPI Roadmap Adherence) : " + ex.Message); }
+
         Console.WriteLine($"  -> Canny chiffré dans {CannyDir(cfg)}/ : {built.Result.Posts} posts, {built.Result.Comments} commentaires, {built.Result.Roadmaps} roadmaps.");
         // Auto-contrôle : on relit ce qu'on vient d'écrire.
         var back = TryReadDatasetJson(cfg);
@@ -59,6 +72,10 @@ public static class CannyService
 
     /// <summary>Commentaires détaillés Canny déchiffrés (JSON) ; <c>null</c> si absent.</summary>
     public static string? TryReadCommentsJson(AppConfig cfg) => SecureStore.TryReadDecrypted(PartitionId, CommentsPath(cfg));
+
+    /// <summary>Adhérence roadmap déchiffrée (JSON, sujets [N] + états d'issues résolus) ; <c>null</c> si absent.
+    /// Injecté au client en <c>window.__ROADMAP__</c> pour le KPI « Roadmap Adherence ».</summary>
+    public static string? TryReadRoadmapJson(AppConfig cfg) => SecureStore.TryReadDecrypted(PartitionId, RoadmapPath(cfg));
 
     /// <summary>True si un dataset Canny a déjà été extrait et stocké.</summary>
     public static bool HasData(AppConfig cfg) => File.Exists(DatasetPath(cfg));
