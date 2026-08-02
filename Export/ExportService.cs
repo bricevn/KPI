@@ -45,7 +45,7 @@ public sealed class ExportService
         List<GitLabIssue> issues, CancellationToken ct, Action<int, int>? onProgress = null)
     {
         onProgress?.Invoke(0, issues.Count);
-        const int MaxConcurrency = 6; // prudent vs rate-limit GitLab
+        const int MaxConcurrency = 10; // requêtes par-issue simultanées (events/notes/MRs/approvals). Ajustable si rate-limit GitLab.
         var exports = new IssueExport[issues.Count];
         var done = 0;
         using var gate = new SemaphoreSlim(MaxConcurrency);
