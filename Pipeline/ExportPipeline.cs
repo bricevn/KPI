@@ -128,8 +128,11 @@ public static class ExportPipeline
     /// <param name="milestoneFilter">Titre d'une milestone pour une acquisition CIBLÉE ; null = toutes les issues.
     /// En mode ciblé, le store existant est MERGÉ : seules les issues de la portée sont remplacées.</param>
     public static async Task RunMultiServerExportAsync(AppConfig config, Action<int, int>? onProgress, CancellationToken ct,
-        string? projectFilter = null, string? milestoneFilter = null)
+        string? projectFilter = null, string? milestoneFilter = null,
+        IReadOnlyList<string>? explicitMilestones = null, Action<string, string, int, int>? onMilestoneProgress = null)
     {
+        // onMilestoneProgress : (projectId, milestone, current, total) — clé composite pour éviter l'écrasement
+        // entre projets partageant une même milestone (milestones de groupe, include_parent_milestones).
         projectFilter = string.IsNullOrWhiteSpace(projectFilter) ? null : projectFilter.Trim();
         milestoneFilter = string.IsNullOrWhiteSpace(milestoneFilter) ? null : milestoneFilter.Trim();
         var scoped = projectFilter != null || milestoneFilter != null;
@@ -181,7 +184,7 @@ public static class ExportPipeline
                 // la régénération CIBLE explicitement un projet (projectFilter) OU une milestone
                 // (milestoneFilter) : la demande explicite prime. C'est ce qui permet le workflow
                 // « setup sans milestone → dashboard vide → import ciblé des milestones plus tard ».
-                if (skipCfg && projectFilter == null && milestoneFilter == null)
+                if (skipCfg && projectFilter == null && milestoneFilter == null && explicitMilestones == null)
                 {
                     Console.WriteLine($"  -- projet {pid} : extraction SAUTÉE (« Aucune » au setup) — données existantes conservées --");
                     continue;
@@ -195,7 +198,8 @@ public static class ExportPipeline
                 //    ce qui a été importé, sans jamais rien effacer d'autre ;
                 //  - sinon (« Tout l'historique », ou projet « Aucune » ciblé par projet) → tout le projet.
                 List<string>? targetMs = null; // null = extraction complète du projet
-                if (milestoneFilter != null) targetMs = new List<string> { milestoneFilter };
+                if (explicitMilestones is { Count: > 0 }) targetMs = explicitMilestones.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                else if (milestoneFilter != null) targetMs = new List<string> { milestoneFilter };
                 else if (!skipCfg && !string.IsNullOrWhiteSpace(setupMs))
                 {
                     var set = new HashSet<string>(
@@ -223,11 +227,40 @@ public static class ExportPipeline
                 // son ProjectId — le groupement du dashboard est préservé).
                 if (targetMs == null)
                     allIssues.AddRange(await service.BuildIssueExportsAsync(ct, onProgress, ""));
+                else if (onMilestoneProgress != null && targetMs.Count > 1)
+                {
+                    // Extraction CONCURRENTE des milestones (progression par (projet, milestone)). Deux bornes :
+                    // msGate limite le fan-out de milestones (fetch de liste inclus, sinon N listes simultanées) ;
+                    // 'shared' borne le total de requêtes par-issue. Une milestone en échec est EXCLUE (log) sans
+                    // faire tomber tout le run, et sa portée est retirée du merge (l'ancienne version est conservée).
+                    using var shared = new SemaphoreSlim(10);
+                    using var msGate = new SemaphoreSlim(4);
+                    var bag = new System.Collections.Concurrent.ConcurrentBag<IssueExport>();
+                    var failed = new System.Collections.Concurrent.ConcurrentBag<string>();
+                    var msTasks = targetMs.Select(async ms =>
+                    {
+                        await msGate.WaitAsync(ct);
+                        try
+                        {
+                            var part = await service.BuildIssueExportsAsync(ct, (c, t) => onMilestoneProgress(pid, ms, c, t), ms, shared);
+                            foreach (var e in part) bag.Add(e);
+                        }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception ex) { failed.Add(ms); Console.Error.WriteLine($"     [warn] milestone « {ms} » (projet {pid}) échouée : {ex.Message}"); }
+                        finally { msGate.Release(); }
+                    }).ToList();
+                    await Task.WhenAll(msTasks);
+                    allIssues.AddRange(bag);
+                    // Milestones échouées : retirées de la portée remplacée → le merge conserve leur version existante.
+                    if (!failed.IsEmpty && scopeByProject.TryGetValue(pid, out var sc) && sc != null)
+                        foreach (var f in failed) sc.Remove(f);
+                }
                 else
                     foreach (var msTitle in targetMs)
                     {
                         ct.ThrowIfCancellationRequested();
-                        allIssues.AddRange(await service.BuildIssueExportsAsync(ct, onProgress, msTitle));
+                        var cb = onMilestoneProgress != null ? (Action<int, int>)((c, t) => onMilestoneProgress(pid, msTitle, c, t)) : onProgress;
+                        allIssues.AddRange(await service.BuildIssueExportsAsync(ct, cb, msTitle));
                     }
                 try { foreach (var l in await client.GetProjectLabelsAsync(ct)) if (!string.IsNullOrEmpty(l.Name)) labels[l.Name] = l; }
                 catch (Exception ex) { Console.WriteLine($"     [warn] labels projet {pid} : {ex.Message}"); }
@@ -251,6 +284,10 @@ public static class ExportPipeline
                     Console.WriteLine($"  Merge : {preserved.Count} issues conservées (hors portée / projets sautés) + {allIssues.Count} fraîchement extraites.");
                 allIssues = preserved.Concat(allIssues).OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
             }
+            else
+                // Store vide : le tri du merge est sauté → on trie ici (l'extraction concurrente via ConcurrentBag
+                // ne garantit pas l'ordre). Aligne le chemin store-vide sur le comportement trié habituel.
+                allIssues = allIssues.OrderBy(e => e.ProjectId).ThenBy(e => e.Iid).ToList();
             // Catalogues labels/milestones : réinjecter l'existant (autres projets) — le frais gagne.
             var prevLb = SecureStore.TryReadDecrypted(server.Id, Path.Combine(serverDir, "labels.json"));
             if (prevLb != null)

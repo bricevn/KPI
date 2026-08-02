@@ -529,27 +529,15 @@ public sealed partial class WebDashboard
                     await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token, projectFilter);
                 else
                 {
-                    // Récap : « Milestone en cours / max » + cumul d'issues de la sélection. selTotal accumule
-                    // les milestones terminées ; pendant l'une, on affiche selTotal + progression courante.
+                    // Milestones sélectionnées extraites EN PARALLÈLE, avec une progression PAR milestone
+                    // (« Milestone <titre> : cur/total »). Un seul merge/écriture à la fin (pas de course au store).
+                    // La clé d'agrégation est (projet, titre) : le seed n'est pas possible ici (pid inconnu),
+                    // les lignes apparaissent au 1er callback de chaque milestone.
                     _state.MilestoneCount = milestonesToRefresh.Count;
-                    var selTotal = 0;
-                    for (int i = 0; i < milestonesToRefresh.Count; i++)
-                    {
-                        linked.Token.ThrowIfCancellationRequested();
-                        _state.MilestoneCurrent = i + 1;
-                        _state.CurrentMilestone = milestonesToRefresh[i];
-                        Console.WriteLine($"[Refresh] Milestone {i + 1}/{milestonesToRefresh.Count} : {milestonesToRefresh[i]}");
-                        var msMax = 0;
-                        var baseTotal = selTotal;
-                        await ExportPipeline.RunMultiServerExportAsync(_config, (cur, tot) =>
-                        {
-                            _state.Current = cur; _state.Total = tot;
-                            if (tot > msMax) msMax = tot;
-                            _state.TotalIssues = baseTotal + cur;
-                        }, linked.Token, projectFilter, milestonesToRefresh[i]);
-                        selTotal += msMax;
-                        _state.TotalIssues = selTotal;
-                    }
+                    await ExportPipeline.RunMultiServerExportAsync(_config,
+                        (i, t) => { _state.Current = i; _state.Total = t; }, linked.Token, projectFilter,
+                        explicitMilestones: milestonesToRefresh,
+                        onMilestoneProgress: (pid, ms, cur, tot) => _state.SetMs(pid, ms, cur, tot));
                 }
             }
             else
@@ -937,6 +925,9 @@ public sealed partial class WebDashboard
         private int _milestoneCount;
         private string? _currentMilestone;
         private int _totalIssues;
+        // Progression PAR (projet, milestone) : clé composite pid+US+titre → (nom, current, total). Composite
+        // pour ne pas écraser une milestone de groupe partagée entre projets ; agrégée par nom au Snapshot.
+        private readonly Dictionary<string, (string name, int cur, int tot)> _ms = new();
 
         public bool Running { get { lock (_lock) return _running; } set { lock (_lock) _running = value; } }
         public int Current { get { lock (_lock) return _current; } set { lock (_lock) _current = value; } }
@@ -948,8 +939,10 @@ public sealed partial class WebDashboard
         public int MilestoneCount { get { lock (_lock) return _milestoneCount; } set { lock (_lock) _milestoneCount = value; } }
         public string? CurrentMilestone { get { lock (_lock) return _currentMilestone; } set { lock (_lock) _currentMilestone = value; } }
         public int TotalIssues { get { lock (_lock) return _totalIssues; } set { lock (_lock) _totalIssues = value; } }
+        // Clé = pid + ':' + titre (pid numérique -> pas de collision : le 1er ':' sépare pid du titre).
+        public void SetMs(string pid, string ms, int cur, int tot) { lock (_lock) _ms[pid + ":" + ms] = (ms, cur, tot); }
 
-        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; _milestoneCurrent = 0; _milestoneCount = 0; _currentMilestone = null; _totalIssues = 0; } }
+        public void Reset() { lock (_lock) { _current = 0; _total = 0; _lastError = null; _milestoneCurrent = 0; _milestoneCount = 0; _currentMilestone = null; _totalIssues = 0; _ms.Clear(); } }
 
         public StateSnapshot Snapshot()
         {
@@ -967,9 +960,21 @@ public sealed partial class WebDashboard
                     milestoneCount = _milestoneCount,
                     currentMilestone = _currentMilestone,
                     totalIssues = _totalIssues,
+                    // Agrégation par TITRE de milestone : une même milestone présente dans plusieurs projets
+                    // (clés (pid,titre) distinctes) se cumule en une seule ligne « cur/total ».
+                    milestones = _ms.Values.GroupBy(v => v.name, StringComparer.OrdinalIgnoreCase)
+                        .Select(g => new MsProgress { name = g.Key, current = g.Sum(x => x.cur), total = g.Sum(x => x.tot) })
+                        .OrderBy(m => m.name, StringComparer.OrdinalIgnoreCase).ToList(),
                 };
             }
         }
+    }
+
+    public sealed class MsProgress
+    {
+        public string name { get; set; } = "";
+        public int current { get; set; }
+        public int total { get; set; }
     }
 
     public sealed class StateSnapshot
@@ -985,6 +990,8 @@ public sealed partial class WebDashboard
         public int milestoneCount { get; set; }
         public string? currentMilestone { get; set; }
         public int totalIssues { get; set; }
+        // Progression PAR milestone (extraction concurrente) : une ligne par milestone sélectionnée.
+        public List<MsProgress> milestones { get; set; } = new();
     }
 
     private sealed class RefreshRequest

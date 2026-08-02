@@ -25,7 +25,8 @@ public sealed class ExportService
     public async Task<List<IssueExport>> BuildIssueExportsAsync(
         CancellationToken ct,
         Action<int, int>? onProgress = null,
-        string? milestoneOverride = null)
+        string? milestoneOverride = null,
+        SemaphoreSlim? sharedGate = null)
     {
         // milestoneOverride : null = utiliser _milestone (config), "" = TOUTES les issues du projet, sinon nom précis.
         var effective = milestoneOverride ?? _milestone;
@@ -34,7 +35,7 @@ public sealed class ExportService
             : $"Récupération des issues (milestone={effective})...");
         var issues = await _client.GetIssuesByMilestoneAsync(effective, ct);
         Console.WriteLine($"  -> {issues.Count} issues récupérées.");
-        return await BuildExportsFromIssuesAsync(issues, ct, onProgress);
+        return await BuildExportsFromIssuesAsync(issues, ct, onProgress, sharedGate);
     }
 
     /// <summary>Construit les IssueExport à partir d'une liste d'issues DÉJÀ récupérées (ex. extraction scopée
@@ -42,28 +43,34 @@ public sealed class ExportService
     /// chaque issue déclenche ~4-5 appels API (events, notes, MRs, approvals) — l'enchaînement séquentiel était
     /// le goulot. BuildSingleAsync est sans état partagé mutable → sûr en concurrent ; ordre préservé.</summary>
     public async Task<List<IssueExport>> BuildExportsFromIssuesAsync(
-        List<GitLabIssue> issues, CancellationToken ct, Action<int, int>? onProgress = null)
+        List<GitLabIssue> issues, CancellationToken ct, Action<int, int>? onProgress = null, SemaphoreSlim? sharedGate = null)
     {
         onProgress?.Invoke(0, issues.Count);
         const int MaxConcurrency = 10; // requêtes par-issue simultanées (events/notes/MRs/approvals). Ajustable si rate-limit GitLab.
         var exports = new IssueExport[issues.Count];
         var done = 0;
-        using var gate = new SemaphoreSlim(MaxConcurrency);
-        async Task ProcessAsync(int i)
+        // Sémaphore PARTAGÉ possible : quand plusieurs milestones s'extraient en parallèle, on borne le TOTAL
+        // de requêtes par-issue simultanées (sinon N milestones × 10). Sinon on crée le nôtre.
+        var gate = sharedGate ?? new SemaphoreSlim(MaxConcurrency);
+        try
         {
-            await gate.WaitAsync(ct);
-            try
+            async Task ProcessAsync(int i)
             {
-                exports[i] = await BuildSingleAsync(issues[i], ct);
-                var n = Interlocked.Increment(ref done);
-                Console.WriteLine($"  [{n}/{issues.Count}] #{issues[i].Iid} — {Truncate(issues[i].Title, 60)}");
-                onProgress?.Invoke(n, issues.Count);
+                await gate.WaitAsync(ct);
+                try
+                {
+                    exports[i] = await BuildSingleAsync(issues[i], ct);
+                    var n = Interlocked.Increment(ref done);
+                    Console.WriteLine($"  [{n}/{issues.Count}] #{issues[i].Iid} — {Truncate(issues[i].Title, 60)}");
+                    onProgress?.Invoke(n, issues.Count);
+                }
+                finally { gate.Release(); }
             }
-            finally { gate.Release(); }
+            var tasks = new List<Task>(issues.Count);
+            for (var i = 0; i < issues.Count; i++) tasks.Add(ProcessAsync(i));
+            await Task.WhenAll(tasks);
         }
-        var tasks = new List<Task>(issues.Count);
-        for (var i = 0; i < issues.Count; i++) tasks.Add(ProcessAsync(i));
-        await Task.WhenAll(tasks);
+        finally { if (sharedGate == null) gate.Dispose(); }
         return exports.ToList();
     }
 

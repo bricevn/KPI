@@ -807,13 +807,21 @@
             <div className="lbl"></div>
             <button className="btn btn-primary" onClick={doRefresh}>{window.ICONS.refresh} {window.t('opt.refresh')}</button>
           </div>}
-          {regenBusy &&
+          {regenBusy && prog && prog.milestones && prog.milestones.length > 0 &&
+          <div className="opt-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+            {prog.milestones.map((m) =>
+            <div key={m.name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="lbl" style={{ minWidth: 220, flex: 'none' }}>{window.t('opt.milestone')} {m.name}<span>{m.current}/{m.total || 0} {window.t('issues')}</span></div>
+              <div className={'opt-progress' + (m.total > 0 ? '' : ' ind')} style={{ flex: 1 }}><i style={{ width: (m.total > 0 ? Math.min(100, Math.round(m.current / m.total * 100)) : 12) + '%' }}></i></div>
+            </div>)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
+              <span className="muted" style={{ fontSize: 'var(--text-caption,12px)' }}>{prog.milestones.reduce((s, m) => s + (m.current || 0), 0)} / {prog.milestones.reduce((s, m) => s + (m.total || 0), 0)} {window.t('issues')} {window.t('opt.total')}</span>
+              <button className="btn btn-sm" onClick={doCancel}>{window.t('opt.cancel')}</button>
+            </div>
+          </div>}
+          {regenBusy && (!prog || !prog.milestones || prog.milestones.length === 0) &&
           <div className="opt-row">
-            <div className="lbl">{window.t('opt.extracting')}<span>{prog ? (
-              prog.milestoneCount > 0
-                ? window.t('opt.milestone') + ' ' + prog.milestoneCurrent + '/' + prog.milestoneCount + (prog.currentMilestone ? ' · ' + prog.currentMilestone : '') + ' : ' + prog.current + '/' + (prog.total || 0) + ' · ' + (prog.totalIssues || 0) + ' ' + window.t('opt.total')
-                : (prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…')
-            ) : '…'}</span></div>
+            <div className="lbl">{window.t('opt.extracting')}<span>{prog && prog.total > 0 ? prog.current + ' / ' + prog.total + ' ' + window.t('issues') : '…'}</span></div>
             <div className={'opt-progress' + (prog && prog.total > 0 ? '' : ' ind')}><i style={{ width: (prog && prog.total > 0 ? Math.min(100, Math.round(prog.current / prog.total * 100)) : 12) + '%' }}></i></div>
             <button className="btn" onClick={doCancel}>{window.t('opt.cancel')}</button>
           </div>}
