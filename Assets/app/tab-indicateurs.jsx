@@ -86,8 +86,8 @@
         <div className="issue-hd" onClick={() => setOpen((o) => !o)}>
           <span className={'issue-chev' + (open ? ' open' : '')}>{window.ICONS.chevron}</span>
           <span className="rm-dot" style={{ background: tp.adherent ? 'var(--color-good)' : 'var(--color-bad)' }}></span>
-          <a className="issue-ttl rm-title" href={tp.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tp.title}</a>
-          <span className="issue-meta">
+          <a className="rm-title" href={tp.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tp.title}</a>
+          <span className="issue-meta" style={{ marginLeft: 'auto' }}>
             <span className="rm-badge" style={statusStyle(tp.status)}>{tp.status}</span>
             <span className="rm-count">{tp.targetClosed}/{tp.targetTotal} {t('kpi.ofIssues')}</span>
           </span>

@@ -93,7 +93,10 @@
    badges/états propres au KPI via .rm-* (tokens charte, thème-aware). */
 .rm-intro { font-size: var(--text-caption); color: var(--color-ink-3); margin: 0 0 var(--space-4); line-height: 1.5; }
 .rm-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
-.rm-title { color: var(--color-ink-1); text-decoration: none; }
+/* Titre du sujet = lien Canny à la LARGEUR DE SON TEXTE (ne remplit pas la ligne) → le reste de
+   l'entête (chevron, pastille, espace, badges) reste cliquable pour déplier l'accordéon. */
+.rm-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-ink-1); text-decoration: none; }
 .rm-title:hover { color: var(--color-accent); text-decoration: underline; }
 .rm-badge {
   font-size: var(--text-caption); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);
