@@ -75,6 +75,23 @@
 .kcard-kpi .kbig small { font-size: 12px; }
 .kcard-kpi .kbar { height: 6px; }
 .kcard-kpi .kcap { margin-top: var(--space-2); }
+/* Badges de provenance / filtrabilité / audience (rangée en bas de cartouche). */
+.kcard-kpi .ktags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-3); }
+.ktag { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+  padding: 2px 6px; border-radius: var(--radius-pill); white-space: nowrap;
+  background: var(--color-surface-3); color: var(--color-ink-3); border: 1px solid transparent; }
+.ktag-canny  { background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent); }
+.ktag-gitlab { background: color-mix(in srgb, var(--color-complement, #e0792e) 16%, transparent); color: var(--color-complement, #e0792e); }
+.ktag-mixte  { background: color-mix(in srgb, var(--color-done) 15%, transparent); color: var(--color-done); }
+.ktag-filter { background: color-mix(in srgb, var(--color-good) 14%, transparent); color: var(--color-good); }
+.ktag-global { background: var(--color-surface-3); color: var(--color-ink-3); }
+.ktag-aud    { background: transparent; color: var(--color-ink-2); border-color: var(--color-line-1); }
+
+/* Sections de la page Indicateurs (regroupement par source de données). */
+.kpi-sec { margin-bottom: var(--space-7); }
+.kpi-sec-hd { display: flex; align-items: baseline; gap: var(--space-3); margin: 0 0 var(--space-4); }
+.kpi-sec-hd h2 { margin: 0; font-size: var(--text-h2); font-weight: 700; color: var(--color-ink-1); }
+.kpi-sec-hd .kpi-sec-sub { font-size: var(--text-caption); color: var(--color-ink-3); }
 
 /* ---- popup « Roadmap Adherence » (accordéon par sujet [N] + issues GitLab) --------
    Structure = accordéon .issue/.issue-hd/.issue-body de l'onglet Issues (studio.css) ;

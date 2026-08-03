@@ -30,7 +30,7 @@
 
   // --- Kard (verbatim du handoff) ---
   function Kard({ icon, iconColor, title, value, display = 'bar', ratio = 0,
-                  barColor = 'var(--color-accent)', series, footer, popup, onOpen, info }) {
+                  barColor = 'var(--color-accent)', series, footer, popup, onOpen, info, tags }) {
     const clickable = !!popup;
     const open = () => { if (clickable && onOpen) onOpen(popup); };
 
@@ -67,6 +67,9 @@
         <div className="kbig">{value}</div>
         {body}
         {footer ? <div className="kcap">{footer}</div> : null}
+        {tags && tags.length
+          ? <div className="ktags">{tags.map((tg, i) => <span key={i} className={'ktag ktag-' + (tg.tone || 'src')}>{tg.text}</span>)}</div>
+          : null}
       </div>
     );
   }

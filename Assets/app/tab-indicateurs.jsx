@@ -26,6 +26,31 @@
     });
   }
 
+  // Métadonnées par KPI : grp = section (produit=Canny/roadmap, ingenierie=GitLab) ; src = source de
+  // données (canny/gitlab/mixte) ; filt = filtrabilité par les pills (all/ms/none) ; aud = audience (rôle).
+  // Ajustable ici de façon centralisée (badges + regroupement en dérivent).
+  const KPI_META = {
+    roadmap:   { grp: 'produit',    src: 'mixte',  filt: 'ms',   aud: 'produit' },
+    ack:       { grp: 'produit',    src: 'canny',  filt: 'none', aud: 'support' },
+    saydo:     { grp: 'produit',    src: 'canny',  filt: 'none', aud: 'produit' },
+    unplanned: { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    patch:     { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    bugres:    { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    mttr:      { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    refactor:  { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+  };
+  const SRC_LABEL = { canny: 'Canny', gitlab: 'GitLab', mixte: 'Canny + GitLab' };
+  function tagsFor(key) {
+    const m = KPI_META[key]; if (!m) return null;
+    const t = window.t;
+    const tags = [{ text: SRC_LABEL[m.src] || m.src, tone: m.src }];
+    if (m.filt === 'all') tags.push({ text: t('kpi.tagFilterable'), tone: 'filter' });
+    else if (m.filt === 'ms') tags.push({ text: t('kpi.tagFilterMs'), tone: 'filter' });
+    else tags.push({ text: t('kpi.tagGlobal'), tone: 'global' });
+    tags.push({ text: t('kpi.aud_' + m.aud), tone: 'aud' });
+    return tags;
+  }
+
   // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien.
   const RmIssue = (it) => (
     <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
@@ -135,9 +160,9 @@
       const col = has ? barColor : 'var(--color-neutral)';
       const list = issues || [];
       const clickable = list.length > 0;
-      cards.push(<K key={key} icon={icon} iconColor={col} title={title} info={info}
+      cards.push({ key, el: <K key={key} icon={icon} iconColor={col} title={title} info={info} tags={tagsFor(key)}
         value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer}
-        popup={clickable ? true : null} onOpen={clickable ? () => setIssModal({ title, issues: list, rowMeta }) : undefined} />);
+        popup={clickable ? true : null} onOpen={clickable ? () => setIssModal({ title, issues: list, rowMeta }) : undefined} /> });
     }
 
     // 1. Roadmap Adherence — sujets roadmap « [N] » corrélés à GitLab. Adhérent = statut Canny « complete »
@@ -159,12 +184,12 @@
     const rmPct = rmTotal ? Math.round(rmAdh / rmTotal * 100) : 0;
     const rmHas = rmTotal > 0;
     const rmCol = rmHas ? colorUp(rmPct) : 'var(--color-neutral)';
-    cards.push(
-      <K key="roadmap" icon="circle-check" iconColor={rmCol} title={t('kpi.roadmapTitle')} info={t('kpi.roadmapInfo')}
+    cards.push({ key: 'roadmap', el: (
+      <K key="roadmap" icon="circle-check" iconColor={rmCol} title={t('kpi.roadmapTitle')} info={t('kpi.roadmapInfo')} tags={tagsFor('roadmap')}
         value={rmHas ? rmPct + ' %' : '—'} display="bar" ratio={rmHas ? rmPct / 100 : 0} barColor={rmCol}
         footer={<span><b>{rmAdh}</b> {t('kpi.adherent')} · <b>{rmTotal}</b> {t('kpi.topics')}</span>}
         popup onOpen={() => setRmOpen(true)} />
-    );
+    ) });
 
     // 2. Acknowledge Time — part des demandes Canny répondues en ≤ SLA (heures ouvrées). Recalcul CLIENT
     //    filtré par deux listes configurables (Options → admin) : on ne compte QUE les posts d'auteurs
@@ -201,24 +226,24 @@
       ackGroups = groupAckByBoard(ackRows); // récap + sections par type de poste (board Canny)
       const pct = ackAnswered ? Math.round(ackWithin / ackAnswered * 100) : 0;
       const col = ackAnswered ? colorUp(pct) : 'var(--color-neutral)';
-      cards.push(
-        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+      cards.push({ key: 'ack', el: (
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')} tags={tagsFor('ack')}
           value={ackAnswered ? pct + ' %' : '—'} display="bar" ratio={ackAnswered ? pct / 100 : 0} barColor={col}
           footer={F(ackWithin, '≤' + ackSlaH + 'h', ackAnswered, t('kpi.answered'))}
           popup onOpen={() => setAckOpen(true)} />
-      );
+      ) });
     } else if (agg.sla) {
       // Repli : dataset extrait AVANT l'ajout des ackEvents (pas de liste par post ni de recalcul filtré).
       // Agrégat serveur historique (non filtré). Cliquable → invite à ré-extraire Canny.
       const answered = (agg.sla.compliant || 0) + (agg.sla.breached || 0);
       const pct = answered ? Math.round((agg.sla.within4h || 0) / answered * 100) : 0;
       const col = answered ? colorUp(pct) : 'var(--color-neutral)';
-      cards.push(
-        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+      cards.push({ key: 'ack', el: (
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')} tags={tagsFor('ack')}
           value={answered ? pct + ' %' : '—'} display="bar" ratio={answered ? pct / 100 : 0} barColor={col}
           footer={F(agg.sla.within4h || 0, '≤4h', answered, t('kpi.answered'))}
           popup onOpen={() => setAckOpen(true)} />
-      );
+      ) });
     }
 
     // 3. Unplanned Work — part des issues « Unplanned » (cible < 15%, plus bas mieux).
@@ -268,11 +293,25 @@
       card('saydo', 'gauge', t('kpi.saydoTitle'), sdPct, tot > 0, colorUp(sdPct), F(val, t('kpi.delivered'), tot, t('kpi.planned')), t('kpi.saydoInfo'));
     }
 
+    // Regroupement en sections par SOURCE de données (ordre des cartes préservé dans chaque section).
+    const grid = (items) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
+        {items.map((c) => c.el)}
+      </div>
+    );
+    const section = (id, titleKey, subKey, items) => items.length ? (
+      <div className="kpi-sec" key={id}>
+        <div className="kpi-sec-hd"><h2>{t(titleKey)}</h2><span className="kpi-sec-sub">{t(subKey)}</span></div>
+        {grid(items)}
+      </div>
+    ) : null;
+    const produit = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'produit');
+    const ingenierie = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'ingenierie');
+
     return (
       <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
-          {cards}
-        </div>
+        {section('produit', 'kpi.secProduit', 'kpi.secProduitSub', produit)}
+        {section('ingenierie', 'kpi.secEng', 'kpi.secEngSub', ingenierie)}
         {!CANNY && <p style={{ marginTop: 16, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
 
         {rmOpen && (
