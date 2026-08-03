@@ -118,6 +118,11 @@
 .ackp-resp { flex: none; min-width: 150px; text-align: right; font-size: var(--text-caption); color: var(--color-ink-2); white-space: nowrap; }
 .ackp-resp b { font-family: var(--font-mono); }
 .ackp-none { color: var(--color-neutral); }
+/* Popups KPI par issue (Unplanned/Patch/BugRes/MTTR/Refactoring) : #iid = lien GitLab (.rm-iid),
+   titre non cliquable (.rm-issue-t, flex:1), puis Type::* + métrique, et badge état à DROITE. */
+.il-type { flex: none; font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.il-metric { flex: none; font-family: var(--font-mono); font-size: var(--text-caption); white-space: nowrap; }
+.ackp-row .st-badge { flex: none; }
 
 /* ---- Acknowledge Time : TABLE alignée (entête de colonnes + lignes) --------------------
    Colonnes : pastille · Titre · Celui qui écrit · Celui qui répond · Temps. Grille partagée

@@ -154,15 +154,15 @@
     const typeLbl = (d.labels || []).find((l) => /^type::/i.test(l));
     const short = typeLbl ? typeLbl.replace(/^type::\s*/i, '') : null;
     const href = base ? base + d.iid : null;
-    const title = '#' + d.iid + ' ' + (d.title || '');
     return (
       <div className="ackp-row">
-        <span className={'st-badge ' + (closed ? 'st-closed' : 'st-open')}><span className="sd"></span>{closed ? t('common.closedF') : t('common.openF')}</span>
         {href
-          ? <a className="ackp-title" href={href} target="_blank" rel="noreferrer">{title}</a>
-          : <span className="ackp-title">{title}</span>}
-        {short && <span className="ackp-author">{short}</span>}
-        <span className="ackp-resp">{rowMeta ? rowMeta(d) : null}</span>
+          ? <a className="rm-iid" href={href} target="_blank" rel="noreferrer">#{d.iid}</a>
+          : <span className="rm-iid">#{d.iid}</span>}
+        <span className="rm-issue-t">{d.title || ''}</span>
+        {short && <span className="il-type">{short}</span>}
+        {rowMeta && <span className="il-metric">{rowMeta(d)}</span>}
+        <span className={'st-badge ' + (closed ? 'st-closed' : 'st-open')}><span className="sd"></span>{closed ? t('common.closedF') : t('common.openF')}</span>
       </div>
     );
   }
