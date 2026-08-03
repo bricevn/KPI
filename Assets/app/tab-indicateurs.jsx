@@ -12,6 +12,20 @@
   const hasExact = (d, name) => (d.labels || []).some((l) => String(l).toLowerCase() === name);
   const hours = (a, b) => (new Date(b).getTime() - new Date(a).getTime()) / 3600000;
 
+  // Acknowledge Time : regroupement du détail par TYPE DE POSTE (board Canny). Ordre demandé puis alpha.
+  const BOARD_ORDER = ['Bug', 'Questions', 'Feature Requests'];
+  function groupAckByBoard(rows) {
+    const map = {};
+    rows.forEach((r) => { (map[r.board] = map[r.board] || []).push(r); });
+    return Object.keys(map).sort((a, b) => {
+      const ia = BOARD_ORDER.indexOf(a), ib = BOARD_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    }).map((b) => {
+      const rws = map[b];
+      return { board: b, rows: rws, answered: rws.filter((r) => r.answered).length, within: rws.filter((r) => r.within).length };
+    });
+  }
+
   // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien.
   const RmIssue = (it) => (
     <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
@@ -160,7 +174,7 @@
     const ackCfg = window.__ACKCFG__ || { authorIds: [], responderIds: [] };
     const ackSlaH = (CANNY && CANNY.meta && CANNY.meta.slaConfig && CANNY.meta.slaConfig.hours) || 4;
     const hasAck = CANNY && CANNY.posts && CANNY.posts.some((p) => Array.isArray(p.ackEvents));
-    let ackRows = null, ackAnswered = 0, ackWithin = 0;   // exposés au popup (liste des posts concernés)
+    let ackRows = null, ackAnswered = 0, ackWithin = 0, ackGroups = null;   // exposés au popup (liste + récap par board)
     if (hasAck) {
       const authorSet = new Set(ackCfg.authorIds || []);
       const respSet = new Set(ackCfg.responderIds || []);
@@ -174,6 +188,7 @@
         const first = ev.length ? ev.reduce((a, b) => (b.bh < a.bh ? b : a)) : null; // 1re réponse éligible
         ackRows.push({
           id: p.id, title: p.title || p.id, url: p.url, author: p.authorName || uname(p.authorId),
+          board: p.board || t('kpi.ackNoBoard'),
           answered: !!first, delay: first ? first.bh : null, within: !!first && first.bh <= ackSlaH,
           responder: first ? uname(first.a) : null, via: first ? first.v : null,
         });
@@ -183,6 +198,7 @@
       // Tri : sans réponse d'abord, puis hors délai (le pire en haut), puis dans les délais.
       const rank = (r) => (r.answered ? (r.within ? 2 : 1) : 0);
       ackRows.sort((a, b) => rank(a) - rank(b) || ((b.delay || 0) - (a.delay || 0)));
+      ackGroups = groupAckByBoard(ackRows); // récap + sections par type de poste (board Canny)
       const pct = ackAnswered ? Math.round(ackWithin / ackAnswered * 100) : 0;
       const col = ackAnswered ? colorUp(pct) : 'var(--color-neutral)';
       cards.push(
@@ -275,9 +291,36 @@
             subtitle={ackRows && ackRows.length ? ackRows.length + ' ' + t('kpi.postsConcerned') + ' · ' + ackWithin + ' / ' + ackAnswered + ' ≤' + ackSlaH + 'h' : undefined}
             wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setAckOpen(false)}>
             <p className="rm-intro">{t('kpi.ackInfo')}</p>
-            {ackRows && ackRows.length
-              ? <div className="ackp-list">{ackRows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
-              : <p className="empty">{t('kpi.ackNoDetail')}</p>}
+            {ackGroups && ackGroups.length ? (
+              <React.Fragment>
+                {/* Récap comparatif des 3 types de poste : taux d'acquittement (barre + %) + volume (part du total). */}
+                <div className="acksum">
+                  {ackGroups.map((g) => {
+                    const rate = g.answered ? Math.round(g.within / g.answered * 100) : 0;
+                    const col = g.answered ? colorUp(rate) : 'var(--color-neutral)';
+                    const share = ackRows.length ? Math.round(g.rows.length / ackRows.length * 100) : 0;
+                    return (
+                      <div className="acksum-card" key={g.board}>
+                        <div className="acksum-name">{g.board}</div>
+                        <div className="acksum-pct" style={{ color: col }}>{g.answered ? rate + ' %' : '—'}</div>
+                        <div className="acksum-bar"><i style={{ width: (g.answered ? rate : 0) + '%', background: col }}></i></div>
+                        <div className="acksum-meta"><b>{g.within}/{g.answered}</b> ≤{ackSlaH}h · <b>{g.rows.length}</b> {t('kpi.postsWord')} ({share}%)</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {ackGroups.map((g) => (
+                  <div className="ackg" key={g.board}>
+                    <div className="ackg-hd">
+                      <span className="ackg-name">{g.board}</span>
+                      <span className="ackg-stat">{g.within} / {g.answered} ≤{ackSlaH}h{g.answered ? ' · ' + Math.round(g.within / g.answered * 100) + ' %' : ''}</span>
+                      <span className="ackg-count">{g.rows.length}</span>
+                    </div>
+                    <div className="ackp-list">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+                  </div>
+                ))}
+              </React.Fragment>
+            ) : <p className="empty">{t('kpi.ackNoDetail')}</p>}
           </window.Modal>
         )}
 
