@@ -293,14 +293,13 @@
       card('saydo', 'gauge', t('kpi.saydoTitle'), sdPct, tot > 0, colorUp(sdPct), F(val, t('kpi.delivered'), tot, t('kpi.planned')), t('kpi.saydoInfo'));
     }
 
-    // Strip globale (rendue par le Shell sous les pills, sur toutes les pages) : grille à plat, sans
-    // en-têtes de section. La source reste lisible via les badges de chaque cartouche. Ordre : Produit
-    // (Canny/roadmap) puis Ingénierie (GitLab), sans titre.
+    // Page dédiée « Indicateurs » : grille à plat, sans en-têtes de section (la source reste lisible via
+    // les badges de chaque cartouche). Ordre : Produit (Canny/roadmap) puis Ingénierie (GitLab).
     const ordered = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'produit')
       .concat(cards.filter((c) => (KPI_META[c.key] || {}).grp !== 'produit'));
 
     return (
-      <div className="kpi-root kpi-strip">
+      <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
           {ordered.map((c) => c.el)}
         </div>

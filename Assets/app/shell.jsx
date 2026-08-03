@@ -1,9 +1,8 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
-  // « indicateurs » n'est plus un onglet : les cartouches KPI sont une STRIP globale (sous les pills,
-  // sur toutes les pages) rendue par le Shell — voir <window.TabIndicateurs /> plus bas.
-  const NAV_IDS = ['dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
+  // « indicateurs » : page dédiée (cartouches KPI), première de la nav, avant le Dashboard.
+  const NAV_IDS = ['indicateurs', 'dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
 
@@ -34,7 +33,7 @@
   window.Shell = function Shell() {
     const A = window.APP;
     const [t, setTweak] = window.useTweaks(CHART_TWEAKS);
-    const [tab, setTab] = useState(() => {try {const s = localStorage.getItem('app-tab');return (s && s !== 'indicateurs') ? s : 'dashboard';} catch (e) {return 'dashboard';}});
+    const [tab, setTab] = useState(() => {try {return localStorage.getItem('app-tab') || 'dashboard';} catch (e) {return 'dashboard';}});
     const [theme, setTheme] = useState(() => load('app-theme', 'dark'));
     const [accent, setAccent] = useState(() => load('app-accent', '#2b7fff'));
     const [numFont, setNumFont] = useState(() => load('app-numfont', 'grotesk'));
@@ -74,6 +73,7 @@
     const resolved = theme === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : theme;
 
     const TabComp = {
+      indicateurs: window.TabIndicateurs,
       dashboard: window.TabDashboard, charts: window.TabCharts, comparison: window.TabComparison, anomalies: window.TabAnomalies,
       issues: window.TabIssues, calendar: window.TabCalendar, velocity: window.TabVelocity, options: window.TabOptions
     }[tab];
@@ -153,9 +153,6 @@
               <div className="r" style={{ marginTop: 6, marginBottom: 0 }}><span>{A.milestone.start}</span><span>{A.milestone.end}</span></div>
             </div>
           </div>
-
-          {/* Strip KPI globale : cartouches Indicateurs AU-DESSUS des pills, sur toutes les pages (hors Options). */}
-          {showFilters && window.TabIndicateurs && <window.TabIndicateurs />}
 
           {showFilters &&
           <div className="fl">

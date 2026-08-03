@@ -87,8 +87,6 @@
 .ktag-global { background: var(--color-surface-3); color: var(--color-ink-3); }
 .ktag-aud    { background: transparent; color: var(--color-ink-2); border-color: var(--color-line-1); }
 
-/* Strip KPI globale (sous les pills, sur toutes les pages) : grille à plat + séparateur bas. */
-.kpi-strip { padding: 0 0 var(--space-5); border-bottom: 1px solid var(--color-line-1); }
 
 /* ---- popup « Roadmap Adherence » (accordéon par sujet [N] + issues GitLab) --------
    Structure = accordéon .issue/.issue-hd/.issue-body de l'onglet Issues (studio.css) ;
