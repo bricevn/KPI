@@ -12,6 +12,20 @@
   const hasExact = (d, name) => (d.labels || []).some((l) => String(l).toLowerCase() === name);
   const hours = (a, b) => (new Date(b).getTime() - new Date(a).getTime()) / 3600000;
 
+  // Acknowledge Time : regroupement du détail par TYPE DE POSTE (board Canny). Ordre demandé puis alpha.
+  const BOARD_ORDER = ['Bug', 'Questions', 'Feature Requests'];
+  function groupAckByBoard(rows) {
+    const map = {};
+    rows.forEach((r) => { (map[r.board] = map[r.board] || []).push(r); });
+    return Object.keys(map).sort((a, b) => {
+      const ia = BOARD_ORDER.indexOf(a), ib = BOARD_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    }).map((b) => {
+      const rws = map[b];
+      return { board: b, rows: rws, answered: rws.filter((r) => r.answered).length, within: rws.filter((r) => r.within).length };
+    });
+  }
+
   // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien.
   const RmIssue = (it) => (
     <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
@@ -174,6 +188,7 @@
         const first = ev.length ? ev.reduce((a, b) => (b.bh < a.bh ? b : a)) : null; // 1re réponse éligible
         ackRows.push({
           id: p.id, title: p.title || p.id, url: p.url, author: p.authorName || uname(p.authorId),
+          board: p.board || t('kpi.ackNoBoard'),
           answered: !!first, delay: first ? first.bh : null, within: !!first && first.bh <= ackSlaH,
           responder: first ? uname(first.a) : null, via: first ? first.v : null,
         });
@@ -276,7 +291,16 @@
             wide layout={(typeof window !== 'undefined' && window.__drillLayout) || 'modal'} onClose={() => setAckOpen(false)}>
             <p className="rm-intro">{t('kpi.ackInfo')}</p>
             {ackRows && ackRows.length
-              ? <div className="ackp-list">{ackRows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+              ? groupAckByBoard(ackRows).map((g) => (
+                  <div className="ackg" key={g.board}>
+                    <div className="ackg-hd">
+                      <span className="ackg-name">{g.board}</span>
+                      <span className="ackg-stat">{g.within} / {g.answered} ≤{ackSlaH}h{g.answered ? ' · ' + Math.round(g.within / g.answered * 100) + ' %' : ''}</span>
+                      <span className="ackg-count">{g.rows.length}</span>
+                    </div>
+                    <div className="ackp-list">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+                  </div>
+                ))
               : <p className="empty">{t('kpi.ackNoDetail')}</p>}
           </window.Modal>
         )}

@@ -103,6 +103,13 @@
 .ackp-resp { flex: none; min-width: 150px; text-align: right; font-size: var(--text-caption); color: var(--color-ink-2); white-space: nowrap; }
 .ackp-resp b { font-family: var(--font-mono); }
 .ackp-none { color: var(--color-neutral); }
+
+/* ---- Acknowledge Time : regroupement par type de poste (board Canny) ---- */
+.ackg { margin-bottom: var(--space-5); }
+.ackg-hd { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-3); border-bottom: 2px solid var(--color-line-1); }
+.ackg-name { font-size: var(--text-h3); font-weight: 700; color: var(--color-ink-1); }
+.ackg-stat { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); }
+.ackg-count { margin-left: auto; font-size: var(--text-caption); color: var(--color-ink-2); background: var(--color-surface-3); padding: 2px 9px; border-radius: var(--radius-pill); }
 .rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
 .rm-epic-h:hover { color: var(--color-accent); }
 .rm-epic-h svg { flex: none; }
