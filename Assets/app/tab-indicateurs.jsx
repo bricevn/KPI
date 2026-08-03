@@ -300,7 +300,7 @@
 
     return (
       <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-4, 12px)' }}>
           {ordered.map((c) => c.el)}
         </div>
         {!CANNY && <p style={{ marginTop: 12, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
