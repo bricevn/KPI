@@ -119,6 +119,21 @@
 .ackp-resp b { font-family: var(--font-mono); }
 .ackp-none { color: var(--color-neutral); }
 
+/* ---- Acknowledge Time : TABLE alignée (entête de colonnes + lignes) --------------------
+   Colonnes : pastille · Titre · Celui qui écrit · Celui qui répond · Temps. Grille partagée
+   entête/lignes → alignement parfait. (Distinct de .ackp-* réutilisé par les popups d'issues.) */
+.acktab { display: flex; flex-direction: column; }
+.acktab-hd, .acktab-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 148px 148px 60px; align-items: center; gap: var(--space-3); }
+.acktab-hd { padding: 2px var(--space-2) 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-ink-3); border-bottom: 1px solid var(--color-line-1); margin-bottom: 2px; }
+.acktab-row { padding: 8px var(--space-2); font-size: var(--text-sm); border-top: 1px solid var(--color-line-2); }
+.acktab-row:first-child { border-top: 0; }
+.acktab-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); }
+.acktab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-1); text-decoration: none; }
+.acktab-title:hover { color: var(--color-accent); text-decoration: underline; }
+.acktab-author, .acktab-resp { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-2); }
+.acktab-time { text-align: right; font-family: var(--font-mono); font-size: var(--text-caption); white-space: nowrap; }
+.acktab-hd > :last-child { text-align: right; }
+
 /* ---- Acknowledge Time : regroupement par type de poste (board Canny) ---- */
 .ackg { margin-bottom: var(--space-5); }
 .ackg-hd { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-3); border-bottom: 2px solid var(--color-line-1); }

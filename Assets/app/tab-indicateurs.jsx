@@ -115,21 +115,33 @@
     );
   }
 
+  // Entête de colonnes de la liste Acknowledge (grille alignée avec les lignes AckPost).
+  const AckHead = () => {
+    const t = window.t;
+    return (
+      <div className="acktab-hd">
+        <span></span>
+        <span>{t('kpi.colTitle')}</span>
+        <span>{t('kpi.colAuthor')}</span>
+        <span>{t('kpi.colResponder')}</span>
+        <span>{t('kpi.colTime')}</span>
+      </div>
+    );
+  };
+
   // Une ligne de post « concerné » (popup Acknowledge Time) : pastille de verdict + titre (lien Canny) +
-  // auteur + répondeur/délai. Vert = réponse ≤ SLA, rouge = hors délai, neutre = aucune réponse éligible.
+  // auteur (celui qui écrit) + répondeur (celui qui répond) + temps. Vert = ≤ SLA, rouge = hors délai,
+  // neutre = aucune réponse éligible. Colonnes alignées via grille (mêmes que AckHead).
   function AckPost({ r }) {
     const t = window.t;
     const col = r.answered ? (r.within ? 'var(--color-good)' : 'var(--color-bad)') : 'var(--color-neutral)';
     return (
-      <div className="ackp-row">
-        <span className="ackp-dot" style={{ background: col }}></span>
-        <a className="ackp-title" href={r.url} target="_blank" rel="noreferrer">{r.title}</a>
-        <span className="ackp-author">{r.author}</span>
-        <span className="ackp-resp">
-          {r.answered
-            ? <span>{r.responder} · <b style={{ color: col }}>{r.delay}h</b></span>
-            : <span className="ackp-none">{t('kpi.ackNoResp')}</span>}
-        </span>
+      <div className="acktab-row">
+        <span className="acktab-dot" style={{ background: col }}></span>
+        <a className="acktab-title" href={r.url} target="_blank" rel="noreferrer">{r.title}</a>
+        <span className="acktab-author">{r.author}</span>
+        <span className={'acktab-resp' + (r.answered ? '' : ' ackp-none')}>{r.answered ? r.responder : t('kpi.ackNoResp')}</span>
+        <span className="acktab-time">{r.answered ? <b style={{ color: col }}>{r.delay}h</b> : '—'}</span>
       </div>
     );
   }
@@ -364,6 +376,7 @@
                     );
                   })}
                 </div>
+                <AckHead />
                 {ackGroups.map((g) => (
                   <div className="ackg" key={g.board}>
                     <div className="ackg-hd">
@@ -371,7 +384,7 @@
                       <span className="ackg-stat">{g.within} / {g.answered} ≤{ackSlaH}h{g.answered ? ' · ' + Math.round(g.within / g.answered * 100) + ' %' : ''}</span>
                       <span className="ackg-count">{g.rows.length}</span>
                     </div>
-                    <div className="ackp-list">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+                    <div className="acktab">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
                   </div>
                 ))}
               </React.Fragment>
