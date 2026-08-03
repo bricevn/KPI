@@ -87,11 +87,8 @@
 .ktag-global { background: var(--color-surface-3); color: var(--color-ink-3); }
 .ktag-aud    { background: transparent; color: var(--color-ink-2); border-color: var(--color-line-1); }
 
-/* Sections de la page Indicateurs (regroupement par source de données). */
-.kpi-sec { margin-bottom: var(--space-7); }
-.kpi-sec-hd { display: flex; align-items: baseline; gap: var(--space-3); margin: 0 0 var(--space-4); }
-.kpi-sec-hd h2 { margin: 0; font-size: var(--text-h2); font-weight: 700; color: var(--color-ink-1); }
-.kpi-sec-hd .kpi-sec-sub { font-size: var(--text-caption); color: var(--color-ink-3); }
+/* Strip KPI globale (sous les pills, sur toutes les pages) : grille à plat + séparateur bas. */
+.kpi-strip { padding: 0 0 var(--space-5); border-bottom: 1px solid var(--color-line-1); }
 
 /* ---- popup « Roadmap Adherence » (accordéon par sujet [N] + issues GitLab) --------
    Structure = accordéon .issue/.issue-hd/.issue-body de l'onglet Issues (studio.css) ;

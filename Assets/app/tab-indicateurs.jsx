@@ -293,26 +293,18 @@
       card('saydo', 'gauge', t('kpi.saydoTitle'), sdPct, tot > 0, colorUp(sdPct), F(val, t('kpi.delivered'), tot, t('kpi.planned')), t('kpi.saydoInfo'));
     }
 
-    // Regroupement en sections par SOURCE de données (ordre des cartes préservé dans chaque section).
-    const grid = (items) => (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
-        {items.map((c) => c.el)}
-      </div>
-    );
-    const section = (id, titleKey, subKey, items) => items.length ? (
-      <div className="kpi-sec" key={id}>
-        <div className="kpi-sec-hd"><h2>{t(titleKey)}</h2><span className="kpi-sec-sub">{t(subKey)}</span></div>
-        {grid(items)}
-      </div>
-    ) : null;
-    const produit = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'produit');
-    const ingenierie = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'ingenierie');
+    // Strip globale (rendue par le Shell sous les pills, sur toutes les pages) : grille à plat, sans
+    // en-têtes de section. La source reste lisible via les badges de chaque cartouche. Ordre : Produit
+    // (Canny/roadmap) puis Ingénierie (GitLab), sans titre.
+    const ordered = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'produit')
+      .concat(cards.filter((c) => (KPI_META[c.key] || {}).grp !== 'produit'));
 
     return (
-      <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
-        {section('produit', 'kpi.secProduit', 'kpi.secProduitSub', produit)}
-        {section('ingenierie', 'kpi.secEng', 'kpi.secEngSub', ingenierie)}
-        {!CANNY && <p style={{ marginTop: 16, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
+      <div className="kpi-root kpi-strip">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
+          {ordered.map((c) => c.el)}
+        </div>
+        {!CANNY && <p style={{ marginTop: 12, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
 
         {rmOpen && (
           <window.Modal title={t('kpi.roadmapTitle')}
