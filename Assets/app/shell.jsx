@@ -154,6 +154,9 @@
             </div>
           </div>
 
+          {/* Strip KPI globale : cartouches Indicateurs AU-DESSUS des pills, sur toutes les pages (hors Options). */}
+          {showFilters && window.TabIndicateurs && <window.TabIndicateurs />}
+
           {showFilters &&
           <div className="fl">
               <window.MultiSelect label={window.t('f_project')} value={fProject} onChange={setFProject}
@@ -177,9 +180,6 @@
               </div>
             </div>
           }
-
-          {/* Strip KPI globale : cartouches Indicateurs sous les pills, sur toutes les pages (hors Options). */}
-          {showFilters && window.TabIndicateurs && <window.TabIndicateurs />}
 
           {TabComp ? <TabComp theme={theme} setTheme={setTheme} appearance={appearance} tweaks={t} lang={lang} /> : <Stub name={window.t('nav_' + tab)} />}
         </main>
