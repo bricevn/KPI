@@ -161,8 +161,11 @@
       <div className={'modal-back lay-' + lay} onClick={onClose}>
         <div className={'modal lay-' + lay + (wide && lay === 'modal' ? ' wide' : '')} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
           <div className="modal-h">
-            <div className="modal-h-txt"><h3>{title}</h3>{subtitle && <div className="modal-sub">{subtitle}</div>}</div>
+            {headline != null
+              ? <div className="modal-h-txt"><h3>{title}</h3>{subtitle && <div className="modal-sub">{subtitle}</div>}</div>
+              : <h3>{title}</h3>}
             {headline != null && <span className="modal-headline">{headline}</span>}
+            {headline == null && subtitle && <div className="modal-sub modal-sub-right">{subtitle}</div>}
             <button className="modal-x" onClick={onClose} aria-label={window.t('common.close')}>✕</button>
           </div>
           <div className="modal-b">{children}</div>

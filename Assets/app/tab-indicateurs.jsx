@@ -51,11 +51,28 @@
     return tags;
   }
 
-  // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien.
+  // Couleur du statut Canny (approx. « synchro Canny ») : Complete=vert, In Progress=bleu, Planned=ambre,
+  // Under Review=violet, Closed=rouge, sinon neutre. Renvoie {color, background} inline pour le badge.
+  function statusStyle(status) {
+    const s = String(status || '').toLowerCase();
+    let c = 'var(--color-neutral)';
+    if (s.indexOf('complete') >= 0) c = 'var(--color-good)';
+    else if (s.indexOf('progress') >= 0) c = 'var(--color-done)';
+    else if (s.indexOf('planned') >= 0) c = 'var(--color-warn)';
+    else if (s.indexOf('review') >= 0) c = 'var(--color-feature)';
+    else if (s.indexOf('closed') >= 0) c = 'var(--color-bad)';
+    return { color: c, background: 'color-mix(in srgb, ' + c + ' 16%, transparent)' };
+  }
+
+  // Ligne d'issue GitLab (épic ou directe) : #iid en LIEN GitLab cliquable, titre NON cliquable,
+  // état (opened/closed) à DROITE.
   const RmIssue = (it) => (
     <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
+      {it.webUrl
+        ? <a className="rm-iid" href={it.webUrl} target="_blank" rel="noreferrer">#{it.iid}</a>
+        : <span className="rm-iid">#{it.iid}</span>}
+      <span className="rm-issue-t">{it.title}</span>
       <span className={'rm-st ' + (it.state === 'closed' ? 'closed' : 'opened')}>{it.state}</span>
-      <a href={it.webUrl} target="_blank" rel="noreferrer">#{it.iid} {it.title}</a>
     </div>
   );
 
@@ -71,7 +88,7 @@
           <span className="rm-dot" style={{ background: tp.adherent ? 'var(--color-good)' : 'var(--color-bad)' }}></span>
           <a className="issue-ttl rm-title" href={tp.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tp.title}</a>
           <span className="issue-meta">
-            <span className="rm-badge">{tp.status}</span>
+            <span className="rm-badge" style={statusStyle(tp.status)}>{tp.status}</span>
             <span className="rm-count">{tp.targetClosed}/{tp.targetTotal} {t('kpi.ofIssues')}</span>
           </span>
         </div>
@@ -79,10 +96,14 @@
           <div className="issue-body">
             {tp.epics.map((e) => (
               <div className="rm-epic" key={'e' + e.iid}>
-                <a className="rm-epic-h" href={e.webUrl} target="_blank" rel="noreferrer">
-                  {window.Icon('activity', 12)} <b>épic &{e.iid}</b> {e.title}
-                  <span className={'rm-st ' + (e.allClosed ? 'closed' : 'opened')} style={{ marginLeft: 6 }}>{e.closed}/{e.total}</span>
-                </a>
+                <div className="rm-epic-h">
+                  {window.Icon('activity', 13)}
+                  {e.webUrl
+                    ? <a className="rm-iid" href={e.webUrl} target="_blank" rel="noreferrer" title="Ouvrir l'épic GitLab">&{e.iid}</a>
+                    : <span className="rm-iid">&{e.iid}</span>}
+                  <span className="rm-epic-t">{e.title}</span>
+                  <span className={'rm-st ' + (e.allClosed ? 'closed' : 'opened')}>{e.closed}/{e.total}</span>
+                </div>
                 <div className="rm-epic-issues">{e.issues.map(RmIssue)}</div>
               </div>
             ))}
@@ -177,7 +198,11 @@
     const normRm = (s) => String(s).toLowerCase().replace(/roadmap/g, '').replace(/[^a-z0-9]/g, '');
     const selMsNorm = activeMs.map(normMs).filter(Boolean);
     const rmInScope = (tp) => !selMsNorm.length || (tp.roadmaps || []).map(normRm).some((r) => selMsNorm.indexOf(r) >= 0);
-    const rmTopics = rmAllTopics.filter(rmInScope);
+    // Date du post Canny (via window.__CANNY__.posts, par postId) → tri du plus RÉCENT au plus vieux.
+    // Les dates ISO se comparent lexicographiquement ; pas besoin de re-résoudre côté serveur.
+    const rmCreated = {}; ((CANNY && CANNY.posts) || []).forEach((p) => { rmCreated[p.id] = p.created || ''; });
+    const rmTopics = rmAllTopics.filter(rmInScope).slice()
+      .sort((a, b) => String(rmCreated[b.postId] || '').localeCompare(String(rmCreated[a.postId] || '')));
     const rmDataExists = rmAllTopics.length > 0;   // des sujets existent (extraction Canny faite) vs filtre sans correspondance
     const rmTotal = rmTopics.length;
     const rmAdh = rmTopics.filter((x) => x.adherent).length;

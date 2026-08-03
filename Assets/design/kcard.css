@@ -99,7 +99,7 @@
   font-size: var(--text-caption); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);
   background: var(--color-surface-3); color: var(--color-ink-2); text-transform: capitalize; white-space: nowrap;
 }
-.rm-count { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.rm-count { font-family: var(--font-mono); font-size: var(--text-caption); font-weight: 600; color: var(--color-ink-1); white-space: nowrap; background: var(--color-surface-3); padding: 1px 8px; border-radius: var(--radius-pill); }
 .rm-epic { padding: var(--space-2) 0; }
 .rm-epic + .rm-epic { border-top: 1px dashed var(--color-line-2); }
 
@@ -132,16 +132,15 @@
 .acksum-bar > i { display: block; height: 100%; border-radius: inherit; }
 .acksum-meta { margin-top: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-3); }
 .acksum-meta b { font-family: var(--font-mono); color: var(--color-ink-2); font-weight: 600; }
-.rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
-.rm-epic-h:hover { color: var(--color-accent); }
-.rm-epic-h svg { flex: none; }
-.rm-epic-issues { margin: var(--space-2) 0 0 18px; display: flex; flex-direction: column; gap: 2px; }
-.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-2); }
-.rm-issue a { color: var(--color-ink-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rm-issue a:hover { color: var(--color-accent); text-decoration: underline; }
-.rm-st {
-  font-family: var(--font-mono); font-size: 10px; font-weight: 600; flex: none;
-  padding: 1px 6px; border-radius: var(--radius-pill);
-}
+.rm-epic-h { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink-1); }
+.rm-epic-h svg { flex: none; color: var(--color-ink-3); }
+.rm-epic-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-1); }
+.rm-epic-issues { margin: var(--space-3) 0 0 22px; display: flex; flex-direction: column; gap: 4px; }
+.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink-1); }
+.rm-issue-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-2); }
+/* #iid (issue) / &iid (épic) : SEUL élément cliquable (lien GitLab) ; le titre reste non cliquable. */
+.rm-iid { flex: none; font-family: var(--font-mono); font-weight: 700; color: var(--color-accent); text-decoration: none; }
+.rm-iid:hover { text-decoration: underline; }
+.rm-st { font-family: var(--font-mono); font-size: 11px; font-weight: 600; flex: none; padding: 1px 7px; border-radius: var(--radius-pill); }
 .rm-st.closed { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 15%, transparent); }
 .rm-st.opened { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 15%, transparent); }
