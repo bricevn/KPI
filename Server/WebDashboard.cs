@@ -536,7 +536,9 @@ public sealed partial class WebDashboard
                 // v2 multi-serveurs : extraction cloisonnée + chiffrée, CIBLABLE par projet et/ou
                 // milestone (merge du store : seule la portée demandée est remplacée).
                 if (milestonesToRefresh.Count == 0)
-                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token, projectFilter);
+                    // « Rafraîchir » global (admin) sans milestone → forceFull : ré-extrait TOUT, y compris
+                    // les projets « Aucune » (sinon l'extraction serait sautée et « rien ne se passe »).
+                    await ExportPipeline.RunMultiServerExportAsync(_config, (i, t) => { _state.Current = i; _state.Total = t; _state.TotalIssues = t; }, linked.Token, projectFilter, forceFull: true);
                 else
                 {
                     // Milestones sélectionnées extraites EN PARALLÈLE, avec une progression PAR milestone

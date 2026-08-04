@@ -129,8 +129,11 @@ public static class ExportPipeline
     /// En mode ciblé, le store existant est MERGÉ : seules les issues de la portée sont remplacées.</param>
     public static async Task RunMultiServerExportAsync(AppConfig config, Action<int, int>? onProgress, CancellationToken ct,
         string? projectFilter = null, string? milestoneFilter = null,
-        IReadOnlyList<string>? explicitMilestones = null, Action<string, string, int, int>? onMilestoneProgress = null)
+        IReadOnlyList<string>? explicitMilestones = null, Action<string, string, int, int>? onMilestoneProgress = null,
+        bool forceFull = false)
     {
+        // forceFull : une régénération GLOBALE explicite (admin « Rafraîchir » sans sélection) ré-extrait
+        // TOUT — y compris les projets configurés « Aucune » (__skip__), qui ne sont sautés que par défaut.
         // onMilestoneProgress : (projectId, milestone, current, total) — clé composite pour éviter l'écrasement
         // entre projets partageant une même milestone (milestones de groupe, include_parent_milestones).
         projectFilter = string.IsNullOrWhiteSpace(projectFilter) ? null : projectFilter.Trim();
@@ -182,9 +185,10 @@ public static class ExportPipeline
                 var skipCfg = setupMs == ExportConfig.SkipExtractionSentinel;
                 // « Aucune » (sentinelle __skip__) : le projet est SAUTÉ lors des runs globaux — sauf si
                 // la régénération CIBLE explicitement un projet (projectFilter) OU une milestone
-                // (milestoneFilter) : la demande explicite prime. C'est ce qui permet le workflow
-                // « setup sans milestone → dashboard vide → import ciblé des milestones plus tard ».
-                if (skipCfg && projectFilter == null && milestoneFilter == null && explicitMilestones == null)
+                // (milestoneFilter), OU si forceFull (« Rafraîchir » global explicite) est demandé. C'est
+                // ce qui permet le workflow « setup sans milestone → import ciblé plus tard », tout en
+                // laissant l'admin tout ré-extraire d'un clic.
+                if (skipCfg && !forceFull && projectFilter == null && milestoneFilter == null && explicitMilestones == null)
                 {
                     Console.WriteLine($"  -- projet {pid} : extraction SAUTÉE (« Aucune » au setup) — données existantes conservées --");
                     continue;
