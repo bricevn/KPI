@@ -75,19 +75,34 @@
 .kcard-kpi .kbig small { font-size: 12px; }
 .kcard-kpi .kbar { height: 6px; }
 .kcard-kpi .kcap { margin-top: var(--space-2); }
+/* Badges de provenance / filtrabilité / audience (rangée en bas de cartouche). */
+.kcard-kpi .ktags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-3); }
+.ktag { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+  padding: 2px 6px; border-radius: var(--radius-pill); white-space: nowrap;
+  background: var(--color-surface-3); color: var(--color-ink-3); border: 1px solid transparent; }
+.ktag-canny  { background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent); }
+.ktag-gitlab { background: color-mix(in srgb, var(--color-complement, #e0792e) 16%, transparent); color: var(--color-complement, #e0792e); }
+.ktag-mixte  { background: color-mix(in srgb, var(--color-done) 15%, transparent); color: var(--color-done); }
+.ktag-filter { background: color-mix(in srgb, var(--color-good) 14%, transparent); color: var(--color-good); }
+.ktag-global { background: var(--color-surface-3); color: var(--color-ink-3); }
+.ktag-aud    { background: transparent; color: var(--color-ink-2); border-color: var(--color-line-1); }
+
 
 /* ---- popup « Roadmap Adherence » (accordéon par sujet [N] + issues GitLab) --------
    Structure = accordéon .issue/.issue-hd/.issue-body de l'onglet Issues (studio.css) ;
    badges/états propres au KPI via .rm-* (tokens charte, thème-aware). */
 .rm-intro { font-size: var(--text-caption); color: var(--color-ink-3); margin: 0 0 var(--space-4); line-height: 1.5; }
 .rm-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); flex: none; }
-.rm-title { color: var(--color-ink-1); text-decoration: none; }
+/* Titre du sujet = lien Canny à la LARGEUR DE SON TEXTE (ne remplit pas la ligne) → le reste de
+   l'entête (chevron, pastille, espace, badges) reste cliquable pour déplier l'accordéon. */
+.rm-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-ink-1); text-decoration: none; }
 .rm-title:hover { color: var(--color-accent); text-decoration: underline; }
 .rm-badge {
   font-size: var(--text-caption); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-pill);
   background: var(--color-surface-3); color: var(--color-ink-2); text-transform: capitalize; white-space: nowrap;
 }
-.rm-count { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.rm-count { font-family: var(--font-mono); font-size: var(--text-caption); font-weight: 600; color: var(--color-ink-1); white-space: nowrap; background: var(--color-surface-3); padding: 1px 8px; border-radius: var(--radius-pill); }
 .rm-epic { padding: var(--space-2) 0; }
 .rm-epic + .rm-epic { border-top: 1px dashed var(--color-line-2); }
 
@@ -103,6 +118,26 @@
 .ackp-resp { flex: none; min-width: 150px; text-align: right; font-size: var(--text-caption); color: var(--color-ink-2); white-space: nowrap; }
 .ackp-resp b { font-family: var(--font-mono); }
 .ackp-none { color: var(--color-neutral); }
+/* Popups KPI par issue (Unplanned/Patch/BugRes/MTTR/Refactoring) : #iid = lien GitLab (.rm-iid),
+   titre non cliquable (.rm-issue-t, flex:1), puis Type::* + métrique, et badge état à DROITE. */
+.il-type { flex: none; font-size: var(--text-caption); color: var(--color-ink-3); white-space: nowrap; }
+.il-metric { flex: none; font-family: var(--font-mono); font-size: var(--text-caption); white-space: nowrap; }
+.ackp-row .st-badge { flex: none; }
+
+/* ---- Acknowledge Time : TABLE alignée (entête de colonnes + lignes) --------------------
+   Colonnes : pastille · Titre · Celui qui écrit · Celui qui répond · Temps. Grille partagée
+   entête/lignes → alignement parfait. (Distinct de .ackp-* réutilisé par les popups d'issues.) */
+.acktab { display: flex; flex-direction: column; }
+.acktab-hd, .acktab-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 148px 148px 60px; align-items: center; gap: var(--space-3); }
+.acktab-hd { padding: 2px var(--space-2) 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-ink-3); border-bottom: 1px solid var(--color-line-1); margin-bottom: 2px; }
+.acktab-row { padding: 8px var(--space-2); font-size: var(--text-sm); border-top: 1px solid var(--color-line-2); }
+.acktab-row:first-child { border-top: 0; }
+.acktab-dot { width: 9px; height: 9px; border-radius: var(--radius-pill); }
+.acktab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-1); text-decoration: none; }
+.acktab-title:hover { color: var(--color-accent); text-decoration: underline; }
+.acktab-author, .acktab-resp { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-2); }
+.acktab-time { text-align: right; font-family: var(--font-mono); font-size: var(--text-caption); white-space: nowrap; }
+.acktab-hd > :last-child { text-align: right; }
 
 /* ---- Acknowledge Time : regroupement par type de poste (board Canny) ---- */
 .ackg { margin-bottom: var(--space-5); }
@@ -120,16 +155,15 @@
 .acksum-bar > i { display: block; height: 100%; border-radius: inherit; }
 .acksum-meta { margin-top: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-3); }
 .acksum-meta b { font-family: var(--font-mono); color: var(--color-ink-2); font-weight: 600; }
-.rm-epic-h { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--color-ink-2); text-decoration: none; }
-.rm-epic-h:hover { color: var(--color-accent); }
-.rm-epic-h svg { flex: none; }
-.rm-epic-issues { margin: var(--space-2) 0 0 18px; display: flex; flex-direction: column; gap: 2px; }
-.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-caption); color: var(--color-ink-2); }
-.rm-issue a { color: var(--color-ink-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rm-issue a:hover { color: var(--color-accent); text-decoration: underline; }
-.rm-st {
-  font-family: var(--font-mono); font-size: 10px; font-weight: 600; flex: none;
-  padding: 1px 6px; border-radius: var(--radius-pill);
-}
+.rm-epic-h { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink-1); }
+.rm-epic-h svg { flex: none; color: var(--color-ink-3); }
+.rm-epic-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-1); }
+.rm-epic-issues { margin: var(--space-3) 0 0 22px; display: flex; flex-direction: column; gap: 4px; }
+.rm-issue { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink-1); }
+.rm-issue-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-2); }
+/* #iid (issue) / &iid (épic) : SEUL élément cliquable (lien GitLab) ; le titre reste non cliquable. */
+.rm-iid { flex: none; font-family: var(--font-mono); font-weight: 700; color: var(--color-accent); text-decoration: none; }
+.rm-iid:hover { text-decoration: underline; }
+.rm-st { font-family: var(--font-mono); font-size: 11px; font-weight: 600; flex: none; padding: 1px 7px; border-radius: var(--radius-pill); }
 .rm-st.closed { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 15%, transparent); }
 .rm-st.opened { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 15%, transparent); }

@@ -26,11 +26,53 @@
     });
   }
 
-  // Ligne d'issue GitLab (épic ou directe) : pastille d'état + lien.
+  // Métadonnées par KPI : grp = section (produit=Canny/roadmap, ingenierie=GitLab) ; src = source de
+  // données (canny/gitlab/mixte) ; filt = filtrabilité par les pills (all/ms/none) ; aud = audience (rôle).
+  // Ajustable ici de façon centralisée (badges + regroupement en dérivent).
+  const KPI_META = {
+    roadmap:   { grp: 'produit',    src: 'mixte',  filt: 'ms',   aud: 'produit' },
+    ack:       { grp: 'produit',    src: 'canny',  filt: 'none', aud: 'support' },
+    saydo:     { grp: 'produit',    src: 'canny',  filt: 'none', aud: 'produit' },
+    unplanned: { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    patch:     { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    bugres:    { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    mttr:      { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+    refactor:  { grp: 'ingenierie', src: 'gitlab', filt: 'all',  aud: 'equipe' },
+  };
+  const SRC_LABEL = { canny: 'Canny', gitlab: 'GitLab', mixte: 'Canny + GitLab' };
+  function tagsFor(key) {
+    const m = KPI_META[key]; if (!m) return null;
+    const t = window.t;
+    const tags = [{ text: SRC_LABEL[m.src] || m.src, tone: m.src }];
+    if (m.filt === 'all') tags.push({ text: t('kpi.tagFilterable'), tone: 'filter' });
+    else if (m.filt === 'ms') tags.push({ text: t('kpi.tagFilterMs'), tone: 'filter' });
+    else tags.push({ text: t('kpi.tagGlobal'), tone: 'global' });
+    tags.push({ text: t('kpi.aud_' + m.aud), tone: 'aud' });
+    return tags;
+  }
+
+  // Couleur du statut Canny (approx. « synchro Canny ») : Complete=vert, In Progress=bleu, Planned=ambre,
+  // Under Review=violet, Closed=rouge, sinon neutre. Renvoie {color, background} inline pour le badge.
+  function statusStyle(status) {
+    const s = String(status || '').toLowerCase();
+    let c = 'var(--color-neutral)';
+    if (s.indexOf('complete') >= 0) c = 'var(--color-good)';
+    else if (s.indexOf('progress') >= 0) c = 'var(--color-done)';
+    else if (s.indexOf('planned') >= 0) c = 'var(--color-warn)';
+    else if (s.indexOf('review') >= 0) c = 'var(--color-feature)';
+    else if (s.indexOf('closed') >= 0) c = 'var(--color-bad)';
+    return { color: c, background: 'color-mix(in srgb, ' + c + ' 16%, transparent)' };
+  }
+
+  // Ligne d'issue GitLab (épic ou directe) : #iid en LIEN GitLab cliquable, titre NON cliquable,
+  // état (opened/closed) à DROITE.
   const RmIssue = (it) => (
     <div className="rm-issue" key={(it.webUrl || '') + '#' + it.iid}>
+      {it.webUrl
+        ? <a className="rm-iid" href={it.webUrl} target="_blank" rel="noreferrer">#{it.iid}</a>
+        : <span className="rm-iid">#{it.iid}</span>}
+      <span className="rm-issue-t">{it.title}</span>
       <span className={'rm-st ' + (it.state === 'closed' ? 'closed' : 'opened')}>{it.state}</span>
-      <a href={it.webUrl} target="_blank" rel="noreferrer">#{it.iid} {it.title}</a>
     </div>
   );
 
@@ -44,9 +86,9 @@
         <div className="issue-hd" onClick={() => setOpen((o) => !o)}>
           <span className={'issue-chev' + (open ? ' open' : '')}>{window.ICONS.chevron}</span>
           <span className="rm-dot" style={{ background: tp.adherent ? 'var(--color-good)' : 'var(--color-bad)' }}></span>
-          <a className="issue-ttl rm-title" href={tp.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tp.title}</a>
-          <span className="issue-meta">
-            <span className="rm-badge">{tp.status}</span>
+          <a className="rm-title" href={tp.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{tp.title}</a>
+          <span className="issue-meta" style={{ marginLeft: 'auto' }}>
+            <span className="rm-badge" style={statusStyle(tp.status)}>{tp.status}</span>
             <span className="rm-count">{tp.targetClosed}/{tp.targetTotal} {t('kpi.ofIssues')}</span>
           </span>
         </div>
@@ -54,10 +96,14 @@
           <div className="issue-body">
             {tp.epics.map((e) => (
               <div className="rm-epic" key={'e' + e.iid}>
-                <a className="rm-epic-h" href={e.webUrl} target="_blank" rel="noreferrer">
-                  {window.Icon('activity', 12)} <b>épic &{e.iid}</b> {e.title}
-                  <span className={'rm-st ' + (e.allClosed ? 'closed' : 'opened')} style={{ marginLeft: 6 }}>{e.closed}/{e.total}</span>
-                </a>
+                <div className="rm-epic-h">
+                  {window.Icon('activity', 13)}
+                  {e.webUrl
+                    ? <a className="rm-iid" href={e.webUrl} target="_blank" rel="noreferrer" title="Ouvrir l'épic GitLab">&{e.iid}</a>
+                    : <span className="rm-iid">&{e.iid}</span>}
+                  <span className="rm-epic-t">{e.title}</span>
+                  <span className={'rm-st ' + (e.allClosed ? 'closed' : 'opened')}>{e.closed}/{e.total}</span>
+                </div>
                 <div className="rm-epic-issues">{e.issues.map(RmIssue)}</div>
               </div>
             ))}
@@ -69,21 +115,33 @@
     );
   }
 
+  // Entête de colonnes de la liste Acknowledge (grille alignée avec les lignes AckPost).
+  const AckHead = () => {
+    const t = window.t;
+    return (
+      <div className="acktab-hd">
+        <span></span>
+        <span>{t('kpi.colTitle')}</span>
+        <span>{t('kpi.colAuthor')}</span>
+        <span>{t('kpi.colResponder')}</span>
+        <span>{t('kpi.colTime')}</span>
+      </div>
+    );
+  };
+
   // Une ligne de post « concerné » (popup Acknowledge Time) : pastille de verdict + titre (lien Canny) +
-  // auteur + répondeur/délai. Vert = réponse ≤ SLA, rouge = hors délai, neutre = aucune réponse éligible.
+  // auteur (celui qui écrit) + répondeur (celui qui répond) + temps. Vert = ≤ SLA, rouge = hors délai,
+  // neutre = aucune réponse éligible. Colonnes alignées via grille (mêmes que AckHead).
   function AckPost({ r }) {
     const t = window.t;
     const col = r.answered ? (r.within ? 'var(--color-good)' : 'var(--color-bad)') : 'var(--color-neutral)';
     return (
-      <div className="ackp-row">
-        <span className="ackp-dot" style={{ background: col }}></span>
-        <a className="ackp-title" href={r.url} target="_blank" rel="noreferrer">{r.title}</a>
-        <span className="ackp-author">{r.author}</span>
-        <span className="ackp-resp">
-          {r.answered
-            ? <span>{r.responder} · <b style={{ color: col }}>{r.delay}h</b></span>
-            : <span className="ackp-none">{t('kpi.ackNoResp')}</span>}
-        </span>
+      <div className="acktab-row">
+        <span className="acktab-dot" style={{ background: col }}></span>
+        <a className="acktab-title" href={r.url} target="_blank" rel="noreferrer">{r.title}</a>
+        <span className="acktab-author">{r.author}</span>
+        <span className={'acktab-resp' + (r.answered ? '' : ' ackp-none')}>{r.answered ? r.responder : t('kpi.ackNoResp')}</span>
+        <span className="acktab-time">{r.answered ? <b style={{ color: col }}>{r.delay}h</b> : '—'}</span>
       </div>
     );
   }
@@ -96,15 +154,15 @@
     const typeLbl = (d.labels || []).find((l) => /^type::/i.test(l));
     const short = typeLbl ? typeLbl.replace(/^type::\s*/i, '') : null;
     const href = base ? base + d.iid : null;
-    const title = '#' + d.iid + ' ' + (d.title || '');
     return (
       <div className="ackp-row">
-        <span className={'st-badge ' + (closed ? 'st-closed' : 'st-open')}><span className="sd"></span>{closed ? t('common.closedF') : t('common.openF')}</span>
         {href
-          ? <a className="ackp-title" href={href} target="_blank" rel="noreferrer">{title}</a>
-          : <span className="ackp-title">{title}</span>}
-        {short && <span className="ackp-author">{short}</span>}
-        <span className="ackp-resp">{rowMeta ? rowMeta(d) : null}</span>
+          ? <a className="rm-iid" href={href} target="_blank" rel="noreferrer">#{d.iid}</a>
+          : <span className="rm-iid">#{d.iid}</span>}
+        <span className="rm-issue-t">{d.title || ''}</span>
+        {short && <span className="il-type">{short}</span>}
+        {rowMeta && <span className="il-metric">{rowMeta(d)}</span>}
+        <span className={'st-badge ' + (closed ? 'st-closed' : 'st-open')}><span className="sd"></span>{closed ? t('common.closedF') : t('common.openF')}</span>
       </div>
     );
   }
@@ -135,9 +193,9 @@
       const col = has ? barColor : 'var(--color-neutral)';
       const list = issues || [];
       const clickable = list.length > 0;
-      cards.push(<K key={key} icon={icon} iconColor={col} title={title} info={info}
+      cards.push({ key, el: <K key={key} icon={icon} iconColor={col} title={title} info={info} tags={tagsFor(key)}
         value={has ? pct + ' %' : '—'} display="bar" ratio={has ? (pct || 0) / 100 : 0} barColor={col} footer={footer}
-        popup={clickable ? true : null} onOpen={clickable ? () => setIssModal({ title, issues: list, rowMeta }) : undefined} />);
+        popup={clickable ? true : null} onOpen={clickable ? () => setIssModal({ title, issues: list, rowMeta }) : undefined} /> });
     }
 
     // 1. Roadmap Adherence — sujets roadmap « [N] » corrélés à GitLab. Adhérent = statut Canny « complete »
@@ -152,19 +210,23 @@
     const normRm = (s) => String(s).toLowerCase().replace(/roadmap/g, '').replace(/[^a-z0-9]/g, '');
     const selMsNorm = activeMs.map(normMs).filter(Boolean);
     const rmInScope = (tp) => !selMsNorm.length || (tp.roadmaps || []).map(normRm).some((r) => selMsNorm.indexOf(r) >= 0);
-    const rmTopics = rmAllTopics.filter(rmInScope);
+    // Date du post Canny (via window.__CANNY__.posts, par postId) → tri du plus RÉCENT au plus vieux.
+    // Les dates ISO se comparent lexicographiquement ; pas besoin de re-résoudre côté serveur.
+    const rmCreated = {}; ((CANNY && CANNY.posts) || []).forEach((p) => { rmCreated[p.id] = p.created || ''; });
+    const rmTopics = rmAllTopics.filter(rmInScope).slice()
+      .sort((a, b) => String(rmCreated[b.postId] || '').localeCompare(String(rmCreated[a.postId] || '')));
     const rmDataExists = rmAllTopics.length > 0;   // des sujets existent (extraction Canny faite) vs filtre sans correspondance
     const rmTotal = rmTopics.length;
     const rmAdh = rmTopics.filter((x) => x.adherent).length;
     const rmPct = rmTotal ? Math.round(rmAdh / rmTotal * 100) : 0;
     const rmHas = rmTotal > 0;
     const rmCol = rmHas ? colorUp(rmPct) : 'var(--color-neutral)';
-    cards.push(
-      <K key="roadmap" icon="circle-check" iconColor={rmCol} title={t('kpi.roadmapTitle')} info={t('kpi.roadmapInfo')}
+    cards.push({ key: 'roadmap', el: (
+      <K key="roadmap" icon="circle-check" iconColor={rmCol} title={t('kpi.roadmapTitle')} info={t('kpi.roadmapInfo')} tags={tagsFor('roadmap')}
         value={rmHas ? rmPct + ' %' : '—'} display="bar" ratio={rmHas ? rmPct / 100 : 0} barColor={rmCol}
         footer={<span><b>{rmAdh}</b> {t('kpi.adherent')} · <b>{rmTotal}</b> {t('kpi.topics')}</span>}
         popup onOpen={() => setRmOpen(true)} />
-    );
+    ) });
 
     // 2. Acknowledge Time — part des demandes Canny répondues en ≤ SLA (heures ouvrées). Recalcul CLIENT
     //    filtré par deux listes configurables (Options → admin) : on ne compte QUE les posts d'auteurs
@@ -201,24 +263,24 @@
       ackGroups = groupAckByBoard(ackRows); // récap + sections par type de poste (board Canny)
       const pct = ackAnswered ? Math.round(ackWithin / ackAnswered * 100) : 0;
       const col = ackAnswered ? colorUp(pct) : 'var(--color-neutral)';
-      cards.push(
-        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+      cards.push({ key: 'ack', el: (
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')} tags={tagsFor('ack')}
           value={ackAnswered ? pct + ' %' : '—'} display="bar" ratio={ackAnswered ? pct / 100 : 0} barColor={col}
           footer={F(ackWithin, '≤' + ackSlaH + 'h', ackAnswered, t('kpi.answered'))}
           popup onOpen={() => setAckOpen(true)} />
-      );
+      ) });
     } else if (agg.sla) {
       // Repli : dataset extrait AVANT l'ajout des ackEvents (pas de liste par post ni de recalcul filtré).
       // Agrégat serveur historique (non filtré). Cliquable → invite à ré-extraire Canny.
       const answered = (agg.sla.compliant || 0) + (agg.sla.breached || 0);
       const pct = answered ? Math.round((agg.sla.within4h || 0) / answered * 100) : 0;
       const col = answered ? colorUp(pct) : 'var(--color-neutral)';
-      cards.push(
-        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')}
+      cards.push({ key: 'ack', el: (
+        <K key="ack" icon="clock" iconColor={col} title={t('kpi.ackTitle')} info={t('kpi.ackInfo')} tags={tagsFor('ack')}
           value={answered ? pct + ' %' : '—'} display="bar" ratio={answered ? pct / 100 : 0} barColor={col}
           footer={F(agg.sla.within4h || 0, '≤4h', answered, t('kpi.answered'))}
           popup onOpen={() => setAckOpen(true)} />
-      );
+      ) });
     }
 
     // 3. Unplanned Work — part des issues « Unplanned » (cible < 15%, plus bas mieux).
@@ -268,12 +330,17 @@
       card('saydo', 'gauge', t('kpi.saydoTitle'), sdPct, tot > 0, colorUp(sdPct), F(val, t('kpi.delivered'), tot, t('kpi.planned')), t('kpi.saydoInfo'));
     }
 
+    // Page dédiée « Indicateurs » : grille à plat, sans en-têtes de section (la source reste lisible via
+    // les badges de chaque cartouche). Ordre : Produit (Canny/roadmap) puis Ingénierie (GitLab).
+    const ordered = cards.filter((c) => (KPI_META[c.key] || {}).grp === 'produit')
+      .concat(cards.filter((c) => (KPI_META[c.key] || {}).grp !== 'produit'));
+
     return (
       <div className="kpi-root" style={{ padding: 'var(--space-5, 20px)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4, 12px)', maxWidth: 1180 }}>
-          {cards}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--space-4, 12px)' }}>
+          {ordered.map((c) => c.el)}
         </div>
-        {!CANNY && <p style={{ marginTop: 16, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
+        {!CANNY && <p style={{ marginTop: 12, color: 'var(--color-ink-3, #888)', fontSize: 'var(--text-caption, 12px)' }}>{t('kpi.noCanny')}</p>}
 
         {rmOpen && (
           <window.Modal title={t('kpi.roadmapTitle')}
@@ -309,6 +376,7 @@
                     );
                   })}
                 </div>
+                <AckHead />
                 {ackGroups.map((g) => (
                   <div className="ackg" key={g.board}>
                     <div className="ackg-hd">
@@ -316,7 +384,7 @@
                       <span className="ackg-stat">{g.within} / {g.answered} ≤{ackSlaH}h{g.answered ? ' · ' + Math.round(g.within / g.answered * 100) + ' %' : ''}</span>
                       <span className="ackg-count">{g.rows.length}</span>
                     </div>
-                    <div className="ackp-list">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
+                    <div className="acktab">{g.rows.map((r) => <AckPost key={r.id} r={r} slaH={ackSlaH} />)}</div>
                   </div>
                 ))}
               </React.Fragment>

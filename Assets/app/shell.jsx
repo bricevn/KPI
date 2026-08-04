@@ -1,6 +1,7 @@
 // Shell — sidebar nav, header, global filters, tab routing, theme toggle.
 (function () {
   const { useState, useEffect } = React;
+  // « indicateurs » : page dédiée (cartouches KPI), première de la nav, avant le Dashboard.
   const NAV_IDS = ['indicateurs', 'dashboard', 'charts', 'anomalies', 'issues', 'calendar', 'velocity', 'comparison'];
 
   function Stub({ name }) {return <div className="empty">Onglet « {name} » — à venir</div>;}
